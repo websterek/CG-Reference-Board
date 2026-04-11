@@ -1,0 +1,1264 @@
+<Window
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:CGReferenceBoard.Controls"
+    xmlns:vm="clr-namespace:CGReferenceBoard.ViewModels"
+    x:Class="CGReferenceBoard.Views.MainWindow"
+    Title="CG Reference Board"
+    x:CompileBindings="False"
+    Icon="avares://CGReferenceBoard/Images/icon.ico"
+    Background="#121212"
+    Width="1200"
+    Height="800"
+    WindowDecorations="None"
+    KeyDown="Window_KeyDown"
+    DragDrop.AllowDrop="True"
+>
+    <Window.Styles>
+        <!-- Menu items compact sizing -->
+        <Style Selector="MenuItem">
+            <Setter Property="Padding" Value="4,2" />
+            <Setter Property="MinHeight" Value="24" />
+        </Style>
+
+        <!-- Cell hover effects with smooth transition -->
+        <Style Selector="Border.CellRoot">
+            <Setter Property="BorderBrush" Value="#1AFFFFFF" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="ClipToBounds" Value="True" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition
+                        Property="BorderBrush"
+                        Duration="0:0:0.15"
+                    />
+                    <BrushTransition
+                        Property="Background"
+                        Duration="0:0:0.15"
+                    />
+                    <BoxShadowsTransition
+                        Property="BoxShadow"
+                        Duration="0:0:0.2"
+                    />
+                </Transitions>
+            </Setter>
+            <Setter Property="BoxShadow" Value="0 2 8 0 #18000000" />
+        </Style>
+        <Style Selector="Border.CellRoot:pointerover">
+            <Setter Property="BorderBrush" Value="#44AAFF" />
+            <Setter Property="Background" Value="#1144AAFF" />
+            <Setter Property="BoxShadow" Value="0 4 16 0 #3044AAFF" />
+        </Style>
+
+        <!-- Resize thumb visibility on hover with transition -->
+        <Style Selector="Border.CellRoot Border#ResizeThumb">
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.15" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.CellRoot:pointerover Border#ResizeThumb">
+            <Setter Property="Opacity" Value="0.7" />
+        </Style>
+
+        <!-- Window control button styles -->
+        <Style Selector="Button.windowBtn">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.1" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.windowBtn:pointerover">
+            <Setter Property="Background" Value="#33FFFFFF" />
+        </Style>
+        <Style Selector="Button.windowBtnClose">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.1" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.windowBtnClose:pointerover">
+            <Setter Property="Background" Value="#E81123" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+
+        <!-- Context menu modern styling -->
+        <Style Selector="ContextMenu">
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="4" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="#3AFFFFFF" />
+            <Setter Property="Background" Value="#E6222222" />
+        </Style>
+        <Style Selector="ContextMenu MenuItem">
+            <Setter Property="CornerRadius" Value="4" />
+        </Style>
+
+        <!-- Download indicator pulsing animation -->
+        <Style Selector="Ellipse.PulsingDot">
+            <Style.Animations>
+                <Animation
+                    Duration="0:0:1"
+                    IterationCount="Infinite"
+                    PlaybackDirection="Alternate"
+                >
+                    <KeyFrame Cue="0%">
+                        <Setter Property="Opacity" Value="0.2" />
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="Opacity" Value="1.0" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+
+        <!-- Status bar text styling -->
+        <Style Selector="TextBlock.statusText">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="#888888" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.statusDivider">
+            <Setter Property="Width" Value="1" />
+            <Setter Property="Background" Value="#333333" />
+            <Setter Property="Margin" Value="8,4" />
+        </Style>
+    </Window.Styles>
+
+    <Grid>
+        <Grid RowDefinitions="Auto, *, Auto">
+
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <!-- Top Menu Bar                                               -->
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <Border
+                Grid.Row="0"
+                Background="#1A1A1A"
+                BorderBrush="#2A2A2A"
+                BorderThickness="0,0,0,1"
+                Padding="6,0,0,0"
+                DoubleTapped="TopBar_DoubleTapped"
+                PointerPressed="TopBar_PointerPressed"
+                BackgroundSizing="InnerBorderEdge"
+            >
+                <Grid ColumnDefinitions="Auto, *, Auto">
+                    <Menu
+                        Grid.Column="0"
+                        Background="Transparent"
+                        VerticalAlignment="Center"
+                        Margin="4,0,0,0"
+                    >
+                        <!-- File Menu -->
+                        <MenuItem Header="_File">
+                            <MenuItem
+                                Header="New"
+                                Click="NewBoard_Click"
+                                InputGesture="Ctrl+N"
+                            />
+                            <MenuItem
+                                Header="Open"
+                                Click="LoadBoard_Click"
+                                InputGesture="Ctrl+O"
+                            />
+                            <MenuItem
+                                Header="Save"
+                                Click="SaveBoard_Click"
+                                InputGesture="Ctrl+S"
+                            />
+                            <Separator />
+                            <MenuItem Header="Exit" Click="Exit_Click" />
+                        </MenuItem>
+
+                        <!-- Edit Menu -->
+                        <MenuItem Header="_Edit">
+                            <MenuItem
+                                Header="Import Media..."
+                                Click="ImportMedia_Click"
+                                InputGesture="Ctrl+I"
+                            />
+                            <MenuItem
+                                Header="Open Board Dir"
+                                Click="BoardDir_Click"
+                            />
+                            <Separator />
+                            <MenuItem
+                                Header="Undo"
+                                Click="Undo_Click"
+                                InputGesture="Ctrl+Z"
+                            />
+                            <MenuItem
+                                Header="Redo"
+                                Click="Redo_Click"
+                                InputGesture="Ctrl+Shift+Z"
+                            />
+                        </MenuItem>
+
+                        <!-- Board Menu (dynamic list of .cgrb files in directory) -->
+                        <MenuItem
+                            Header="_Board"
+                            ItemsSource="{Binding BoardFilesInDirectory}"
+                            Click="BoardMenuItem_Click"
+                        >
+                            <MenuItem.Styles>
+                                <Style Selector="MenuItem > MenuItem">
+                                    <Setter
+                                        Property="ToggleType"
+                                        Value="Radio"
+                                    />
+                                    <Setter
+                                        Property="IsChecked"
+                                        Value="{Binding IsActive}"
+                                    />
+                                </Style>
+                            </MenuItem.Styles>
+                            <MenuItem.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding FileName}" />
+                                </DataTemplate>
+                            </MenuItem.ItemTemplate>
+                        </MenuItem>
+
+                        <!-- Mode Menu -->
+                        <MenuItem Header="_Mode">
+                            <MenuItem
+                                Click="GridMode_Click"
+                                ToggleType="Radio"
+                                IsChecked="{Binding !IsDrawMode}"
+                            >
+                                <MenuItem.Header>
+                                    <Grid ColumnDefinitions="*, Auto">
+                                        <TextBlock
+                                            Grid.Column="0"
+                                            Text="Grid"
+                                        />
+                                        <TextBlock
+                                            Grid.Column="1"
+                                            Text="Ctrl+1"
+                                            Foreground="#888888"
+                                            Margin="24,0,0,0"
+                                        />
+                                    </Grid>
+                                </MenuItem.Header>
+                            </MenuItem>
+                            <MenuItem
+                                Click="AnnotationMode_Click"
+                                ToggleType="Radio"
+                                IsChecked="{Binding IsDrawMode}"
+                            >
+                                <MenuItem.Header>
+                                    <Grid ColumnDefinitions="*, Auto">
+                                        <TextBlock
+                                            Grid.Column="0"
+                                            Text="Annotation"
+                                        />
+                                        <TextBlock
+                                            Grid.Column="1"
+                                            Text="Ctrl+2"
+                                            Foreground="#888888"
+                                            Margin="24,0,0,0"
+                                        />
+                                    </Grid>
+                                </MenuItem.Header>
+                            </MenuItem>
+                        </MenuItem>
+
+                        <!-- View Menu -->
+                        <MenuItem Header="_View">
+                            <MenuItem
+                                Header="Annotation Show"
+                                ToggleType="CheckBox"
+                                IsChecked="{Binding IsAnnotationsVisible, Mode=TwoWay}"
+                            />
+                            <Separator />
+                            <MenuItem
+                                Header="Center"
+                                Click="CenterView_Click"
+                                InputGesture="Home"
+                            />
+                            <MenuItem
+                                Header="Show All"
+                                Click="ShowAll_Click"
+                                InputGesture="F"
+                            />
+                            <Separator />
+                            <MenuItem
+                                Header="Always on Top"
+                                ToggleType="CheckBox"
+                                IsChecked="{Binding IsAlwaysOnTop, Mode=TwoWay}"
+                                InputGesture="Ctrl+Shift+T"
+                            />
+                        </MenuItem>
+                    </Menu>
+
+                    <!-- Window Title -->
+                    <TextBlock
+                        Grid.Column="1"
+                        Text="{Binding WindowTitle}"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Foreground="#AAAAAA"
+                        FontWeight="SemiBold"
+                        IsHitTestVisible="False"
+                    />
+
+                    <!-- Window Control Buttons -->
+                    <StackPanel
+                        Grid.Column="2"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Top"
+                    >
+                        <Button
+                            Width="46"
+                            Height="32"
+                            Background="Transparent"
+                            Foreground="#999999"
+                            BorderThickness="0"
+                            CornerRadius="0"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"
+                            Click="MinimizeWindow_Click"
+                            Classes="windowBtn"
+                        >
+                            <PathIcon
+                                Data="M20,14H4V10H20"
+                                Width="12"
+                                Height="12"
+                            />
+                        </Button>
+                        <Button
+                            Width="46"
+                            Height="32"
+                            Background="Transparent"
+                            Foreground="#999999"
+                            BorderThickness="0"
+                            CornerRadius="0"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"
+                            Click="MaximizeWindow_Click"
+                            Classes="windowBtn"
+                        >
+                            <PathIcon
+                                Data="M4,4H20V20H4V4M6,8V18H18V8H6Z"
+                                Width="12"
+                                Height="12"
+                            />
+                        </Button>
+                        <Button
+                            Width="46"
+                            Height="32"
+                            Background="Transparent"
+                            Foreground="#999999"
+                            BorderThickness="0"
+                            CornerRadius="0"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"
+                            Click="CloseWindow_Click"
+                            Classes="windowBtnClose"
+                        >
+                            <PathIcon
+                                Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
+                                Width="12"
+                                Height="12"
+                            />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <!-- Infinite Canvas Area                                       -->
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <Border
+                Grid.Row="1"
+                Background="Transparent"
+                ClipToBounds="True"
+                PointerPressed="Canvas_PointerPressed"
+                PointerMoved="Canvas_PointerMoved"
+                PointerReleased="Canvas_PointerReleased"
+                PointerWheelChanged="Canvas_PointerWheelChanged"
+                PointerExited="CanvasBorder_PointerExited"
+                DragDrop.AllowDrop="True"
+            >
+                <Grid Background="Transparent">
+                    <Canvas
+                        x:Name="MainCanvas"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Stretch"
+                        RenderTransformOrigin="0,0"
+                    >
+                        <!-- Grid Background Pattern + Context Menu -->
+                        <Border
+                            Width="1000000"
+                            Height="1000000"
+                            Canvas.Left="-500000"
+                            Canvas.Top="-500000"
+                        >
+                            <Border.ContextMenu>
+                                <ContextMenu>
+                                    <!-- Grid Mode Context Items -->
+                                    <MenuItem
+                                        Header="Add Text"
+                                        Click="AddText_Click"
+                                        IsVisible="{Binding !IsDrawMode}"
+                                    />
+                                    <MenuItem
+                                        Header="Add Label"
+                                        Click="AddLabel_Click"
+                                        IsVisible="{Binding !IsDrawMode}"
+                                    />
+                                    <MenuItem
+                                        Header="Add Backdrop"
+                                        Click="AddBackdrop_Click"
+                                        IsVisible="{Binding !IsDrawMode}"
+                                    />
+
+                                    <!-- Annotation Mode: Tool Submenu -->
+                                    <MenuItem
+                                        Header="Tool"
+                                        IsVisible="{Binding IsDrawMode}"
+                                    >
+                                        <MenuItem
+                                            Header="Pencil"
+                                            Click="PencilMode_Click"
+                                        />
+                                        <MenuItem
+                                            Header="Text"
+                                            Click="TextMode_Click"
+                                        />
+                                        <MenuItem
+                                            Header="Arrow"
+                                            Click="ArrowMode_Click"
+                                        />
+                                        <MenuItem
+                                            Header="Square"
+                                            Click="SquareMode_Click"
+                                        />
+                                        <MenuItem
+                                            Header="Circle"
+                                            Click="CircleMode_Click"
+                                        />
+                                        <MenuItem
+                                            Header="Eraser"
+                                            Click="EraserMode_Click"
+                                        />
+                                        <MenuItem
+                                            Header="Move"
+                                            Click="MoveMode_Click"
+                                        />
+                                    </MenuItem>
+
+                                    <!-- Annotation Mode: Brush Size Submenu -->
+                                    <MenuItem
+                                        Header="Size"
+                                        IsVisible="{Binding IsDrawMode}"
+                                    >
+                                        <MenuItem>
+                                            <MenuItem.Header>
+                                                <ListBox
+                                                    SelectedItem="{Binding CurrentBrushThickness}"
+                                                    Background="Transparent"
+                                                    BorderThickness="0"
+                                                >
+                                                    <ListBox.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <StackPanel
+                                                                Orientation="Horizontal"
+                                                                Spacing="5"
+                                                            />
+                                                        </ItemsPanelTemplate>
+                                                    </ListBox.ItemsPanel>
+                                                    <x:Double>2</x:Double>
+                                                    <x:Double>4</x:Double>
+                                                    <x:Double>8</x:Double>
+                                                    <x:Double>16</x:Double>
+                                                </ListBox>
+                                            </MenuItem.Header>
+                                        </MenuItem>
+                                    </MenuItem>
+
+                                    <!-- Annotation Mode: Brush Color Submenu -->
+                                    <MenuItem
+                                        Header="Color"
+                                        IsVisible="{Binding IsDrawMode}"
+                                    >
+                                        <MenuItem>
+                                            <MenuItem.Header>
+                                                <ListBox
+                                                    SelectedItem="{Binding CurrentBrushColor}"
+                                                    Background="Transparent"
+                                                    BorderThickness="0"
+                                                >
+                                                    <ListBox.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <StackPanel
+                                                                Orientation="Horizontal"
+                                                                Spacing="5"
+                                                            />
+                                                        </ItemsPanelTemplate>
+                                                    </ListBox.ItemsPanel>
+                                                    <ListBox.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Rectangle
+                                                                Width="20"
+                                                                Height="20"
+                                                                Fill="{Binding}"
+                                                                RadiusX="4"
+                                                                RadiusY="4"
+                                                            />
+                                                        </DataTemplate>
+                                                    </ListBox.ItemTemplate>
+                                                    <x:String
+                                                    >#FFFF4444</x:String>
+                                                    <x:String
+                                                    >#FF44AAFF</x:String>
+                                                    <x:String
+                                                    >#FF66FF66</x:String>
+                                                    <x:String
+                                                    >#FFFFFF66</x:String>
+                                                    <x:String
+                                                    >#FFFFFFFF</x:String>
+                                                    <x:String
+                                                    >#FF000000</x:String>
+                                                </ListBox>
+                                            </MenuItem.Header>
+                                        </MenuItem>
+                                    </MenuItem>
+                                </ContextMenu>
+                            </Border.ContextMenu>
+
+                            <!-- Dot-grid pattern background -->
+                            <Border.Background>
+                                <VisualBrush
+                                    TileMode="Tile"
+                                    SourceRect="0,0,160,160"
+                                    DestinationRect="0,0,160,160"
+                                >
+                                    <VisualBrush.Visual>
+                                        <Canvas Width="160" Height="160">
+                                            <Ellipse
+                                                Width="3"
+                                                Height="3"
+                                                Fill="#2D2D2D"
+                                                Canvas.Left="78.5"
+                                                Canvas.Top="78.5"
+                                            />
+                                            <Ellipse
+                                                Width="1.5"
+                                                Height="1.5"
+                                                Fill="#222222"
+                                                Canvas.Left="79.25"
+                                                Canvas.Top="-0.25"
+                                            />
+                                            <Ellipse
+                                                Width="1.5"
+                                                Height="1.5"
+                                                Fill="#222222"
+                                                Canvas.Left="-0.25"
+                                                Canvas.Top="79.25"
+                                            />
+                                        </Canvas>
+                                    </VisualBrush.Visual>
+                                </VisualBrush>
+                            </Border.Background>
+                        </Border>
+
+                        <!-- ─────────────────────────────────────────── -->
+                        <!-- Annotations Layer                           -->
+                        <!-- ─────────────────────────────────────────── -->
+                        <ItemsControl
+                            ItemsSource="{Binding Annotations}"
+                            IsVisible="{Binding IsAnnotationsVisible}"
+                            ZIndex="100"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch"
+                            ClipToBounds="False"
+                            IsHitTestVisible="{Binding IsAnnotationsVisible}"
+                        >
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <Canvas
+                                        HorizontalAlignment="Stretch"
+                                        VerticalAlignment="Stretch"
+                                        ClipToBounds="False"
+                                        Background="Transparent"
+                                    />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemContainerTheme>
+                                <ControlTheme TargetType="ContentPresenter">
+                                    <Setter
+                                        Property="Canvas.Left"
+                                        Value="{ReflectionBinding CanvasX}"
+                                    />
+                                    <Setter
+                                        Property="Canvas.Top"
+                                        Value="{ReflectionBinding CanvasY}"
+                                    />
+                                </ControlTheme>
+                            </ItemsControl.ItemContainerTheme>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:AnnotationViewModel">
+                                    <local:AnnotationShape
+                                        Annotation="{Binding}"
+                                        PointerPressed="Annotation_PointerPressed"
+                                        Cursor="Hand"
+                                    />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Marquee Selection Rectangle (annotation move mode) -->
+                        <Border
+                            x:Name="SelectionMarquee"
+                            BorderBrush="#FF44AAFF"
+                            BorderThickness="1.5"
+                            Background="#2244AAFF"
+                            IsHitTestVisible="False"
+                            IsVisible="False"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            ZIndex="105"
+                        />
+
+                        <Border
+                            x:Name="CellSelectionMarquee"
+                            BorderBrush="#FF44AAFF"
+                            BorderThickness="2"
+                            Background="#1844AAFF"
+                            IsHitTestVisible="False"
+                            IsVisible="False"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            ZIndex="104"
+                        />
+
+                        <!-- Grid cell hover highlight -->
+                        <Border
+                            x:Name="HoverHighlight"
+                            Width="160"
+                            Height="160"
+                            BorderBrush="#88AAFF"
+                            BorderThickness="2.5"
+                            Background="#2288AAFF"
+                            IsHitTestVisible="False"
+                            IsVisible="False"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                        />
+
+                        <!-- ─────────────────────────────────────────── -->
+                        <!-- Board Cells Layer                           -->
+                        <!-- ─────────────────────────────────────────── -->
+                        <ItemsControl
+                            x:Name="CanvasGrid"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch"
+                            ClipToBounds="False"
+                            RenderTransformOrigin="0,0"
+                            IsHitTestVisible="{Binding !IsDrawMode}"
+                        >
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <Canvas
+                                        HorizontalAlignment="Stretch"
+                                        VerticalAlignment="Stretch"
+                                        ClipToBounds="False"
+                                        DragDrop.AllowDrop="True"
+                                        Background="Transparent"
+                                    />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+
+                            <ItemsControl.ItemContainerTheme>
+                                <ControlTheme
+                                    TargetType="ContentPresenter"
+                                    x:DataType="vm:CellViewModel"
+                                >
+                                    <Setter
+                                        Property="Canvas.Left"
+                                        Value="{Binding VisualX}"
+                                    />
+                                    <Setter
+                                        Property="Canvas.Top"
+                                        Value="{Binding VisualY}"
+                                    />
+                                    <Setter
+                                        Property="ZIndex"
+                                        Value="{Binding ZIndex}"
+                                    />
+                                </ControlTheme>
+                            </ItemsControl.ItemContainerTheme>
+
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:CellViewModel">
+                                    <Border
+                                        Classes="CellRoot"
+                                        Width="{Binding PixelWidth}"
+                                        Height="{Binding PixelHeight}"
+                                        BorderThickness="1.5"
+                                        Cursor="Hand"
+                                        PointerEntered="Cell_PointerEntered"
+                                        PointerExited="Cell_PointerExited"
+                                        PointerPressed="Cell_PointerPressed"
+                                        PointerMoved="Cell_PointerMoved"
+                                        PointerReleased="Cell_PointerReleased"
+                                        DragDrop.AllowDrop="True"
+                                    >
+                                        <!-- Cell Context Menu -->
+                                        <Border.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem
+                                                    Header="Toggle Image Fit"
+                                                    Click="ToggleImageFit_Click"
+                                                    IsVisible="{Binding IsImage}"
+                                                />
+                                                <Separator
+                                                    IsVisible="{Binding IsImage}"
+                                                    Background="#333"
+                                                />
+                                                <MenuItem
+                                                    Header="Copy Image"
+                                                    Click="CopyImage_Click"
+                                                    IsVisible="{Binding IsImage}"
+                                                />
+                                                <MenuItem
+                                                    Header="Copy Path"
+                                                    Click="CopyPath_Click"
+                                                    IsVisible="{Binding IsFile}"
+                                                />
+                                                <MenuItem
+                                                    Header="Copy Text"
+                                                    Click="CopyText_Click"
+                                                    IsVisible="{Binding HasTextContent}"
+                                                />
+                                                <MenuItem
+                                                    Header="Show in File Explorer"
+                                                    Click="ShowInExplorer_Click"
+                                                    IsVisible="{Binding IsFile}"
+                                                />
+                                                <MenuItem
+                                                    Header="Change Color"
+                                                    Click="ChangeColor_Click"
+                                                    IsVisible="{Binding IsBoardElement}"
+                                                />
+                                                <MenuItem
+                                                    Header="Increase Font Size"
+                                                    Click="IncreaseFontSize_Click"
+                                                    IsVisible="{Binding IsLabel}"
+                                                />
+                                                <MenuItem
+                                                    Header="Decrease Font Size"
+                                                    Click="DecreaseFontSize_Click"
+                                                    IsVisible="{Binding IsLabel}"
+                                                />
+                                                <Separator Background="#333" />
+                                                <MenuItem
+                                                    Header="Delete"
+                                                    Click="DeleteCell_Click"
+                                                    Foreground="#FF6666"
+                                                />
+                                            </ContextMenu>
+                                        </Border.ContextMenu>
+
+                                        <Grid Background="Transparent">
+                                            <!-- Selection highlight -->
+                                            <Border
+                                                BorderBrush="#FF44AAFF"
+                                                BorderThickness="2.5"
+                                                Background="#2244AAFF"
+                                                CornerRadius="6"
+                                                IsVisible="{Binding IsSelected}"
+                                                IsHitTestVisible="False"
+                                                ZIndex="8"
+                                            />
+
+                                            <!-- Image Content -->
+                                            <Border
+                                                IsVisible="{Binding IsImage}"
+                                                Background="#80000000"
+                                            >
+                                                <Image
+                                                    Source="{Binding Image}"
+                                                    Stretch="{Binding ImageStretch}"
+                                                    DoubleTapped="CanvasImage_DoubleTapped"
+                                                />
+                                            </Border>
+
+                                            <!-- Video Thumbnail -->
+                                            <Image
+                                                Source="{Binding Image}"
+                                                Stretch="UniformToFill"
+                                                IsVisible="{Binding IsVideo}"
+                                                DoubleTapped="CanvasImage_DoubleTapped"
+                                            />
+
+                                            <!-- Text Content -->
+                                            <Border
+                                                Background="#2A2A2A"
+                                                IsVisible="{Binding IsText}"
+                                                Padding="10"
+                                                DoubleTapped="CanvasText_DoubleTapped"
+                                            >
+                                                <TextBlock
+                                                    local:TextBlockLinkify.Text="{Binding TextContent}"
+                                                    TextWrapping="Wrap"
+                                                    Background="Transparent"
+                                                    Foreground="White"
+                                                />
+                                            </Border>
+
+                                            <!-- Label Content -->
+                                            <Border
+                                                Background="Transparent"
+                                                IsVisible="{Binding IsLabel}"
+                                                Padding="10"
+                                                DoubleTapped="CanvasText_DoubleTapped"
+                                                ZIndex="5"
+                                            >
+                                                <TextBlock
+                                                    local:TextBlockLinkify.Text="{Binding TextContent}"
+                                                    TextWrapping="Wrap"
+                                                    Background="Transparent"
+                                                    Foreground="{Binding ForegroundColor}"
+                                                    FontSize="{Binding FontSize}"
+                                                    FontWeight="Bold"
+                                                    TextAlignment="Center"
+                                                    VerticalAlignment="Center"
+                                                />
+                                            </Border>
+
+                                            <!-- Backdrop Content -->
+                                            <Border
+                                                Background="{Binding BackgroundColor}"
+                                                IsVisible="{Binding IsBackdrop}"
+                                                Padding="20"
+                                                DoubleTapped="CanvasText_DoubleTapped"
+                                                CornerRadius="6"
+                                            >
+                                                <TextBlock
+                                                    local:TextBlockLinkify.Text="{Binding TextContent}"
+                                                    TextWrapping="Wrap"
+                                                    Background="Transparent"
+                                                    Foreground="{Binding ForegroundColor}"
+                                                    FontSize="36"
+                                                    FontWeight="Bold"
+                                                    VerticalAlignment="Top"
+                                                    HorizontalAlignment="Left"
+                                                />
+                                            </Border>
+
+                                            <!-- Download Progress Indicator -->
+                                            <Border
+                                                Background="#1A1A1A"
+                                                IsVisible="{Binding IsDownloading}"
+                                            >
+                                                <StackPanel
+                                                    VerticalAlignment="Center"
+                                                    HorizontalAlignment="Center"
+                                                    Orientation="Horizontal"
+                                                    Spacing="10"
+                                                >
+                                                    <Ellipse
+                                                        Classes="PulsingDot"
+                                                        Width="10"
+                                                        Height="10"
+                                                        Fill="#44AAFF"
+                                                    />
+                                                    <TextBlock
+                                                        Text="Downloading..."
+                                                        Foreground="#DDDDDD"
+                                                        FontSize="14"
+                                                        FontWeight="SemiBold"
+                                                    />
+                                                </StackPanel>
+                                            </Border>
+
+                                            <!-- Type Icon Badge (top-right corner) -->
+                                            <Border
+                                                Background="#99000000"
+                                                CornerRadius="4"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Top"
+                                                Margin="5"
+                                                Padding="4,2"
+                                                IsVisible="{Binding ShowIcon}"
+                                            >
+                                                <PathIcon
+                                                    Data="{Binding TypeIcon}"
+                                                    Width="16"
+                                                    Height="16"
+                                                    Foreground="White"
+                                                />
+                                            </Border>
+
+                                            <!-- Resize Thumb (edit mode only) -->
+                                            <Panel
+                                                IsVisible="{Binding !IsViewMode, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                ZIndex="10"
+                                            >
+                                                <Border
+                                                    x:Name="ResizeThumb"
+                                                    Background="#AA000000"
+                                                    BorderBrush="#88AAFF"
+                                                    BorderThickness="2"
+                                                    Width="16"
+                                                    Height="16"
+                                                    CornerRadius="8"
+                                                    HorizontalAlignment="Right"
+                                                    VerticalAlignment="Bottom"
+                                                    Margin="4"
+                                                    Cursor="BottomRightCorner"
+                                                    ZIndex="10"
+                                                    PointerPressed="ResizeThumb_PointerPressed"
+                                                    PointerMoved="ResizeThumb_PointerMoved"
+                                                    PointerReleased="ResizeThumb_PointerReleased"
+                                                    IsVisible="{Binding HasContent}"
+                                                />
+                                            </Panel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Annotation Text Editor (inline) -->
+                        <TextBox
+                            x:Name="AnnotationTextEditor"
+                            IsVisible="False"
+                            AcceptsReturn="True"
+                            TextWrapping="Wrap"
+                            Background="#333"
+                            Foreground="White"
+                            BorderBrush="#FF44AAFF"
+                            BorderThickness="1"
+                            Padding="4"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            ZIndex="200"
+                        />
+                    </Canvas>
+                </Grid>
+            </Border>
+
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <!-- Fullscreen Media Overlay                                   -->
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <Border
+                Grid.RowSpan="2"
+                x:Name="FullMediaOverlay"
+                Background="#F0101010"
+                IsVisible="False"
+                PointerPressed="Overlay_PointerPressed"
+            >
+                <Grid>
+                    <Image x:Name="FullImage" Stretch="Uniform" Margin="60" />
+
+                    <TextBox
+                        x:Name="FullText"
+                        Margin="60"
+                        AcceptsReturn="True"
+                        TextWrapping="Wrap"
+                        Background="#222"
+                        BorderThickness="1"
+                        BorderBrush="#555"
+                        Foreground="White"
+                        FontSize="24"
+                        IsVisible="False"
+                        TextChanged="FullText_TextChanged"
+                    />
+
+                    <Button
+                        FontSize="14"
+                        FontWeight="SemiBold"
+                        Background="#33FFFFFF"
+                        Foreground="White"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Margin="20"
+                        Padding="14,8"
+                        CornerRadius="6"
+                        BorderThickness="0"
+                        Click="CloseFullMedia_Click"
+                    >
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <PathIcon
+                                Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
+                                Width="12"
+                                Height="12"
+                                Foreground="White"
+                            />
+                            <TextBlock
+                                Text="Close"
+                                VerticalAlignment="Center"
+                            />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <!-- Startup Overlay                                            -->
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <Border
+                Grid.RowSpan="2"
+                x:Name="StartupOverlay"
+                Background="#EE121212"
+                IsVisible="True"
+            >
+                <StackPanel
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="12"
+                    MaxWidth="480"
+                >
+                    <!-- Logo -->
+                    <Image
+                        Source="avares://CGReferenceBoard/Images/logo.png"
+                        Width="64"
+                        Height="64"
+                        HorizontalAlignment="Center"
+                        Margin="0,0,0,8"
+                    />
+
+                    <!-- Title -->
+                    <TextBlock
+                        Text="CG Reference Board"
+                        FontSize="32"
+                        FontWeight="Bold"
+                        Foreground="White"
+                        HorizontalAlignment="Center"
+                        LetterSpacing="0.5"
+                    />
+
+                    <!-- Accent line -->
+                    <Border
+                        Height="2"
+                        Width="60"
+                        Background="#44AAFF"
+                        CornerRadius="1"
+                        HorizontalAlignment="Center"
+                        Margin="0,4,0,4"
+                    />
+
+                    <!-- Subtitle -->
+                    <TextBlock
+                        Text="Open or create a board to get started"
+                        FontSize="14"
+                        Foreground="#888"
+                        HorizontalAlignment="Center"
+                        Margin="0,0,0,24"
+                    />
+
+                    <!-- Action buttons -->
+                    <StackPanel
+                        Orientation="Horizontal"
+                        Spacing="16"
+                        HorizontalAlignment="Center"
+                    >
+                        <Button
+                            Content="Open Board..."
+                            FontSize="14"
+                            FontWeight="SemiBold"
+                            Padding="24,12"
+                            Click="LoadBoard_Click"
+                            Background="#2A2A2A"
+                            Foreground="#CCCCCC"
+                            BorderBrush="#444"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                        />
+                        <Button
+                            Content="New Board"
+                            FontSize="14"
+                            FontWeight="SemiBold"
+                            Padding="24,12"
+                            Click="SaveBoard_Click"
+                            Background="#44AAFF"
+                            Foreground="White"
+                            BorderThickness="0"
+                            CornerRadius="6"
+                        />
+                    </StackPanel>
+
+                    <!-- Recent boards -->
+                    <TextBlock
+                        Text="Recent"
+                        FontSize="12"
+                        FontWeight="SemiBold"
+                        Foreground="#666"
+                        HorizontalAlignment="Center"
+                        Margin="0,32,0,4"
+                        IsVisible="{Binding HasRecentBoards}"
+                        LetterSpacing="1.5"
+                    />
+                    <ItemsControl
+                        x:Name="RecentBoardsList"
+                        HorizontalAlignment="Center"
+                    >
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button
+                                    Content="{Binding}"
+                                    Background="Transparent"
+                                    Foreground="#44AAFF"
+                                    FontSize="13"
+                                    Padding="8,4"
+                                    Click="RecentBoard_Click"
+                                    HorizontalAlignment="Center"
+                                    Cursor="Hand"
+                                    BorderThickness="0"
+                                />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <!-- Status Bar                                                 -->
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <Border
+                Grid.Row="2"
+                Background="#1A1A1A"
+                BorderBrush="#2A2A2A"
+                BorderThickness="0,1,0,0"
+                Padding="12,3"
+                Height="26"
+            >
+                <Grid ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto, Auto">
+                    <!-- Mode indicator -->
+                    <StackPanel
+                        Grid.Column="0"
+                        Orientation="Horizontal"
+                        Spacing="6"
+                        VerticalAlignment="Center"
+                    >
+                        <Ellipse
+                            Width="7"
+                            Height="7"
+                            Fill="#44AAFF"
+                            VerticalAlignment="Center"
+                        />
+                        <TextBlock
+                            Text="{Binding CurrentModeText}"
+                            Classes="statusText"
+                            FontWeight="SemiBold"
+                        />
+                    </StackPanel>
+
+                    <Border Grid.Column="1" Classes="statusDivider" />
+
+                    <!-- Board name -->
+                    <TextBlock
+                        Grid.Column="2"
+                        Text="{Binding CurrentBoardName}"
+                        Classes="statusText"
+                    />
+
+                    <!-- Spacer -->
+
+                    <!-- Selection count -->
+                    <TextBlock
+                        Grid.Column="4"
+                        Text="{Binding SelectionCountText}"
+                        Classes="statusText"
+                        Foreground="#44AAFF"
+                    />
+
+                    <Border Grid.Column="5" Classes="statusDivider" />
+
+                    <!-- Zoom level -->
+                    <TextBlock
+                        Grid.Column="6"
+                        Text="{Binding ZoomLevelText}"
+                        Classes="statusText"
+                        FontWeight="SemiBold"
+                        MinWidth="40"
+                        TextAlignment="Right"
+                    />
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <!-- Window Resize Grips (custom chrome, SystemDecorations=None)-->
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <Border
+            Width="6"
+            Height="6"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Top"
+            Cursor="TopLeftCorner"
+            PointerPressed="TopLeft_PointerPressed"
+            Background="Transparent"
+        />
+        <Border
+            Height="6"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Top"
+            Margin="6,0"
+            Cursor="TopSide"
+            PointerPressed="Top_PointerPressed"
+            Background="Transparent"
+        />
+        <Border
+            Width="6"
+            Height="6"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Top"
+            Cursor="TopRightCorner"
+            PointerPressed="TopRight_PointerPressed"
+            Background="Transparent"
+        />
+        <Border
+            Width="6"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Stretch"
+            Margin="0,6"
+            Cursor="RightSide"
+            PointerPressed="Right_PointerPressed"
+            Background="Transparent"
+        />
+        <Border
+            Width="6"
+            Height="6"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Bottom"
+            Cursor="BottomRightCorner"
+            PointerPressed="BottomRight_PointerPressed"
+            Background="Transparent"
+        />
+        <Border
+            Height="6"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Bottom"
+            Margin="6,0"
+            Cursor="BottomSide"
+            PointerPressed="Bottom_PointerPressed"
+            Background="Transparent"
+        />
+        <Border
+            Width="6"
+            Height="6"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Bottom"
+            Cursor="BottomLeftCorner"
+            PointerPressed="BottomLeft_PointerPressed"
+            Background="Transparent"
+        />
+        <Border
+            Width="6"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Stretch"
+            Margin="0,6"
+            Cursor="LeftSide"
+            PointerPressed="Left_PointerPressed"
+            Background="Transparent"
+        />
+    </Grid>
+</Window>
