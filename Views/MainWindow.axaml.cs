@@ -1286,11 +1286,19 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         double bottom = y + rows * Constants.GridSize;
 
         return GridCells.Any(c =>
-            c != exclude && c.HasContent && c.CollisionLayer == layer
-            && c.CanvasX < right
-            && c.CanvasX + c.ColSpan * Constants.GridSize > x
-            && c.CanvasY < bottom
-            && c.CanvasY + c.RowSpan * Constants.GridSize > y);
+        {
+            if (c == exclude || !c.HasContent || c.CollisionLayer != layer)
+                return false;
+
+            // Backdrops get a half-grid margin to create visual spacing
+            double margin = c.IsBackdrop ? Constants.GridSize / 2.0 : 0;
+            double cellLeft = c.CanvasX - margin;
+            double cellRight = c.CanvasX + c.ColSpan * Constants.GridSize + margin;
+            double cellTop = c.CanvasY - margin;
+            double cellBottom = c.CanvasY + c.RowSpan * Constants.GridSize + margin;
+
+            return cellLeft < right && cellRight > x && cellTop < bottom && cellBottom > y;
+        });
     }
 
     /// <summary>
@@ -1303,11 +1311,19 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         double bottom = y + rows * Constants.GridSize;
 
         return GridCells.Any(c =>
-            !excludeSet.Contains(c) && c.HasContent && c.CollisionLayer == layer
-            && c.CanvasX < right
-            && c.CanvasX + c.ColSpan * Constants.GridSize > x
-            && c.CanvasY < bottom
-            && c.CanvasY + c.RowSpan * Constants.GridSize > y);
+        {
+            if (excludeSet.Contains(c) || !c.HasContent || c.CollisionLayer != layer)
+                return false;
+
+            // Backdrops get a half-grid margin to create visual spacing
+            double margin = c.IsBackdrop ? Constants.GridSize / 2.0 : 0;
+            double cellLeft = c.CanvasX - margin;
+            double cellRight = c.CanvasX + c.ColSpan * Constants.GridSize + margin;
+            double cellTop = c.CanvasY - margin;
+            double cellBottom = c.CanvasY + c.RowSpan * Constants.GridSize + margin;
+
+            return cellLeft < right && cellRight > x && cellTop < bottom && cellBottom > y;
+        });
     }
 
     /// <summary>Deselects all cells and annotations, clears both selection lists.</summary>
@@ -1328,7 +1344,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             double newX = cell.CanvasX + dx;
             double newY = cell.CanvasY + dy;
             bool collision = HasLayerCollision(cell.CollisionLayer, group, newX, newY, cell.ColSpan, cell.RowSpan);
-            Console.WriteLine($"  Checking cell at ({cell.CanvasX:F0}, {cell.CanvasY:F0}) layer={cell.CollisionLayer}, moving to ({newX:F0}, {newY:F0}), collision={collision}");
             if (collision)
                 return true;
         }
@@ -1424,7 +1439,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 // Select the backdrop itself
                 cell.IsSelected = true;
                 _selectedCells.Add(cell);
-                Console.WriteLine($"Backdrop clicked at ({cell.CanvasX}, {cell.CanvasY})");
 
                 // Select all cells within the backdrop bounds (using same logic as marquee)
                 foreach (var c in GridCells)
@@ -1465,7 +1479,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 }
 
                 OnPropertyChanged(nameof(SelectionCountText));
-                Console.WriteLine($"Backdrop selection complete: {_selectedCells.Count} cells and {_selectedAnnotations.Count} annotations selected");
             }
 
             // If clicking a regular cell (not backdrop), select it and any annotations inside it
@@ -1598,7 +1611,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (Math.Abs(dx) > 0.1 || Math.Abs(dy) > 0.1)
             {
                 bool collision = HasGroupCollision(_selectedCells, dx, dy);
-                Console.WriteLine($"Group drag: dx={dx:F1}, dy={dy:F1}, collision={collision}, selected cells={_selectedCells.Count}, annotations={_selectedAnnotations.Count}");
 
                 if (!collision)
                 {
@@ -1880,14 +1892,41 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         // Annotation drag
         if (_isDraggingAnnotations && _selectedAnnotations.Count > 0)
         {
-            double dx = pt.X - _annotationDragStart.X;
-            double dy = pt.Y - _annotationDragStart.Y;
-            foreach (var ann in _selectedAnnotations)
+            if (IsDrawMode)
             {
-                ann.CanvasX += dx;
-                ann.CanvasY += dy;
+                // Annotation mode: free movement
+                double dx = pt.X - _annotationDragStart.X;
+                double dy = pt.Y - _annotationDragStart.Y;
+                foreach (var ann in _selectedAnnotations)
+                {
+                    ann.CanvasX += dx;
+                    ann.CanvasY += dy;
+                }
+                _annotationDragStart = pt;
             }
-            _annotationDragStart = pt;
+            else
+            {
+                // Grid mode: grid-snapped movement
+                // Calculate grid-snapped target position
+                double targetX = Math.Round(pt.X / Constants.GridSize) * Constants.GridSize;
+                double targetY = Math.Round(pt.Y / Constants.GridSize) * Constants.GridSize;
+                double startX = Math.Round(_annotationDragStart.X / Constants.GridSize) * Constants.GridSize;
+                double startY = Math.Round(_annotationDragStart.Y / Constants.GridSize) * Constants.GridSize;
+
+                double dx = targetX - startX;
+                double dy = targetY - startY;
+
+                // Only move if there's actual delta
+                if (Math.Abs(dx) > 0.1 || Math.Abs(dy) > 0.1)
+                {
+                    foreach (var ann in _selectedAnnotations)
+                    {
+                        ann.CanvasX += dx;
+                        ann.CanvasY += dy;
+                    }
+                    _annotationDragStart = new Point(targetX, targetY);
+                }
+            }
             return;
         }
 
@@ -2202,7 +2241,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (_isViewMode || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             return;
 
-        // Grid mode: click annotation to select it (like cells)
+        // Grid mode: click annotation to select it and enable grid-snapped dragging
         if (!IsDrawMode && sender is Control { DataContext: AnnotationViewModel annGrid })
         {
             bool isCtrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
@@ -2223,12 +2262,19 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     annGrid.IsSelected = true;
                     _selectedAnnotations.Add(annGrid);
                 }
+
+                // Start grid-snapped annotation drag
+                _isDraggingAnnotations = true;
+                var mainCanvas = this.FindControl<Canvas>("MainCanvas");
+                if (mainCanvas != null)
+                {
+                    _annotationDragStart = e.GetPosition(mainCanvas);
+                }
+                e.Pointer.Capture(sender as Control);
             }
 
-            // In Grid mode annotations cannot be dragged directly — they are not grid-snapped and
-            // moving them independently is confusing.  Selected annotations will still travel with
-            // a group of grid items when those items are dragged (see Cell_PointerMoved group drag).
             e.Handled = true;
+            OnPropertyChanged(nameof(SelectionCountText));
             return;
         }
 
@@ -3023,7 +3069,23 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (cell == excludeCell) continue;
             if (cell.CollisionLayer != collisionLayer) continue;
 
-            var cellRect = new Rect(cell.CanvasX, cell.CanvasY, cell.ColSpan * Constants.GridSize, cell.RowSpan * Constants.GridSize);
+            // Backdrops get a half-grid margin to create visual spacing
+            Rect cellRect;
+            if (cell.IsBackdrop)
+            {
+                double margin = Constants.GridSize / 2.0;
+                cellRect = new Rect(
+                    cell.CanvasX - margin,
+                    cell.CanvasY - margin,
+                    cell.ColSpan * Constants.GridSize + 2 * margin,
+                    cell.RowSpan * Constants.GridSize + 2 * margin
+                );
+            }
+            else
+            {
+                cellRect = new Rect(cell.CanvasX, cell.CanvasY, cell.ColSpan * Constants.GridSize, cell.RowSpan * Constants.GridSize);
+            }
+
             if (rect.Intersects(cellRect))
                 return false;
         }
