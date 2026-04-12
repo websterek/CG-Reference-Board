@@ -100,11 +100,11 @@ public class AnnotationShape : Control
     private void OnScaleChanged()
     {
         var vm = Annotation;
+        // Mark brush geometry dirty so point-decimation LOD rebuilds at new scale
         if (vm?.Type == "Brush" && vm.Points.Count > 10)
-        {
             _geometryDirty = true;
-            InvalidateVisual();
-        }
+        // Always redraw — effect threshold (50 %) applies to every annotation type
+        InvalidateVisual();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
