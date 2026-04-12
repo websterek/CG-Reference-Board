@@ -268,7 +268,7 @@ public partial class MainWindow
         // Drawing in progress
         if (_currentAnnotation != null)
         {
-            if (_currentAnnotation.Type == "Pencil")
+            if (_currentAnnotation.Type == "Brush")
             {
                 if (_currentAnnotation.Points.Count == 0
                     || Math.Abs(pt.X - _currentAnnotation.Points.Last().X) > 2

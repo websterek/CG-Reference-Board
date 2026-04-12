@@ -224,8 +224,8 @@ public partial class MainWindow
 
     #region Annotation Tool Mode Handlers
 
-    private void PencilMode_Click(object? sender, RoutedEventArgs e)
-    { CurrentTool = "Pencil"; }
+    private void BrushMode_Click(object? sender, RoutedEventArgs e)
+    { CurrentTool = "Brush"; }
 
     private void TextMode_Click(object? sender, RoutedEventArgs e)
     { CurrentTool = "Text"; }
@@ -939,66 +939,7 @@ public partial class MainWindow
         if (e.Key == Key.O && isCtrl)
         { LoadBoard_Click(null, null!); return; }
 
-        // Ctrl+Shift+C: Copy image to clipboard
-        if (e.Key == Key.C && isCtrl && isShift)
-        {
-            var targetCell = _selectedCells.FirstOrDefault(c => c.IsImage || c.IsVideo);
-            if (targetCell != null && !string.IsNullOrEmpty(targetCell.FilePath) && File.Exists(targetCell.FilePath))
-            {
-                try
-                {
-                    using var stream = File.OpenRead(targetCell.FilePath);
-                    var bmp = new Avalonia.Media.Imaging.Bitmap(stream);
-                    var dt = new DataTransfer();
-                    var item = new DataTransferItem();
-                    item.SetBitmap(bmp);
-                    dt.Add(item);
-                    var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
-                    if (clipboard != null)
-                        await clipboard.SetDataAsync(dt);
-                    ShowToast("📋 Image copied");
-                }
-                catch { }
-            }
-            return;
-        }
-
-        // Ctrl+C: Copy path of selected image/video, or text content
-        if (e.Key == Key.C && isCtrl && !isShift)
-        {
-            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
-            if (clipboard == null)
-                return;
-
-            // Prefer file path for image/video cells
-            var fileCell = _selectedCells.FirstOrDefault(c => c.IsFile && !string.IsNullOrEmpty(c.FilePath));
-            if (fileCell != null)
-            {
-                var dt = new DataTransfer();
-                var item = new DataTransferItem();
-                item.SetText(fileCell.FilePath!);
-                dt.Add(item);
-                await clipboard.SetDataAsync(dt);
-                ShowToast("📋 Path copied");
-                return;
-            }
-
-            // Fall back to text content
-            var textCell = _selectedCells.FirstOrDefault(c => c.HasTextContent && !string.IsNullOrEmpty(c.TextContent));
-            if (textCell != null)
-            {
-                var dt = new DataTransfer();
-                var item = new DataTransferItem();
-                item.SetText(textCell.TextContent!);
-                dt.Add(item);
-                await clipboard.SetDataAsync(dt);
-                ShowToast("📋 Text copied");
-                return;
-            }
-            return;
-        }
-
-        if (e.Key == Key.V && isCtrl)
+        if (e.Key == Key.S && isCtrl)
         {
             if (!string.IsNullOrEmpty(_currentBoardFile))
             {
@@ -1255,8 +1196,8 @@ public partial class MainWindow
             switch (e.Key)
             {
                 case Key.B:
-                    CurrentTool = "Pencil";
-                    ShowToast("✏️ Pencil");
+                    CurrentTool = "Brush";
+                    ShowToast("🖌️ Brush");
                     return;
                 case Key.E:
                     CurrentTool = "Eraser";

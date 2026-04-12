@@ -93,7 +93,7 @@ public static class BoardSerializer
             }).ToList(),
             Annotations = annotations.Select(a => new
             {
-                Type = a.Type != "Pencil" ? a.Type : null,
+                Type = a.Type != "Brush" ? a.Type : null,
                 Text = !string.IsNullOrEmpty(a.Text) ? a.Text : null,
                 a.CanvasX,
                 a.CanvasY,
@@ -237,7 +237,7 @@ public static class BoardSerializer
     {
         var annotation = new AnnotationViewModel
         {
-            Type = element.TryGetProperty("Type", out var typeProp) ? typeProp.GetString() ?? "Pencil" : "Pencil",
+            Type = MapLegacyAnnotationType(element.TryGetProperty("Type", out var typeProp) ? typeProp.GetString() ?? "Brush" : "Brush"),
             Text = element.TryGetProperty("Text", out var textProp) ? textProp.GetString() ?? "" : "",
             CanvasX = element.GetProperty("CanvasX").GetDouble(),
             CanvasY = element.GetProperty("CanvasY").GetDouble(),
@@ -273,4 +273,11 @@ public static class BoardSerializer
 
         return annotation;
     }
+
+    /// <summary>
+    /// Maps legacy annotation type names to their current equivalents.
+    /// "Pencil" was renamed to "Brush"; existing saved boards are migrated automatically.
+    /// </summary>
+    private static string MapLegacyAnnotationType(string type) =>
+        type == "Pencil" ? "Brush" : type;
 }

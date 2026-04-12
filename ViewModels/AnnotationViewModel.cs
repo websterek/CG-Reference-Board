@@ -43,8 +43,8 @@ public class AnnotationViewModel : ViewModelBase
     /// <summary>Ordered collection of points that define the annotation shape.</summary>
     public ObservableCollection<Point> Points { get; set; } = new();
 
-    private string _type = "Pencil";
-    /// <summary>Annotation tool type: Pencil, Rectangle, Ellipse, Arrow, or Text.</summary>
+    private string _type = "Brush";
+    /// <summary>Annotation tool type: Brush, Rectangle, Ellipse, Arrow, or Text.</summary>
     public string Type
     {
         get => _type;

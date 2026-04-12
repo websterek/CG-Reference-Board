@@ -210,7 +210,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         set { _currentBrushThickness = value; OnPropertyChanged(nameof(CurrentBrushThickness)); }
     }
 
-    private string _currentTool = "Pencil";
+    private string _currentTool = "Brush";
     public string CurrentTool
     {
         get => _currentTool;
@@ -223,7 +223,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             OnPropertyChanged(nameof(IsEraserMode));
             OnPropertyChanged(nameof(IsMoveMode));
             OnPropertyChanged(nameof(CanvasCursor));
-            OnPropertyChanged(nameof(IsPencilSelected));
+            OnPropertyChanged(nameof(IsBrushSelected));
             OnPropertyChanged(nameof(IsTextSelected));
             OnPropertyChanged(nameof(IsArrowSelected));
             OnPropertyChanged(nameof(IsRectangleSelected));
@@ -299,7 +299,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     /// <summary>Material icon kind for the canvas cursor based on the current tool.</summary>
     public string CanvasCursor => CurrentTool switch
     {
-        "Pencil" => "🖌️",
+        "Brush" => "🖌️",
         "Move" => "✥",
         "Text" => "T",
         "Arrow" => "→",
@@ -310,7 +310,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     };
 
     /// <summary>Tool selection properties for menu checkmarks.</summary>
-    public bool IsPencilSelected => CurrentTool == "Pencil";
+    public bool IsBrushSelected => CurrentTool == "Brush";
     public bool IsTextSelected => CurrentTool == "Text";
     public bool IsArrowSelected => CurrentTool == "Arrow";
     public bool IsRectangleSelected => CurrentTool == "Rectangle";

@@ -20,7 +20,7 @@ public enum AnnotationEffect
 
 /// <summary>
 /// Custom control that renders an <see cref="AnnotationViewModel"/> as a drawn shape
-/// (pencil stroke, rectangle, ellipse, arrow, or text) on the annotation layer.
+/// (brush stroke, rectangle, ellipse, arrow, or text) on the annotation layer.
 /// Supports optional shadow or outline effects for readability.
 /// </summary>
 public class AnnotationShape : Control
@@ -191,8 +191,8 @@ public class AnnotationShape : Control
 
         switch (vm.Type)
         {
-            case "Pencil":
-                RenderPencil(context, vm, pen, selectPen, hitTestPen, effect, offsetX, offsetY);
+            case "Brush":
+                RenderBrush(context, vm, pen, selectPen, hitTestPen, effect, offsetX, offsetY);
                 break;
             case "Rectangle":
                 RenderRectangle(context, vm, pen, selectPen, hitTestPen, effect, offsetX, offsetY);
@@ -211,12 +211,12 @@ public class AnnotationShape : Control
 
     // ───────── Shape renderers ─────────
 
-    private static void RenderPencil(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, Pen hitTestPen, AnnotationEffect effect, double ox, double oy)
+    private static void RenderBrush(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, Pen hitTestPen, AnnotationEffect effect, double ox, double oy)
     {
         if (vm.Points.Count < 2)
             return;
 
-        var geometry = BuildPencilGeometry(vm, ox, oy);
+        var geometry = BuildBrushGeometry(vm, ox, oy);
 
         // Effect pass
         if (effect == AnnotationEffect.Shadow)
@@ -235,7 +235,7 @@ public class AnnotationShape : Control
         ctx.DrawGeometry(null, pen, geometry);
     }
 
-    private static StreamGeometry BuildPencilGeometry(AnnotationViewModel vm, double ox, double oy)
+    private static StreamGeometry BuildBrushGeometry(AnnotationViewModel vm, double ox, double oy)
     {
         var geometry = new StreamGeometry();
         using (var gc = geometry.Open())
