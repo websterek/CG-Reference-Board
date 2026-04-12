@@ -585,6 +585,10 @@ public class CellViewModel : ViewModelBase
         Type = CellType.Image;
         CurrentLod = ImageLod.Placeholder;
         // Image stays null — the viewport timer will call ApplyLodAsync when visible.
+        // Kick off average-colour computation in the background so the placeholder
+        // rect shows the real colour even before the bitmap is first loaded.
+        // EnsurePlaceholderColorAsync is a no-op when the colour is already known.
+        _ = EnsurePlaceholderColorAsync();
     }
 
     /// <summary>
@@ -599,6 +603,7 @@ public class CellViewModel : ViewModelBase
         Type = CellType.Video;
         CurrentLod = ImageLod.Placeholder;
         // Image stays null — the viewport timer will call ApplyLodAsync when visible.
+        _ = EnsurePlaceholderColorAsync();
     }
 
     /// <summary>
