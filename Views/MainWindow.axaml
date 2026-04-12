@@ -689,6 +689,7 @@
                                         PointerPressed="Annotation_PointerPressed"
                                         Cursor="Hand"
                                         IsHitTestVisible="{Binding IsHitTestable}"
+                                        IsVisible="{Binding IsInViewport}"
                                     >
                                         <local:AnnotationShape.ContextMenu>
                                             <ContextMenu>

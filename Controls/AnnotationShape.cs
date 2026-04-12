@@ -46,6 +46,22 @@ public class AnnotationShape : Control
         EffectModeChanged?.Invoke();
     }
 
+    // ───────── Static scale state ─────────
+
+    private static double _currentScale = 1.0;
+
+    /// <summary>Raised when the scale changes so instances can invalidate their geometry cache.</summary>
+    public static event Action? ScaleChanged;
+
+    /// <summary>
+    /// Sets the global scale and notifies all instances.
+    /// </summary>
+    public static void SetScale(double scale)
+    {
+        _currentScale = scale;
+        ScaleChanged?.Invoke();
+    }
+
     // ───────── Instance ─────────
 
     public static readonly StyledProperty<AnnotationViewModel?> AnnotationProperty =
@@ -57,18 +73,45 @@ public class AnnotationShape : Control
         set => SetValue(AnnotationProperty, value);
     }
 
+    // ───────── Per-instance geometry cache ─────────
+
+    private StreamGeometry? _cachedGeometry;
+    private double _cachedGeometryOx = double.NaN;
+    private double _cachedGeometryOy = double.NaN;
+    private int _cachedStep = -1;
+    private bool _geometryDirty = true;
+
+    // ───────── Per-instance brush/pen cache ─────────
+
+    private IBrush? _cachedBrush;
+    private string? _cachedBrushColor;
+    private Pen? _cachedPen;
+    private double _cachedPenThickness = -1;
+
     public AnnotationShape()
     {
         ClipToBounds = false;
         EffectModeChanged += OnEffectModeChanged;
+        ScaleChanged += OnScaleChanged;
     }
 
     private void OnEffectModeChanged() => InvalidateVisual();
+
+    private void OnScaleChanged()
+    {
+        var vm = Annotation;
+        if (vm?.Type == "Brush" && vm.Points.Count > 10)
+        {
+            _geometryDirty = true;
+            InvalidateVisual();
+        }
+    }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
         EffectModeChanged -= OnEffectModeChanged;
+        ScaleChanged -= OnScaleChanged;
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -88,6 +131,9 @@ public class AnnotationShape : Control
         {
             newVm.Points.CollectionChanged += OnPointsCollectionChanged;
             newVm.PropertyChanged += OnAnnotationPropertyChanged;
+            // Seed the bounding-box cache so viewport culling works correctly
+            // for annotations that already have all their points (e.g. loaded from file).
+            newVm.UpdateBoundsCache();
         }
 
         UpdateBounds();
@@ -96,18 +142,35 @@ public class AnnotationShape : Control
 
     private void OnAnnotationPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(AnnotationViewModel.Color)
-            or nameof(AnnotationViewModel.Thickness)
-            or nameof(AnnotationViewModel.IsSelected)
-            or nameof(AnnotationViewModel.Text)
-            or nameof(AnnotationViewModel.Type))
+        switch (e.PropertyName)
         {
-            InvalidateAll();
+            case nameof(AnnotationViewModel.IsSelected):
+                // selection only changes the outline pen — no layout change
+                InvalidateVisual();
+                break;
+            case nameof(AnnotationViewModel.Color):
+                _cachedBrush = null;
+                _cachedBrushColor = null;
+                _cachedPen = null;
+                InvalidateVisual();
+                break;
+            case nameof(AnnotationViewModel.Thickness):
+            case nameof(AnnotationViewModel.Type):
+                _cachedPen = null;
+                _geometryDirty = true;
+                InvalidateAll();
+                break;
+            case nameof(AnnotationViewModel.Text):
+                InvalidateAll();
+                break;
         }
     }
 
     private void OnPointsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        _geometryDirty = true;
+        Annotation?.UpdateBoundsCache();
+
         UpdateBounds();
         InvalidateAll();
     }
@@ -168,6 +231,53 @@ public class AnnotationShape : Control
     private static Pen MakeOutlinePen(double thickness)
         => new(OutlineBrush, thickness + Constants.AnnotationOutlineExtraThickness, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
 
+    // ───────── Brush/pen cache helpers ─────────
+
+    private IBrush GetBrush(string color)
+    {
+        if (color == _cachedBrushColor && _cachedBrush != null)
+            return _cachedBrush;
+        _cachedBrush = SolidColorBrush.Parse(color);
+        _cachedBrushColor = color;
+        return _cachedBrush;
+    }
+
+    private Pen GetPen(IBrush brush, double thickness)
+    {
+        if (_cachedPen != null && _cachedPenThickness == thickness && _cachedBrushColor == (brush as SolidColorBrush)?.Color.ToString())
+            return _cachedPen;
+        _cachedPen = new Pen(brush, thickness, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
+        _cachedPenThickness = thickness;
+        return _cachedPen;
+    }
+
+    // ───────── Geometry cache helpers ─────────
+
+    private static int GetPointStep(double scale) => scale switch
+    {
+        < 0.1 => 16,
+        < 0.2 => 8,
+        < 0.4 => 4,
+        < 0.7 => 2,
+        _ => 1
+    };
+
+    private StreamGeometry GetOrBuildGeometry(AnnotationViewModel vm, double ox, double oy)
+    {
+        int step = GetPointStep(_currentScale);
+        if (!_geometryDirty && _cachedGeometry != null &&
+            _cachedGeometryOx == ox && _cachedGeometryOy == oy && _cachedStep == step)
+        {
+            return _cachedGeometry;
+        }
+        _cachedGeometry = BuildBrushGeometry(vm, ox, oy, step);
+        _cachedGeometryOx = ox;
+        _cachedGeometryOy = oy;
+        _cachedStep = step;
+        _geometryDirty = false;
+        return _cachedGeometry;
+    }
+
     // ───────── Render ─────────
 
     public override void Render(DrawingContext context)
@@ -176,14 +286,15 @@ public class AnnotationShape : Control
         if (vm == null || vm.Points.Count == 0)
             return;
 
-        var brush = SolidColorBrush.Parse(vm.Color);
-        var pen = new Pen(brush, vm.Thickness, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
+        var brush = GetBrush(vm.Color);
+        var pen = GetPen(brush, vm.Thickness);
         var selectPen = vm.IsSelected
             ? new Pen(SolidColorBrush.Parse(Constants.AccentColor), vm.Thickness + 4, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round)
             : null;
         var hitTestPen = new Pen(Brushes.Transparent, Math.Max(20, vm.Thickness + 10), lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
 
-        var effect = _currentEffect;
+        // Skip expensive effects when zoomed out past 25% — visually irrelevant at that scale
+        var effect = _currentScale < 0.25 ? AnnotationEffect.None : _currentEffect;
 
         // Map absolute points to local coordinate space
         double offsetX = Bounds.X;
@@ -211,12 +322,12 @@ public class AnnotationShape : Control
 
     // ───────── Shape renderers ─────────
 
-    private static void RenderBrush(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, Pen hitTestPen, AnnotationEffect effect, double ox, double oy)
+    private void RenderBrush(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, Pen hitTestPen, AnnotationEffect effect, double ox, double oy)
     {
         if (vm.Points.Count < 2)
             return;
 
-        var geometry = BuildBrushGeometry(vm, ox, oy);
+        var geometry = GetOrBuildGeometry(vm, ox, oy);
 
         // Effect pass
         if (effect == AnnotationEffect.Shadow)
@@ -235,34 +346,47 @@ public class AnnotationShape : Control
         ctx.DrawGeometry(null, pen, geometry);
     }
 
-    private static StreamGeometry BuildBrushGeometry(AnnotationViewModel vm, double ox, double oy)
+    private static StreamGeometry BuildBrushGeometry(AnnotationViewModel vm, double ox, double oy, int step = 1)
     {
         var geometry = new StreamGeometry();
         using (var gc = geometry.Open())
         {
-            var p0 = new Point(vm.Points[0].X - ox, vm.Points[0].Y - oy);
-            gc.BeginFigure(p0, isFilled: false);
-
-            if (vm.Points.Count == 2)
+            if (step > 1 && vm.Points.Count > 2)
             {
-                var p1 = new Point(vm.Points[1].X - ox, vm.Points[1].Y - oy);
-                gc.LineTo(p1);
+                gc.BeginFigure(new Point(vm.Points[0].X - ox, vm.Points[0].Y - oy), isFilled: false);
+                for (int i = step; i < vm.Points.Count; i += step)
+                    gc.LineTo(new Point(vm.Points[i].X - ox, vm.Points[i].Y - oy));
+                // always include last point
+                if (vm.Points.Count > 1)
+                    gc.LineTo(new Point(vm.Points[^1].X - ox, vm.Points[^1].Y - oy));
+                gc.EndFigure(isClosed: false);
             }
             else
             {
-                for (int i = 1; i < vm.Points.Count - 1; i++)
+                var p0 = new Point(vm.Points[0].X - ox, vm.Points[0].Y - oy);
+                gc.BeginFigure(p0, isFilled: false);
+
+                if (vm.Points.Count == 2)
                 {
-                    var curr = new Point(vm.Points[i].X - ox, vm.Points[i].Y - oy);
-                    var next = new Point(vm.Points[i + 1].X - ox, vm.Points[i + 1].Y - oy);
-                    var mid = new Point((curr.X + next.X) / 2, (curr.Y + next.Y) / 2);
-
-                    gc.QuadraticBezierTo(curr, mid);
+                    var p1 = new Point(vm.Points[1].X - ox, vm.Points[1].Y - oy);
+                    gc.LineTo(p1);
                 }
+                else
+                {
+                    for (int i = 1; i < vm.Points.Count - 1; i++)
+                    {
+                        var curr = new Point(vm.Points[i].X - ox, vm.Points[i].Y - oy);
+                        var next = new Point(vm.Points[i + 1].X - ox, vm.Points[i + 1].Y - oy);
+                        var mid = new Point((curr.X + next.X) / 2, (curr.Y + next.Y) / 2);
 
-                var last = new Point(vm.Points[^1].X - ox, vm.Points[^1].Y - oy);
-                gc.LineTo(last);
+                        gc.QuadraticBezierTo(curr, mid);
+                    }
+
+                    var last = new Point(vm.Points[^1].X - ox, vm.Points[^1].Y - oy);
+                    gc.LineTo(last);
+                }
+                gc.EndFigure(isClosed: false);
             }
-            gc.EndFigure(isClosed: false);
         }
         return geometry;
     }

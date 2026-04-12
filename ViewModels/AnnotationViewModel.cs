@@ -1,5 +1,6 @@
 using Avalonia;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 
 namespace CGReferenceBoard.ViewModels;
 
@@ -8,6 +9,66 @@ namespace CGReferenceBoard.ViewModels;
 /// </summary>
 public class AnnotationViewModel : ViewModelBase
 {
+    // ───────── Bounding-box cache (local coordinates, updated when points change) ─────────
+
+    private double _bboxMinX = double.MaxValue;
+    private double _bboxMinY = double.MaxValue;
+    private double _bboxMaxX = double.MinValue;
+    private double _bboxMaxY = double.MinValue;
+
+    /// <summary>
+    /// Rebuilds the local bounding box from all current points.
+    /// Call whenever the Points collection changes.
+    /// </summary>
+    public void UpdateBoundsCache()
+    {
+        if (Points.Count == 0)
+        {
+            _bboxMinX = _bboxMinY = double.MaxValue;
+            _bboxMaxX = _bboxMaxY = double.MinValue;
+            return;
+        }
+
+        _bboxMinX = _bboxMinY = double.MaxValue;
+        _bboxMaxX = _bboxMaxY = double.MinValue;
+
+        foreach (var p in Points)
+        {
+            if (p.X < _bboxMinX)
+                _bboxMinX = p.X;
+            if (p.X > _bboxMaxX)
+                _bboxMaxX = p.X;
+            if (p.Y < _bboxMinY)
+                _bboxMinY = p.Y;
+            if (p.Y > _bboxMaxY)
+                _bboxMaxY = p.Y;
+        }
+    }
+
+    /// <summary>Absolute canvas left edge (CanvasX + local min X).</summary>
+    public double AbsBoundsLeft => CanvasX + (_bboxMinX == double.MaxValue ? 0 : _bboxMinX);
+    /// <summary>Absolute canvas top edge (CanvasY + local min Y).</summary>
+    public double AbsBoundsTop => CanvasY + (_bboxMinY == double.MaxValue ? 0 : _bboxMinY);
+    /// <summary>Absolute canvas right edge (CanvasX + local max X).</summary>
+    public double AbsBoundsRight => CanvasX + (_bboxMaxX == double.MinValue ? 0 : _bboxMaxX);
+    /// <summary>Absolute canvas bottom edge (CanvasY + local max Y).</summary>
+    public double AbsBoundsBottom => CanvasY + (_bboxMaxY == double.MinValue ? 0 : _bboxMaxY);
+
+    // ───────── Viewport visibility ─────────
+
+    private bool _isInViewport = true;
+    /// <summary>
+    /// Whether this annotation overlaps the current viewport.
+    /// Set by the LOD timer; drives IsVisible on the AnnotationShape so
+    /// off-screen annotations are excluded from layout and rendering.
+    /// Defaults to true so annotations are visible before the first LOD pass.
+    /// </summary>
+    public bool IsInViewport
+    {
+        get => _isInViewport;
+        set => SetProperty(ref _isInViewport, value);
+    }
+
     private double _canvasX;
     /// <summary>Canvas X offset for the entire annotation group.</summary>
     public double CanvasX

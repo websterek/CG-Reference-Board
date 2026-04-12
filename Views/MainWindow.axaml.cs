@@ -337,6 +337,21 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         OnPropertyChanged(nameof(ZoomInverseFactor));
         OnPropertyChanged(nameof(ZoomIndependentBorderThickness));
         OnPropertyChanged(nameof(ZoomIndependentCornerRadius));
+
+        // Push current scale to AnnotationShape so it can LOD-decimate brush geometry
+        CGReferenceBoard.Controls.AnnotationShape.SetScale(_scale.ScaleX);
+
+        // Lower bitmap interpolation quality when zoomed out — Skia renders faster
+        var canvas = this.FindControl<Avalonia.Controls.Canvas>("MainCanvas");
+        if (canvas != null)
+        {
+            var mode = _scale.ScaleX < 0.35
+                ? Avalonia.Media.Imaging.BitmapInterpolationMode.LowQuality
+                : _scale.ScaleX < 1.0
+                    ? Avalonia.Media.Imaging.BitmapInterpolationMode.MediumQuality
+                    : Avalonia.Media.Imaging.BitmapInterpolationMode.HighQuality;
+            Avalonia.Media.RenderOptions.SetBitmapInterpolationMode(canvas, mode);
+        }
     }
 
     /// <summary>Tool selection properties for menu checkmarks.</summary>
@@ -495,6 +510,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private double _lastViewportW = double.NaN;
     private double _lastViewportH = double.NaN;
     private int _lastViewportCellCount = -1;
+    private int _lastAnnotationCount = -1;
     private bool _lodUpdateInProgress;
 
     #endregion
@@ -1162,10 +1178,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         double vw = MainCanvas.Bounds.Width > 0 ? MainCanvas.Bounds.Width : this.Bounds.Width;
         double vh = MainCanvas.Bounds.Height > 0 ? MainCanvas.Bounds.Height : this.Bounds.Height;
 
+        int annCount = Annotations.Count;
+
         // Skip if nothing relevant changed since last tick.
         if (tx == _lastViewportTx && ty == _lastViewportTy
             && sc == _lastViewportScale && count == _lastViewportCellCount
-            && vw == _lastViewportW && vh == _lastViewportH)
+            && vw == _lastViewportW && vh == _lastViewportH
+            && annCount == _lastAnnotationCount)
             return;
 
         _lastViewportTx = tx;
@@ -1174,6 +1193,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _lastViewportCellCount = count;
         _lastViewportW = vw;
         _lastViewportH = vh;
+        _lastAnnotationCount = annCount;
 
         if (_lodUpdateInProgress)
             return;
@@ -1257,6 +1277,31 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 // Nudge the GC to reclaim large bitmap buffers from disposed images.
                 // Optimized mode lets the GC decide whether collection is worthwhile.
                 GC.Collect(2, GCCollectionMode.Optimized, false);
+            }
+
+            // ── Annotation viewport culling ──────────────────────────────────────
+            // Use a generous margin (3 grid cells) so annotations near the edge
+            // are never hidden prematurely due to bounding-box imprecision.
+            double annMargin = Constants.GridSize * 3;
+            double annVpLeft = vpLeft - annMargin;
+            double annVpTop = vpTop - annMargin;
+            double annVpRight = vpRight + annMargin;
+            double annVpBottom = vpBottom + annMargin;
+
+            foreach (var ann in Annotations)
+            {
+                if (ann.Points.Count == 0)
+                {
+                    ann.IsInViewport = true;   // no bounds yet — keep visible
+                    continue;
+                }
+
+                bool inVp = ann.AbsBoundsRight >= annVpLeft
+                         && ann.AbsBoundsLeft <= annVpRight
+                         && ann.AbsBoundsBottom >= annVpTop
+                         && ann.AbsBoundsTop <= annVpBottom;
+
+                ann.IsInViewport = inVp;
             }
         }
         finally
