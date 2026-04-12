@@ -88,6 +88,7 @@ public partial class MainWindow
         if (startupOverlay != null)
             startupOverlay.IsVisible = false;
 
+        OnPropertyChanged(nameof(WindowTitle));
         SaveBoardData();
         ShowToast("💾 Saved");
     }
@@ -128,6 +129,8 @@ public partial class MainWindow
         var startupOverlay = this.FindControl<Border>("StartupOverlay");
         if (startupOverlay != null)
             startupOverlay.IsVisible = false;
+
+        OnPropertyChanged(nameof(WindowTitle));
         ShowToast("📄 New Board");
     }
 

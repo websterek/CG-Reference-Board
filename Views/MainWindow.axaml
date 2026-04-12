@@ -64,10 +64,32 @@
                                 Header="Save"
                                 Click="SaveBoard_Click"
                                 InputGesture="Ctrl+S"
+                                IsEnabled="{Binding !#StartupOverlay.IsVisible}"
                             >
                                 <MenuItem.Icon>
                                     <PathIcon Data="M15 9H5V5H15M12 19C10.34 19 9 17.66 9 16C9 14.34 10.34 13 12 13C13.66 13 15 14.34 15 16C15 17.66 13.66 19 12 19M17 3H5C3.89 3 3 3.9 3 5V19C3 20.1 3.89 21 5 21H19C20.1 21 21 20.1 21 19V7L17 3Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
                                 </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator />
+                            <MenuItem
+                                Header="Recent Boards"
+                                ItemsSource="{Binding RecentBoards}"
+                                IsVisible="{Binding HasRecentBoards}"
+                            >
+                                <MenuItem.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <Button
+                                            Content="{Binding}"
+                                            Click="RecentBoard_Click"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Left"
+                                            Padding="0"
+                                            Cursor="Hand"
+                                        />
+                                    </DataTemplate>
+                                </MenuItem.ItemTemplate>
                             </MenuItem>
                             <Separator />
                             <MenuItem Header="Exit" Click="Exit_Click">
@@ -78,7 +100,7 @@
                         </MenuItem>
 
                         <!-- Edit Menu -->
-                        <MenuItem Header="_Edit">
+                        <MenuItem Header="_Edit" IsEnabled="{Binding !#StartupOverlay.IsVisible}">
                             <MenuItem
                                 Header="Import Media..."
                                 Click="ImportMedia_Click"
@@ -122,16 +144,17 @@
                             Header="_Board"
                             ItemsSource="{Binding BoardFilesInDirectory}"
                             Click="BoardMenuItem_Click"
+                            IsEnabled="{Binding !#StartupOverlay.IsVisible}"
                         >
                             <MenuItem.ItemContainerTheme>
-                                <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:BoardMenuItemViewModel">
+                                <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
                                     <Setter
                                         Property="ToggleType"
                                         Value="Radio"
                                     />
                                     <Setter
                                         Property="IsChecked"
-                                        Value="{Binding IsActive}"
+                                        Value="{Binding IsActive, DataType=vm:BoardMenuItemViewModel}"
                                     />
                                 </ControlTheme>
                             </MenuItem.ItemContainerTheme>
@@ -143,7 +166,7 @@
                         </MenuItem>
 
                         <!-- Mode Menu -->
-                        <MenuItem Header="_Mode">
+                        <MenuItem Header="_Mode" IsEnabled="{Binding !#StartupOverlay.IsVisible}">
                             <MenuItem
                                 Click="GridMode_Click"
                                 ToggleType="Radio"
@@ -193,7 +216,7 @@
                         </MenuItem>
 
                         <!-- View Menu -->
-                        <MenuItem Header="_View">
+                        <MenuItem Header="_View" IsEnabled="{Binding !#StartupOverlay.IsVisible}">
                             <MenuItem
                                 Header="Annotation Show"
                                 ToggleType="CheckBox"
@@ -1137,7 +1160,7 @@
             <!-- Startup Overlay                                            -->
             <!-- ═══════════════════════════════════════════════════════════ -->
             <Border
-                Grid.RowSpan="2"
+                Grid.Row="1"
                 x:Name="StartupOverlay"
                 Background="#EE121212"
                 IsVisible="True"

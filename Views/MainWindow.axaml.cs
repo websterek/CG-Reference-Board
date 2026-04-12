@@ -226,6 +226,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         get
         {
+            var startupOverlay = this.FindControl<Border>("StartupOverlay");
+            if (startupOverlay != null && startupOverlay.IsVisible)
+                return Constants.AppName;
+
             string dir = string.IsNullOrEmpty(_workspaceDir) ? "No Workspace" : Path.GetFileName(_workspaceDir);
             string board = string.IsNullOrEmpty(CurrentBoardName) ? "Untitled" : CurrentBoardName;
             string mode = IsDrawMode ? "Annotation" : "Grid";
@@ -437,7 +441,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (startupOverlay != null)
                 startupOverlay.IsVisible = false;
 
-            string json = await File.ReadAllTextAsync(_currentBoardFile);
+            OnPropertyChanged(nameof(WindowTitle));
+
+            string json = File.ReadAllText(_currentBoardFile);
 
             GridCells.Clear();
             Annotations.Clear();
