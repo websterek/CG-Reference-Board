@@ -588,39 +588,56 @@ public class CellViewModel : ViewModelBase
 
     /// <summary>
     /// Sets this cell to Video type with the given video and thumbnail paths.
+    /// The thumbnail image is loaded if possible; if not, the cell displays a placeholder.
     /// </summary>
     public void SetVideo(string videoPath, string thumbPath)
     {
+        VideoPath = videoPath;
+        FilePath = thumbPath;
+        Type = CellType.Video;
+
+        // Try to load the thumbnail as a bitmap.
+        // thumbPath may be the video file itself (local import without a separate thumbnail),
+        // in which case the bitmap load will fail gracefully → placeholder is shown.
+        Bitmap? newBitmap = null;
         try
         {
-            var old = _image;
-            Image = ImageManager.LoadBitmapFromPath(thumbPath, capSize: true) ?? new Bitmap(thumbPath);
-            old?.Dispose();
-            FilePath = thumbPath;
-            VideoPath = videoPath;
-            Type = CellType.Video;
-            CurrentLod = ImageLod.Full;
-
-            // Kick off background work: thumbnail + average colour.
-            var bgToken = Interlocked.Increment(ref _lodToken);
-            _ = Task.Run(async () =>
-            {
-                var thumb = await ImageManager.EnsureThumbnailAsync(thumbPath);
-                var color = await ImageManager.ComputeAverageColorAsync(thumbPath);
-
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    if (bgToken != _lodToken)
-                        return; // cell was cleared/reassigned
-                    ThumbnailPath = thumb;
-                    PlaceholderColor = color;
-                });
-            });
+            newBitmap = ImageManager.LoadBitmapFromPath(thumbPath, capSize: true);
         }
-        catch
+        catch { /* not a valid image — will use placeholder */ }
+
+        var old = _image;
+        if (newBitmap != null)
         {
-            // Thumbnail file may be missing or corrupt
+            Image = newBitmap;
+            CurrentLod = ImageLod.Full;
         }
+        else
+        {
+            Image = null;
+            CurrentLod = ImageLod.Placeholder;
+        }
+        old?.Dispose();
+
+        // Kick off background work: thumbnail + average colour.
+        var bgToken = Interlocked.Increment(ref _lodToken);
+        _ = Task.Run(async () =>
+        {
+            string? effectiveThumb = thumbPath;
+            // If the "thumbnail" is actually a video file, we can't generate a thumb from it here.
+            // The ImageManager will return null, and we'll just use the placeholder color.
+            var thumb = await ImageManager.EnsureThumbnailAsync(effectiveThumb);
+            var color = await ImageManager.ComputeAverageColorAsync(effectiveThumb);
+
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (bgToken != _lodToken)
+                    return;
+                ThumbnailPath = thumb;
+                if (color != "#FF2A2A2A")
+                    PlaceholderColor = color;
+            });
+        });
     }
 
     /// <summary>

@@ -181,7 +181,11 @@ public partial class MainWindow
                 string destPath = Path.Combine(destDir, Path.GetFileName(file.Path.LocalPath));
                 if (file.Path.LocalPath != destPath && !File.Exists(destPath))
                     File.Copy(file.Path.LocalPath, destPath);
-                cell.SetVideo(destPath, destPath);
+
+                // Try to extract a thumbnail frame via ffmpeg
+                string thumbDir = Path.Combine(_workspaceDir, "images");
+                string? thumbPath = await YtDlpService.ExtractThumbnailAsync(destPath, thumbDir);
+                cell.SetVideo(destPath, thumbPath ?? destPath);
                 MarkUnsaved();
                 SaveBoardData();
             }
@@ -806,7 +810,7 @@ public partial class MainWindow
         e.Handled = true;
     }
 
-    private void OnDrop(object? sender, DragEventArgs e)
+    private async void OnDrop(object? sender, DragEventArgs e)
     {
         if (_isViewMode)
         { e.Handled = true; return; }
@@ -817,11 +821,15 @@ public partial class MainWindow
         int gridY = (int)(Math.Floor(dropPt.Y / Constants.GridSize) * Constants.GridSize);
 
         var files = e.DataTransfer.TryGetFiles();
-        if (files != null && files.Count() > 1)
+        if (files != null && files.Any())
         {
-            int filesPerRow = 4;
-            int currentRow = 0;
-            int currentCol = 0;
+            string[] imageExtensions = { ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp" };
+            string[] videoExtensions = { ".mp4", ".webm", ".avi", ".mov", ".mkv" };
+            string[] textExtensions = { ".txt", ".md", ".log", ".csv", ".json", ".xml" };
+
+            double nextX = gridX;
+            double nextY = gridY;
+            int placedCount = 0;
 
             foreach (var file in files)
             {
@@ -829,99 +837,79 @@ public partial class MainWindow
                 if (!File.Exists(path))
                     continue;
 
-                var dimensions = GridLayoutService.GetImageDimensions(path);
-                var (colSpan, rowSpan) = dimensions.HasValue
-                    ? GridLayoutService.CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height)
-                    : (2, 2);
+                string ext = Path.GetExtension(path).ToLowerInvariant();
+                bool isImage = imageExtensions.Contains(ext);
+                bool isVideo = videoExtensions.Contains(ext);
+                bool isText = textExtensions.Contains(ext);
 
-                double preferredX = gridX + (currentCol * Constants.GridSize * 3);
-                double preferredY = gridY + (currentRow * Constants.GridSize * 3);
+                if (!isImage && !isVideo && !isText)
+                    continue; // Skip unsupported file types
 
-                var emptySpace = GridLayoutService.FindEmptySpace(GridCells, preferredX, preferredY, colSpan, rowSpan, collisionLayer: 1);
+                int colSpan = 2, rowSpan = 2;
+                if (isImage)
+                {
+                    var dimensions = GridLayoutService.GetImageDimensions(path);
+                    if (dimensions.HasValue)
+                        (colSpan, rowSpan) = GridLayoutService.CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height);
+                }
 
-                if (emptySpace != null)
+                var emptySpace = GridLayoutService.FindEmptySpace(
+                    GridCells, nextX, nextY, colSpan, rowSpan, collisionLayer: 1);
+
+                if (emptySpace == null)
+                    continue;
+
+                var cell = new CellViewModel
+                {
+                    CanvasX = emptySpace.Value.X,
+                    CanvasY = emptySpace.Value.Y,
+                    ColSpan = colSpan,
+                    RowSpan = rowSpan
+                };
+
+                if (isVideo)
+                {
+                    string destDir = Path.Combine(_workspaceDir, "videos");
+                    Directory.CreateDirectory(destDir);
+                    string destPath = Path.Combine(destDir, Path.GetFileName(path));
+                    if (path != destPath && !File.Exists(destPath))
+                        File.Copy(path, destPath);
+
+                    // Try to extract a thumbnail frame via ffmpeg
+                    string thumbDir = Path.Combine(_workspaceDir, "images");
+                    string? thumbPath = await YtDlpService.ExtractThumbnailAsync(destPath, thumbDir);
+                    cell.SetVideo(destPath, thumbPath ?? destPath);
+                }
+                else if (isText)
+                {
+                    try
+                    { cell.SetText(File.ReadAllText(path)); }
+                    catch { continue; }
+                }
+                else
                 {
                     string destDir = Path.Combine(_workspaceDir, "images");
                     Directory.CreateDirectory(destDir);
                     string destPath = Path.Combine(destDir, Path.GetFileName(path));
                     if (path != destPath && !File.Exists(destPath))
                         File.Copy(path, destPath);
-
-                    var cell = new CellViewModel
-                    {
-                        CanvasX = emptySpace.Value.X,
-                        CanvasY = emptySpace.Value.Y,
-                        ColSpan = colSpan,
-                        RowSpan = rowSpan
-                    };
                     cell.SetImage(destPath);
-                    GridCells.Add(cell);
-                    HighlightCell(cell);
                 }
 
-                currentCol++;
-                if (currentCol >= filesPerRow)
-                {
-                    currentCol = 0;
-                    currentRow++;
-                }
+                GridCells.Add(cell);
+                HighlightCell(cell);
+                placedCount++;
+
+                nextX = emptySpace.Value.X + colSpan * Constants.GridSize;
             }
 
-            MarkUnsaved();
-            SaveBoardData();
-            e.Handled = true;
+            if (placedCount > 0)
+            {
+                MarkUnsaved();
+                SaveBoardData();
+                ShowToast($"📥 Dropped {placedCount} item(s)");
+            }
             return;
-        }
-
-        CellViewModel targetCell;
-        if (_draggingCell != null)
-        {
-            targetCell = GridCells.FirstOrDefault(c =>
-                    (int)c.CanvasX == gridX && (int)c.CanvasY == gridY
-                    && c.CollisionLayer == _draggingCell.CollisionLayer)
-                ?? GetOrCreateCellAt(dropPt);
-        }
-        else
-        {
-            targetCell = GridCells.FirstOrDefault(c =>
-                    (int)c.CanvasX == gridX && (int)c.CanvasY == gridY && !c.IsBoardElement)
-                ?? GetOrCreateContentCellAt(dropPt);
-        }
-
-        int neededCols = _draggingCell?.ColSpan ?? 1;
-        int neededRows = _draggingCell?.RowSpan ?? 1;
-
-        int dropLayer = _draggingCell?.CollisionLayer ?? 1;
-        bool collision = GridLayoutService.HasLayerCollision(GridCells, dropLayer, _draggingCell,
-            targetCell.CanvasX, targetCell.CanvasY, neededCols, neededRows);
-
-        if (collision)
-        { ShakeScreen(); return; }
-
-        if (files != null && files.Any())
-        {
-            try
-            { LoadImageToCell(targetCell, files.First().Path.LocalPath); }
-            catch { }
-            return;
-        }
-
-        if (_draggingCell != null && _draggingCell != targetCell)
-        {
-            if (_draggingCell.IsVideo)
-                targetCell.SetVideo(_draggingCell.VideoPath!, _draggingCell.FilePath!);
-            else if (_draggingCell.IsImage)
-                targetCell.SetImage(_draggingCell.FilePath!);
-            else if (_draggingCell.IsText)
-                targetCell.SetText(_draggingCell.TextContent ?? "");
-
-            targetCell.ColSpan = _draggingCell.ColSpan;
-            targetCell.RowSpan = _draggingCell.RowSpan;
-
-            _draggingCell.Clear();
-            GridCells.Remove(_draggingCell);
-            MarkUnsaved();
-            SaveBoardData();
         }
 
         _draggingCell = null;
@@ -1107,14 +1095,31 @@ public partial class MainWindow
             var pastedFiles = await data.TryGetFilesAsync();
             if (pastedFiles != null && pastedFiles.Any())
             {
+                string filePath = pastedFiles.First().Path.LocalPath;
+                string ext = Path.GetExtension(filePath).ToLowerInvariant();
+                string[] imageExtensions = { ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp" };
+                string[] videoExtensions = { ".mp4", ".webm", ".avi", ".mov", ".mkv" };
+                string[] textExtensions = { ".txt", ".md", ".log", ".csv", ".json", ".xml" };
+
+                bool isImage = imageExtensions.Contains(ext);
+                bool isVideo = videoExtensions.Contains(ext);
+                bool isText = textExtensions.Contains(ext);
+
+                if (!isImage && !isVideo && !isText)
+                {
+                    ShowToast("⚠️ Unsupported file format");
+                    return;
+                }
+
                 try
                 {
-                    string imagePath = pastedFiles.First().Path.LocalPath;
-
-                    var dimensions = GridLayoutService.GetImageDimensions(imagePath);
-                    var (colSpan, rowSpan) = dimensions != null
-                        ? GridLayoutService.CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height)
-                        : (2, 2);
+                    int colSpan = 2, rowSpan = 2;
+                    if (isImage)
+                    {
+                        var dimensions = GridLayoutService.GetImageDimensions(filePath);
+                        if (dimensions != null)
+                            (colSpan, rowSpan) = GridLayoutService.CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height);
+                    }
 
                     Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, preferredX, preferredY, colSpan, rowSpan, collisionLayer: 1);
 
@@ -1124,13 +1129,6 @@ public partial class MainWindow
                         return;
                     }
 
-                    string destDir = Path.Combine(_workspaceDir, "images");
-                    if (!Directory.Exists(destDir))
-                        Directory.CreateDirectory(destDir);
-                    string destPath = Path.Combine(destDir, Path.GetFileName(imagePath));
-                    if (imagePath != destPath && !File.Exists(destPath))
-                        File.Copy(imagePath, destPath);
-
                     var newCell = new CellViewModel
                     {
                         CanvasX = emptySpace.Value.X,
@@ -1138,14 +1136,53 @@ public partial class MainWindow
                         ColSpan = colSpan,
                         RowSpan = rowSpan
                     };
-                    newCell.SetImage(destPath);
+
+                    if (isVideo)
+                    {
+                        string destDir = Path.Combine(_workspaceDir, "videos");
+                        if (!Directory.Exists(destDir))
+                            Directory.CreateDirectory(destDir);
+                        string destPath = Path.Combine(destDir, Path.GetFileName(filePath));
+                        if (filePath != destPath && !File.Exists(destPath))
+                            File.Copy(filePath, destPath);
+
+                        // Try to extract a thumbnail frame via ffmpeg
+                        string thumbDir = Path.Combine(_workspaceDir, "images");
+                        string? thumbPath = await YtDlpService.ExtractThumbnailAsync(destPath, thumbDir);
+                        newCell.SetVideo(destPath, thumbPath ?? destPath);
+                    }
+                    else if (isText)
+                    {
+                        newCell.SetText(File.ReadAllText(filePath));
+                    }
+                    else
+                    {
+                        string destDir = Path.Combine(_workspaceDir, "images");
+                        if (!Directory.Exists(destDir))
+                            Directory.CreateDirectory(destDir);
+                        string destPath = Path.Combine(destDir, Path.GetFileName(filePath));
+                        if (filePath != destPath && !File.Exists(destPath))
+                            File.Copy(filePath, destPath);
+                        newCell.SetImage(destPath);
+                    }
+
+                    // Verify the cell has content (SetImage/SetVideo may fail for corrupt files)
+                    if (!newCell.HasContent)
+                    {
+                        ShowToast("⚠️ Could not load file");
+                        return;
+                    }
+
                     GridCells.Add(newCell);
                     HighlightCell(newCell);
                     MarkUnsaved();
                     SaveBoardData();
                     ShowToast("📋 Pasted");
                 }
-                catch { }
+                catch
+                {
+                    ShowToast("⚠️ Could not load file");
+                }
                 return;
             }
 

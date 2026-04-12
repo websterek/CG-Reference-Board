@@ -43,7 +43,7 @@ public static class YtDlpService
                     StartInfo = new ProcessStartInfo
                     {
                         FileName = ytDlpPath,
-                        Arguments = $"--write-thumbnail -f mp4 -o \"{outputTemplate}\" \"{url}\"",
+                        Arguments = $"--no-playlist --write-thumbnail --merge-output-format mp4 -o \"{outputTemplate}\" \"{url}\"",
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
                         UseShellExecute = false,
@@ -57,12 +57,24 @@ public static class YtDlpService
                 // when the process writes more than the OS buffer can hold.
                 var stdout = process.StandardOutput.ReadToEnd();
                 var stderr = process.StandardError.ReadToEnd();
-                process.WaitForExit();
 
-                var videoFile = Directory.GetFiles(videosDirectory, guid + ".mp4").FirstOrDefault();
-                var thumbnailFile = Directory.GetFiles(videosDirectory, guid + ".*")
-                    .FirstOrDefault(f => f.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
-                                     || f.EndsWith(".webp", StringComparison.OrdinalIgnoreCase));
+                if (!process.WaitForExit(TimeSpan.FromMinutes(5)))
+                {
+                    try
+                    { process.Kill(entireProcessTree: true); }
+                    catch { }
+                    return new VideoDownloadResult(false, null, null, "Download timed out after 5 minutes.");
+                }
+
+                string[] videoExtensions = { ".mp4", ".mkv", ".webm", ".avi", ".mov", ".m4v" };
+                string[] thumbExtensions = { ".jpg", ".jpeg", ".webp", ".png" };
+
+                var allFiles = Directory.GetFiles(videosDirectory, guid + ".*");
+
+                var videoFile = allFiles.FirstOrDefault(f =>
+                    videoExtensions.Any(ext => f.EndsWith(ext, StringComparison.OrdinalIgnoreCase)));
+                var thumbnailFile = allFiles.FirstOrDefault(f =>
+                    thumbExtensions.Any(ext => f.EndsWith(ext, StringComparison.OrdinalIgnoreCase)));
 
                 if (videoFile != null && thumbnailFile != null)
                 {
@@ -70,13 +82,94 @@ public static class YtDlpService
                 }
 
                 return new VideoDownloadResult(false, null, null,
-                    $"Download completed but expected files were not found. yt-dlp stderr: {stderr}");
+                    $"yt-dlp exited with code {process.ExitCode}. " +
+                    (string.IsNullOrWhiteSpace(stderr) ? "No error output." : $"stderr: {stderr}"));
             }
             catch (Exception ex)
             {
                 return new VideoDownloadResult(false, null, null, ex.Message);
             }
         });
+    }
+
+    /// <summary>
+    /// Extracts a single frame from a video file as a JPEG thumbnail using ffmpeg.
+    /// Returns the path to the generated thumbnail, or null on failure.
+    /// </summary>
+    /// <param name="videoPath">Path to the video file.</param>
+    /// <param name="outputDirectory">Directory where the thumbnail will be saved.</param>
+    public static Task<string?> ExtractThumbnailAsync(string videoPath, string outputDirectory)
+    {
+        return Task.Run(() =>
+        {
+            try
+            {
+                if (!Directory.Exists(outputDirectory))
+                    Directory.CreateDirectory(outputDirectory);
+
+                string thumbPath = Path.Combine(outputDirectory,
+                    Path.GetFileNameWithoutExtension(videoPath) + "_thumb.jpg");
+
+                if (File.Exists(thumbPath))
+                    return thumbPath;
+
+                string ffmpegPath = ResolveFfmpegPath();
+
+                using var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = ffmpegPath,
+                        // Extract a frame at 1 second into the video, scale to 400px wide
+                        Arguments = $"-y -ss 1 -i \"{videoPath}\" -vframes 1 -vf scale=400:-1 \"{thumbPath}\"",
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+
+                process.Start();
+                process.StandardOutput.ReadToEnd();
+                process.StandardError.ReadToEnd();
+
+                if (!process.WaitForExit(TimeSpan.FromSeconds(30)))
+                {
+                    try
+                    { process.Kill(entireProcessTree: true); }
+                    catch { }
+                    return null;
+                }
+
+                return File.Exists(thumbPath) ? thumbPath : null;
+            }
+            catch
+            {
+                return null;
+            }
+        });
+    }
+
+    /// <summary>
+    /// Resolves the path to the bundled ffmpeg executable, or falls back to a system-wide install.
+    /// </summary>
+    private static string ResolveFfmpegPath()
+    {
+        bool isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+
+        string relativePath = isWindows
+            ? Path.Combine("Include", "ffmpeg-windows", "ffmpeg.exe")
+            : Path.Combine("Include", "ffmpeg-linux", "ffmpeg");
+
+        if (File.Exists(relativePath))
+            return relativePath;
+
+        string baseDirPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", relativePath);
+        if (File.Exists(baseDirPath))
+            return baseDirPath;
+
+        // Fall back to system-wide ffmpeg
+        return "ffmpeg";
     }
 
     /// <summary>
