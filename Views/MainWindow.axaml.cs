@@ -1322,9 +1322,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
                 async Task LoadThrottled(CellViewModel cell, ImageLod lod)
                 {
-                    await sem.WaitAsync().ConfigureAwait(false);
+                    // Do NOT use ConfigureAwait(false) here. The semaphore wait must
+                    // resume on the Avalonia dispatcher (UI thread) so that ApplyLodAsync
+                    // captures the dispatcher SyncContext. This guarantees that after its
+                    // internal await Task.Run(...) the continuation — which sets Image =
+                    // newBitmap and disposes the old bitmap — runs on the UI thread and
+                    // never races with the compositor's in-flight render of the old bitmap.
+                    await sem.WaitAsync();
                     try
-                    { await cell.ApplyLodAsync(lod).ConfigureAwait(false); }
+                    { await cell.ApplyLodAsync(lod); }
                     finally { sem.Release(); }
                 }
 
