@@ -147,6 +147,14 @@ public class CellViewModel : ViewModelBase
         }
     }
 
+    private bool _isHighlighted;
+    /// <summary>Whether this cell is temporarily highlighted (e.g. after paste).</summary>
+    public bool IsHighlighted
+    {
+        get => _isHighlighted;
+        set => SetProperty(ref _isHighlighted, value);
+    }
+
     #endregion
 
     #region Derived Type Flags

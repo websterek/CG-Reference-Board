@@ -89,6 +89,7 @@ public partial class MainWindow
             startupOverlay.IsVisible = false;
 
         SaveBoardData();
+        ShowToast("💾 Saved");
     }
 
     private async void LoadBoard_Click(object? sender, RoutedEventArgs e)
@@ -108,7 +109,10 @@ public partial class MainWindow
         });
 
         if (files is { Count: > 0 })
+        {
             LoadBoardFromFile(files[0].Path.LocalPath);
+            ShowToast("📂 Opened");
+        }
     }
 
     private void NewBoard_Click(object? sender, RoutedEventArgs e)
@@ -119,10 +123,12 @@ public partial class MainWindow
         CurrentBoardName = "New Board";
         _hasUnsavedChanges = false;
         Title = Constants.AppName;
+        UpdateBoardDirectoryList();
 
         var startupOverlay = this.FindControl<Border>("StartupOverlay");
         if (startupOverlay != null)
             startupOverlay.IsVisible = false;
+        ShowToast("📄 New Board");
     }
 
     private async void ImportMedia_Click(object? sender, RoutedEventArgs e)
@@ -161,6 +167,7 @@ public partial class MainWindow
 
             var cell = new CellViewModel { CanvasX = x, CanvasY = y };
             GridCells.Add(cell);
+            HighlightCell(cell);
 
             string ext = Path.GetExtension(file.Path.LocalPath).ToLowerInvariant();
             if (videoExtensions.Contains(ext))
@@ -179,6 +186,7 @@ public partial class MainWindow
                 LoadImageToCell(cell, file.Path.LocalPath);
             }
         }
+        ShowToast("📥 Imported");
     }
 
     private void BoardDir_Click(object? sender, RoutedEventArgs e)
@@ -194,6 +202,7 @@ public partial class MainWindow
                 _currentBoardFile = path;
                 CurrentBoardName = Path.GetFileNameWithoutExtension(path);
                 LoadBoardFromFile(path);
+                ShowToast("📂 Opened");
             }
         }
     }
@@ -201,7 +210,10 @@ public partial class MainWindow
     private void RecentBoard_Click(object? sender, RoutedEventArgs e)
     {
         if (sender is Button btn && btn.DataContext is string path)
+        {
             LoadBoardFromFile(path);
+            ShowToast("📂 Opened");
+        }
     }
 
     #endregion
@@ -251,6 +263,7 @@ public partial class MainWindow
             item.SetBitmap(bitmap);
             dt.Add(item);
             await clipboard.SetDataAsync(dt);
+            ShowToast("📋 Copied");
         }
         catch (Exception ex)
         {
@@ -271,6 +284,7 @@ public partial class MainWindow
             item.SetText(cell.TextContent);
             dt.Add(item);
             await clipboard.SetDataAsync(dt);
+            ShowToast("📋 Copied");
         }
     }
 
@@ -287,6 +301,7 @@ public partial class MainWindow
             item.SetText(cell.FilePath);
             dt.Add(item);
             await clipboard.SetDataAsync(dt);
+            ShowToast("📋 Copied");
         }
     }
 
@@ -399,6 +414,7 @@ public partial class MainWindow
         GridCells.Remove(cell);
         MarkUnsaved();
         SaveBoardData();
+        ShowToast("🗑 Deleted");
     }
 
     #endregion
@@ -421,6 +437,7 @@ public partial class MainWindow
         newCell.SetText("New Text Block");
 
         GridCells.Add(newCell);
+        HighlightCell(newCell);
         MarkUnsaved();
         SaveBoardData();
     }
@@ -441,6 +458,7 @@ public partial class MainWindow
         newCell.SetText("New Label");
 
         GridCells.Add(newCell);
+        HighlightCell(newCell);
         MarkUnsaved();
         SaveBoardData();
     }
@@ -497,6 +515,7 @@ public partial class MainWindow
             };
 
             GridCells.Add(backdrop);
+            HighlightCell(backdrop);
             MarkUnsaved();
             SaveBoardData();
 
@@ -712,6 +731,7 @@ public partial class MainWindow
                     };
                     cell.SetImage(destPath);
                     GridCells.Add(cell);
+                    HighlightCell(cell);
                 }
 
                 currentCol++;
@@ -815,7 +835,10 @@ public partial class MainWindow
         if (e.Key == Key.S && isCtrl)
         {
             if (!string.IsNullOrEmpty(_currentBoardFile))
+            {
                 SaveBoardData();
+                ShowToast("💾 Saved");
+            }
             else
                 SaveBoard_Click(null, null!);
             return;
@@ -891,7 +914,9 @@ public partial class MainWindow
                     await DownloadVideoToCell(cell, text);
                 else
                     cell.SetText(text);
+                HighlightCell(cell);
                 SaveBoardData();
+                ShowToast("📋 Pasted");
                 return;
             }
 
@@ -931,8 +956,10 @@ public partial class MainWindow
                     };
                     newCell.SetImage(destPath);
                     GridCells.Add(newCell);
+                    HighlightCell(newCell);
                     MarkUnsaved();
                     SaveBoardData();
+                    ShowToast("📋 Pasted");
                 }
                 catch { }
                 return;
@@ -968,8 +995,10 @@ public partial class MainWindow
                 };
                 newCell.SetImage(path);
                 GridCells.Add(newCell);
+                HighlightCell(newCell);
                 MarkUnsaved();
                 SaveBoardData();
+                ShowToast("📋 Pasted");
                 return;
             }
 

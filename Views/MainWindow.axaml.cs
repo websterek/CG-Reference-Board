@@ -58,6 +58,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         RestoreBoardState(_undoStack.Peek());
         SaveBoardData();
 
+        ShowToast("↩ Undo");
         _isRestoringState = false;
     }
 
@@ -72,6 +73,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         RestoreBoardState(next);
         SaveBoardData();
 
+        ShowToast("↪ Redo");
         _isRestoringState = false;
     }
 
@@ -357,6 +359,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private Point _lastPointerPosition;
     private bool _isEdgeScrolling;
 
+    // Toast notification
+    private System.Threading.CancellationTokenSource? _toastCts;
+
     #endregion
 
 
@@ -556,7 +561,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             BoardFilesInDirectory.Add(new BoardMenuItemViewModel
             {
                 FileName = Path.GetFileName(file),
-                IsActive = file == _currentBoardFile
+                IsActive = !string.IsNullOrEmpty(_currentBoardFile) &&
+                           Path.GetFullPath(file) == Path.GetFullPath(_currentBoardFile)
             });
         }
         OnPropertyChanged(nameof(HasBoardFilesInDirectory));
@@ -687,6 +693,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             a.IsSelected = false;
         _selectedAnnotations.Clear();
         OnPropertyChanged(nameof(SelectionCountText));
+    }
+
+    #endregion
+
+    #region Highlight Helpers
+
+    /// <summary>Briefly highlights a cell to draw attention to it (e.g. after paste).</summary>
+    private async void HighlightCell(CellViewModel cell)
+    {
+        cell.IsHighlighted = true;
+        await Task.Delay(800);
+        cell.IsHighlighted = false;
     }
 
     #endregion
@@ -830,6 +848,40 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 _translate.Y += dy;
             }
         });
+    }
+
+    #endregion
+
+    #region Toast Notification
+
+    /// <summary>Shows a brief toast message at the bottom of the window.</summary>
+    private async void ShowToast(string message)
+    {
+        var border = this.FindControl<Border>("ToastBorder");
+        var text = this.FindControl<TextBlock>("ToastText");
+        if (border == null || text == null)
+            return;
+
+        // Cancel any existing toast
+        _toastCts?.Cancel();
+        _toastCts = new System.Threading.CancellationTokenSource();
+        var token = _toastCts.Token;
+
+        text.Text = message;
+        border.IsVisible = true;
+        border.Opacity = 1;
+
+        try
+        {
+            await Task.Delay(1500, token);
+            border.Opacity = 0;
+            await Task.Delay(250, token);
+            border.IsVisible = false;
+        }
+        catch (TaskCanceledException)
+        {
+            // New toast replaced this one — that's fine
+        }
     }
 
     #endregion
