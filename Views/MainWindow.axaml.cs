@@ -36,6 +36,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private class UserSettings
     {
         public string AnnotationEffect { get; set; } = "None";
+        public string GridBackground { get; set; } = "Dots";
     }
 
     #region INPC Support
@@ -346,6 +347,27 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public bool IsEllipseSelected => CurrentTool == "Ellipse";
     public bool IsEraserSelected => CurrentTool == "Eraser";
     public bool IsMoveSelected => CurrentTool == "Move";
+
+    // ───────── Grid background ─────────
+    private string _gridBackgroundMode = "Dots";
+    public string GridBackgroundMode
+    {
+        get => _gridBackgroundMode;
+        set
+        {
+            if (_gridBackgroundMode == value)
+                return;
+            _gridBackgroundMode = value;
+            OnPropertyChanged(nameof(GridBackgroundMode));
+            OnPropertyChanged(nameof(IsGridBackgroundDots));
+            OnPropertyChanged(nameof(IsGridBackgroundGrid));
+            OnPropertyChanged(nameof(IsGridBackgroundNone));
+            SaveUserSettings();
+        }
+    }
+    public bool IsGridBackgroundDots => _gridBackgroundMode == "Dots";
+    public bool IsGridBackgroundGrid => _gridBackgroundMode == "Grid";
+    public bool IsGridBackgroundNone => _gridBackgroundMode == "None";
 
     // ───────── Annotation effect ─────────
     private string _annotationEffect = "None";
@@ -739,7 +761,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (settings != null)
             {
                 AnnotationEffectMode = settings.AnnotationEffect ?? "None";
-
+                GridBackgroundMode = settings.GridBackground ?? "Dots";
             }
         }
         catch { /* ignore corrupt settings */ }
@@ -756,7 +778,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             string confPath = Path.Combine(confDir, Constants.UserSettingsFileName);
             var settings = new UserSettings
             {
-                AnnotationEffect = _annotationEffect
+                AnnotationEffect = _annotationEffect,
+                GridBackground = _gridBackgroundMode
             };
             await File.WriteAllTextAsync(confPath, JsonSerializer.Serialize(settings));
         }

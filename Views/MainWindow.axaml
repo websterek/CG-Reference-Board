@@ -204,6 +204,35 @@
                                 </MenuItem.Icon>
                             </MenuItem>
                             <Separator />
+                            <MenuItem Header="Canvas Background">
+                                <MenuItem.Icon>
+                                    <PathIcon Data="M3 3H21V21H3V3M5 5V19H19V5H5Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                                </MenuItem.Icon>
+                                <MenuItem
+                                    Header="Dots"
+                                    Click="GridBackgroundDots_Click"
+                                >
+                                    <MenuItem.Icon>
+                                        <Ellipse Width="8" Height="8" Fill="White" IsVisible="{Binding IsGridBackgroundDots}" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem
+                                    Header="Grid"
+                                    Click="GridBackgroundGrid_Click"
+                                >
+                                    <MenuItem.Icon>
+                                        <Ellipse Width="8" Height="8" Fill="White" IsVisible="{Binding IsGridBackgroundGrid}" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem
+                                    Header="None"
+                                    Click="GridBackgroundNone_Click"
+                                >
+                                    <MenuItem.Icon>
+                                        <Ellipse Width="8" Height="8" Fill="White" IsVisible="{Binding IsGridBackgroundNone}" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                            </MenuItem>
                             <MenuItem Header="Annotation Effect">
                                 <MenuItem.Icon>
                                     <PathIcon Data="M17.66 11.2C17.43 10.9 17.15 10.64 16.89 10.38C16.22 9.78 15.46 9.35 14.82 8.72C13.33 7.26 13 4.85 13.95 3C13 3.23 12.17 3.75 11.46 4.32C8.87 6.4 7.85 10.07 9.07 13.22C9.11 13.32 9.15 13.42 9.15 13.55C9.15 13.77 9 13.97 8.8 14.05C8.57 14.15 8.33 14.09 8.14 13.93C8.08 13.88 8.04 13.83 8 13.76C6.87 12.33 6.69 10.28 7.45 8.64C5.78 10 4.87 12.3 5 14.47C5.06 14.97 5.12 15.47 5.29 15.97C5.43 16.57 5.7 17.17 6 17.7C7.08 19.43 8.95 20.67 10.96 20.92C13.1 21.19 15.39 20.8 16.89 19.17C18.55 17.36 19.2 14.72 18.17 12.44L17.96 12.03C17.88 11.86 17.73 11.44 17.66 11.2M14.5 17.5C14.22 17.74 13.76 18 13.4 18.1C12.28 18.5 11.16 17.94 10.5 17.28C11.69 17 12.4 16.12 12.61 15.23C12.78 14.43 12.46 13.77 12.33 13C12.21 12.26 12.23 11.63 12.5 10.94C12.69 11.32 12.89 11.7 13.13 12C13.9 13 15.11 13.44 15.37 14.8C15.41 14.94 15.43 15.08 15.43 15.23C15.46 16.05 15.1 16.95 14.5 17.5Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
@@ -575,31 +604,48 @@
                                 </ContextMenu>
                             </Border.ContextMenu>
 
-                            <!-- Dot-grid pattern background -->
-                            <Border.Background>
-                                <VisualBrush
-                                    TileMode="Tile"
-                                    SourceRect="0,0,160,160"
-                                    DestinationRect="-1.5,-1.5,160,160"
-                                >
-                                    <VisualBrush.Visual>
-                                        <Canvas Width="160" Height="160">
-                                            <!-- Grid lines – positioned at canvas offset 1.5
-                                                 so with DestinationRect="-1.5,-1.5,160,160" they
-                                                 land exactly on the 160-px grid boundaries -->
-                                            <Rectangle Width="160" Height="1" Fill="#1A1A1A"
-                                                Canvas.Left="0" Canvas.Top="1.5" />
-                                            <Rectangle Width="1" Height="160" Fill="#1A1A1A"
-                                                Canvas.Left="1.5" Canvas.Top="0" />
-                                            <!-- Single intersection dot (3 px circle).
-                                                 With the -1.5 tile offset, its centre lands
-                                                 exactly on each grid intersection. -->
-                                            <Ellipse Width="3" Height="3" Fill="#3D3D3D"
-                                                Canvas.Left="0" Canvas.Top="0" />
-                                        </Canvas>
-                                    </VisualBrush.Visual>
-                                </VisualBrush>
-                            </Border.Background>
+                            <!-- Canvas background layers – one visible at a time -->
+                            <Panel>
+                                <!-- Dots: subtle grid lines + centred dot in each cell -->
+                                <Border IsVisible="{Binding IsGridBackgroundDots}">
+                                    <Border.Background>
+                                        <VisualBrush
+                                            TileMode="Tile"
+                                            SourceRect="0,0,160,160"
+                                            DestinationRect="0,0,160,160"
+                                        >
+                                            <VisualBrush.Visual>
+                                                <Canvas Width="160" Height="160">
+                                                        <Ellipse Width="6" Height="6" Fill="#3D3D3D"
+                                                            Canvas.Left="77" Canvas.Top="77" />
+                                                    </Canvas>
+                                            </VisualBrush.Visual>
+                                        </VisualBrush>
+                                    </Border.Background>
+                                </Border>
+
+                                <!-- Grid: lines only, slightly brighter so they read without dots -->
+                                <Border IsVisible="{Binding IsGridBackgroundGrid}">
+                                    <Border.Background>
+                                        <VisualBrush
+                                            TileMode="Tile"
+                                            SourceRect="0,0,160,160"
+                                            DestinationRect="0,0,160,160"
+                                        >
+                                            <VisualBrush.Visual>
+                                                <Canvas Width="160" Height="160">
+                                                    <Rectangle Width="160" Height="0.5" Fill="#282828"
+                                                        Canvas.Left="0" Canvas.Top="0" />
+                                                    <Rectangle Width="0.5" Height="160" Fill="#282828"
+                                                        Canvas.Left="0" Canvas.Top="0" />
+                                                </Canvas>
+                                            </VisualBrush.Visual>
+                                        </VisualBrush>
+                                    </Border.Background>
+                                </Border>
+
+                                <!-- None: fully transparent – nothing to render -->
+                            </Panel>
                         </Border>
 
                         <!-- ─────────────────────────────────────────── -->

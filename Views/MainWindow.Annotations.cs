@@ -298,5 +298,14 @@ public partial class MainWindow
     private void AnnotationEffectOutline_Click(object? sender, RoutedEventArgs e)
         => AnnotationEffectMode = "Outline";
 
+    private void GridBackgroundDots_Click(object? sender, RoutedEventArgs e)
+        => GridBackgroundMode = "Dots";
+
+    private void GridBackgroundGrid_Click(object? sender, RoutedEventArgs e)
+        => GridBackgroundMode = "Grid";
+
+    private void GridBackgroundNone_Click(object? sender, RoutedEventArgs e)
+        => GridBackgroundMode = "None";
+
     #endregion
 }
