@@ -349,18 +349,15 @@ public partial class MainWindow
 
         if (cell.IsBackdrop)
         {
-            string[] bgColors = { "#88222222", "#885A3A10", "#881A3A4A", "#881A4A2A", "#884A1A2A", "#88444444" };
-            string[] fgColors = { "#AAFFFFFF", "#FFFFA500", "#FF44AAFF", "#FF66FF66", "#FFFF6666", "#FFFFFF66" };
-            int idx = Array.IndexOf(bgColors, cell.BackgroundColor);
-            int next = (idx + 1) % bgColors.Length;
-            cell.BackgroundColor = bgColors[next];
-            cell.ForegroundColor = fgColors[next];
+            int idx = Array.IndexOf(Constants.BackdropBackgroundColors, cell.BackgroundColor);
+            int next = (idx + 1) % Constants.BackdropBackgroundColors.Length;
+            cell.BackgroundColor = Constants.BackdropBackgroundColors[next];
+            cell.ForegroundColor = Constants.BackdropForegroundColors[next];
         }
         else if (cell.IsLabel)
         {
-            string[] colors = { "#FFFFA500", "#FFFFFFFF", "#FF44AAFF", "#FFFF6666", "#FF66FF66", "#FFFFFF66" };
-            int idx = Array.IndexOf(colors, cell.ForegroundColor);
-            cell.ForegroundColor = colors[(idx + 1) % colors.Length];
+            int idx = Array.IndexOf(Constants.LabelForegroundColors, cell.ForegroundColor);
+            cell.ForegroundColor = Constants.LabelForegroundColors[(idx + 1) % Constants.LabelForegroundColors.Length];
         }
 
         MarkUnsaved();
@@ -507,9 +504,7 @@ public partial class MainWindow
         double x = Canvas.GetLeft(hoverHighlight);
         double y = Canvas.GetTop(hoverHighlight);
 
-        string[] bgColors = { "#88222222", "#885A3A10", "#881A3A4A", "#881A4A2A", "#884A1A2A", "#88444444" };
-        string[] fgColors = { "#AAFFFFFF", "#FFFFA500", "#FF44AAFF", "#FF66FF66", "#FFFF6666", "#FFFFFF66" };
-        int colorIdx = Random.Shared.Next(bgColors.Length);
+        int colorIdx = Random.Shared.Next(Constants.BackdropBackgroundColors.Length);
 
         var newCell = new CellViewModel
         {
@@ -517,8 +512,8 @@ public partial class MainWindow
             CanvasY = y,
             ColSpan = 4,
             RowSpan = 2,
-            BackgroundColor = bgColors[colorIdx],
-            ForegroundColor = fgColors[colorIdx]
+            BackgroundColor = Constants.BackdropBackgroundColors[colorIdx],
+            ForegroundColor = Constants.BackdropForegroundColors[colorIdx]
         };
         newCell.Type = CellType.Label;
         newCell.SetText("New Label");
@@ -570,9 +565,7 @@ public partial class MainWindow
                 return;
             }
 
-            string[] bgColors = { "#88222222", "#885A3A10", "#881A3A4A", "#881A4A2A", "#884A1A2A", "#88444444" };
-            string[] fgColors = { "#AAFFFFFF", "#FFFFA500", "#FF44AAFF", "#FF66FF66", "#FFFF6666", "#FFFFFF66" };
-            int colorIdx = Random.Shared.Next(bgColors.Length);
+            int colorIdx = Random.Shared.Next(Constants.BackdropBackgroundColors.Length);
 
             var backdrop = new CellViewModel
             {
@@ -582,8 +575,8 @@ public partial class MainWindow
                 RowSpan = rowSpan,
                 Type = CellType.Backdrop,
                 TextContent = "Backdrop",
-                BackgroundColor = bgColors[colorIdx],
-                ForegroundColor = fgColors[colorIdx]
+                BackgroundColor = Constants.BackdropBackgroundColors[colorIdx],
+                ForegroundColor = Constants.BackdropForegroundColors[colorIdx]
             };
 
             GridCells.Add(backdrop);
@@ -613,9 +606,7 @@ public partial class MainWindow
             int gridX = (int)(Math.Floor(x / Constants.GridSize) * Constants.GridSize);
             int gridY = (int)(Math.Floor(y / Constants.GridSize) * Constants.GridSize);
 
-            string[] bgColors = { "#88222222", "#885A3A10", "#881A3A4A", "#881A4A2A", "#884A1A2A", "#88444444" };
-            string[] fgColors = { "#AAFFFFFF", "#FFFFA500", "#FF44AAFF", "#FF66FF66", "#FFFF6666", "#FFFFFF66" };
-            int colorIdx = Random.Shared.Next(bgColors.Length);
+            int colorIdx = Random.Shared.Next(Constants.BackdropBackgroundColors.Length);
 
             // Create pending backdrop
             _pendingBackdrop = new CellViewModel
@@ -624,8 +615,8 @@ public partial class MainWindow
                 RowSpan = 4,
                 Type = CellType.Backdrop,
                 TextContent = "New Backdrop",
-                BackgroundColor = bgColors[colorIdx],
-                ForegroundColor = fgColors[colorIdx]
+                BackgroundColor = Constants.BackdropBackgroundColors[colorIdx],
+                ForegroundColor = Constants.BackdropForegroundColors[colorIdx]
             };
 
             // Show placement preview

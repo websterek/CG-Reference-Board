@@ -326,6 +326,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _ => "✏️"
     };
 
+    /// <summary>Notifies the UI that all zoom-dependent properties have changed.</summary>
+    private void NotifyZoomChanged()
+    {
+        OnPropertyChanged(nameof(ZoomLevelText));
+        OnPropertyChanged(nameof(ZoomInverseFactor));
+        OnPropertyChanged(nameof(ZoomIndependentBorderThickness));
+        OnPropertyChanged(nameof(ZoomIndependentCornerRadius));
+    }
+
     /// <summary>Tool selection properties for menu checkmarks.</summary>
     public bool IsBrushSelected => CurrentTool == "Brush";
     public bool IsTextSelected => CurrentTool == "Text";
@@ -478,9 +487,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         LoadUserSettings();
         RecentBoardsList.ItemsSource = RecentBoards;
 
-        _workspaceDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            Constants.ConfigDirName, "Assets");
+        _workspaceDir = Path.Combine(Constants.ConfigDirectory, "Assets");
         if (!Directory.Exists(_workspaceDir))
             Directory.CreateDirectory(_workspaceDir);
 
@@ -543,7 +550,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
             OnPropertyChanged(nameof(WindowTitle));
 
-            string json = File.ReadAllText(_currentBoardFile);
+            string json = await File.ReadAllTextAsync(_currentBoardFile);
 
             // Dispose existing cell bitmaps and clear colour caches
             foreach (var c in GridCells)
@@ -646,9 +653,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private async void LoadRecentBoards()
     {
-        string path = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            Constants.ConfigDirName, Constants.RecentBoardsFileName);
+        string path = Path.Combine(Constants.ConfigDirectory, Constants.RecentBoardsFileName);
 
         if (File.Exists(path))
         {
@@ -675,9 +680,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         while (RecentBoards.Count > Constants.MaxRecentBoards)
             RecentBoards.RemoveAt(RecentBoards.Count - 1);
 
-        string confDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            Constants.ConfigDirName);
+        string confDir = Constants.ConfigDirectory;
         if (!Directory.Exists(confDir))
             Directory.CreateDirectory(confDir);
 
@@ -715,9 +718,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         try
         {
-            string path = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                Constants.ConfigDirName, Constants.UserSettingsFileName);
+            string path = Path.Combine(Constants.ConfigDirectory, Constants.UserSettingsFileName);
 
             if (!File.Exists(path))
                 return;
@@ -737,9 +738,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         try
         {
-            string confDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                Constants.ConfigDirName);
+            string confDir = Constants.ConfigDirectory;
             if (!Directory.Exists(confDir))
                 Directory.CreateDirectory(confDir);
 

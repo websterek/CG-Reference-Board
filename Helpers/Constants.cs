@@ -107,4 +107,29 @@ public static class Constants
 
     /// <summary>Thickness in pixels of the grid lines.</summary>
     public const double GridLineThickness = 0.5;
+
+    // ───────── Backdrop / Label color palettes ─────────
+
+    /// <summary>Background colors for backdrops (semi-transparent tinted).</summary>
+    public static readonly string[] BackdropBackgroundColors =
+        { "#88222222", "#885A3A10", "#881A3A4A", "#881A4A2A", "#884A1A2A", "#88444444" };
+
+    /// <summary>Foreground (text) colors paired with <see cref="BackdropBackgroundColors"/>.</summary>
+    public static readonly string[] BackdropForegroundColors =
+        { "#AAFFFFFF", "#FFFFA500", "#FF44AAFF", "#FF66FF66", "#FFFF6666", "#FFFFFF66" };
+
+    /// <summary>Foreground colors for standalone labels.</summary>
+    public static readonly string[] LabelForegroundColors =
+        { "#FFFFA500", "#FFFFFFFF", "#FF44AAFF", "#FFFF6666", "#FF66FF66", "#FFFFFF66" };
+
+    // ───────── Paths ─────────
+
+    /// <summary>
+    /// Returns the application config directory path
+    /// (e.g. ~/.config/CGReferenceBoard on Linux, %AppData%/CGReferenceBoard on Windows).
+    /// </summary>
+    public static string ConfigDirectory =>
+        System.IO.Path.Combine(
+            System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData),
+            ConfigDirName);
 }
