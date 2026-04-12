@@ -82,6 +82,18 @@
             x:Key="SelectionBorderBrush"
             Color="{StaticResource SelectionBorderColor}"
         />
+
+        <!-- ═══ Cell UI Constants ═══ -->
+        <CornerRadius x:Key="CellCornerRadius">4</CornerRadius>
+        <x:Double x:Key="CellBorderThickness">1.5</x:Double>
+
+        <!-- Cell hover: visible but subtle -->
+        <Color x:Key="CellHoverBorderColor">#6088AAFF</Color>
+        <SolidColorBrush x:Key="CellHoverBorderBrush" Color="{StaticResource CellHoverBorderColor}" />
+
+        <!-- Cell selection: more prominent -->
+        <Color x:Key="CellSelectionBorderColor">#BB44AAFF</Color>
+        <SolidColorBrush x:Key="CellSelectionBorderBrush" Color="{StaticResource CellSelectionBorderColor}" />
     </Application.Resources>
 
     <Application.Styles>

@@ -371,6 +371,9 @@ public partial class MainWindow
                 _scale.ScaleX = newScale;
                 _scale.ScaleY = newScale;
                 OnPropertyChanged(nameof(ZoomLevelText));
+                OnPropertyChanged(nameof(ZoomInverseFactor));
+                OnPropertyChanged(nameof(ZoomIndependentBorderThickness));
+        OnPropertyChanged(nameof(ZoomIndependentCornerRadius));
             }
 
             _middleZoomStartY = screenPt.Y;
@@ -592,11 +595,14 @@ public partial class MainWindow
         _scale.ScaleX = newScale;
         _scale.ScaleY = newScale;
         OnPropertyChanged(nameof(ZoomLevelText));
+        OnPropertyChanged(nameof(ZoomInverseFactor));
+        OnPropertyChanged(nameof(ZoomIndependentBorderThickness));
+        OnPropertyChanged(nameof(ZoomIndependentCornerRadius));
     }
 
     #endregion
 
-    #region View Navigation
+    #region Viewport Navigation
 
     private void ShowAll_Click(object? sender, RoutedEventArgs e)
     {
@@ -607,6 +613,9 @@ public partial class MainWindow
             _scale.ScaleX = 1;
             _scale.ScaleY = 1;
             OnPropertyChanged(nameof(ZoomLevelText));
+            OnPropertyChanged(nameof(ZoomInverseFactor));
+            OnPropertyChanged(nameof(ZoomIndependentBorderThickness));
+        OnPropertyChanged(nameof(ZoomIndependentCornerRadius));
             return;
         }
 
@@ -660,6 +669,9 @@ public partial class MainWindow
         _translate.X = viewportWidth / 2 / scale - (minX + maxX) / 2;
         _translate.Y = viewportHeight / 2 / scale - (minY + maxY) / 2;
         OnPropertyChanged(nameof(ZoomLevelText));
+        OnPropertyChanged(nameof(ZoomInverseFactor));
+        OnPropertyChanged(nameof(ZoomIndependentBorderThickness));
+        OnPropertyChanged(nameof(ZoomIndependentCornerRadius));
     }
 
     private void ShowSelected_Click(object? sender, RoutedEventArgs e)
@@ -717,6 +729,9 @@ public partial class MainWindow
         _translate.X = viewportWidth / 2 / scale - (minX + maxX) / 2;
         _translate.Y = viewportHeight / 2 / scale - (minY + maxY) / 2;
         OnPropertyChanged(nameof(ZoomLevelText));
+        OnPropertyChanged(nameof(ZoomInverseFactor));
+        OnPropertyChanged(nameof(ZoomIndependentBorderThickness));
+        OnPropertyChanged(nameof(ZoomIndependentCornerRadius));
     }
 
     /// <summary>
@@ -745,6 +760,9 @@ public partial class MainWindow
         _translate.Y = viewportHeight / 2 / scale - cellCenterY;
 
         OnPropertyChanged(nameof(ZoomLevelText));
+        OnPropertyChanged(nameof(ZoomInverseFactor));
+        OnPropertyChanged(nameof(ZoomIndependentBorderThickness));
+        OnPropertyChanged(nameof(ZoomIndependentCornerRadius));
     }
 
     private void ZoomReset_Click(object? sender, RoutedEventArgs e)
@@ -752,6 +770,9 @@ public partial class MainWindow
         _scale.ScaleX = 1;
         _scale.ScaleY = 1;
         OnPropertyChanged(nameof(ZoomLevelText));
+        OnPropertyChanged(nameof(ZoomInverseFactor));
+        OnPropertyChanged(nameof(ZoomIndependentBorderThickness));
+        OnPropertyChanged(nameof(ZoomIndependentCornerRadius));
         ScheduleViewportUpdate();
     }
 

@@ -270,6 +270,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     /// <summary>Current zoom level as percentage string for the status bar.</summary>
     public string ZoomLevelText => $"{_scale.ScaleX * 100:F0}%";
 
+    /// <summary>Inverse of current zoom scale for zoom-independent UI elements.</summary>
+    public double ZoomInverseFactor => 1.0 / _scale.ScaleX;
+
+    /// <summary>Border thickness that remains constant regardless of zoom level.</summary>
+    public Thickness ZoomIndependentBorderThickness => new Thickness(1.5 / _scale.ScaleX);
+
+    /// <summary>Corner radius that remains constant regardless of zoom level.</summary>
+    public CornerRadius ZoomIndependentCornerRadius => new CornerRadius(4.0 / _scale.ScaleX);
+
     /// <summary>Application version string for the status bar.</summary>
     public string VersionText => $"v{Constants.AppVersion}";
 

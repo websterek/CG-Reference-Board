@@ -765,7 +765,7 @@
                                         Classes="CellRoot"
                                         Width="{Binding PixelWidth}"
                                         Height="{Binding PixelHeight}"
-                                        BorderThickness="1"
+                                        BorderThickness="{Binding ZoomIndependentBorderThickness, RelativeSource={RelativeSource AncestorType=views:MainWindow}}"
                                         Cursor="Hand"
                                         PointerEntered="Cell_PointerEntered"
                                         PointerExited="Cell_PointerExited"
@@ -954,6 +954,8 @@
                                                 Classes="SelectionHighlight"
                                                 IsVisible="{Binding IsSelected}"
                                                 ZIndex="8"
+                                                BorderThickness="{Binding ZoomIndependentBorderThickness, RelativeSource={RelativeSource AncestorType=views:MainWindow}}"
+                                                CornerRadius="{Binding ZoomIndependentCornerRadius, RelativeSource={RelativeSource AncestorType=views:MainWindow}}"
                                             />
 
                                             <!-- Paste/New highlight -->
