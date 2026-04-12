@@ -79,6 +79,7 @@ public partial class MainWindow
         // Annotation mode: Move/Select
         if (IsDrawMode && IsMoveMode && !e.Handled && props.IsLeftButtonPressed)
         {
+            _selectionAdditive = e.KeyModifiers.HasFlag(KeyModifiers.Control);
             _isSelectingAnnotations = true;
             _annotationSelectionStart = e.GetPosition(mainCanvas);
 
@@ -92,9 +93,12 @@ public partial class MainWindow
                 marquee.IsVisible = true;
             }
 
-            _selectedAnnotations.Clear();
-            foreach (var a in Annotations)
-                a.IsSelected = false;
+            if (!_selectionAdditive)
+            {
+                _selectedAnnotations.Clear();
+                foreach (var a in Annotations)
+                    a.IsSelected = false;
+            }
             e.Pointer.Capture(sender as IInputElement);
             return;
         }
@@ -152,8 +156,8 @@ public partial class MainWindow
         // Left-click on empty canvas space: start cell marquee selection
         else if (!e.Handled && props.IsLeftButtonPressed && !IsDrawMode)
         {
-            _cellSelectionAdditive = e.KeyModifiers.HasFlag(KeyModifiers.Control);
-            if (!_cellSelectionAdditive)
+            _selectionAdditive = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+            if (!_selectionAdditive)
                 ClearSelection();
             _isSelectingCells = true;
             _cellSelectionStart = e.GetPosition(mainCanvas);
@@ -432,10 +436,15 @@ public partial class MainWindow
                 double right = left + marquee.Width;
                 double bottom = top + marquee.Height;
 
-                _selectedAnnotations.Clear();
+                if (!_selectionAdditive)
+                {
+                    _selectedAnnotations.Clear();
+                    foreach (var ann in Annotations)
+                        ann.IsSelected = false;
+                }
+
                 foreach (var ann in Annotations)
                 {
-                    ann.IsSelected = false;
                     bool inRect = ann.Points.Any(p =>
                     {
                         double px = p.X + ann.CanvasX;
@@ -443,7 +452,7 @@ public partial class MainWindow
                         return px >= left && px <= right && py >= top && py <= bottom;
                     });
 
-                    if (inRect)
+                    if (inRect && !ann.IsSelected)
                     {
                         ann.IsSelected = true;
                         _selectedAnnotations.Add(ann);
@@ -531,7 +540,7 @@ public partial class MainWindow
 
                 if (cellMarquee.Width > 4 || cellMarquee.Height > 4)
                 {
-                    if (!_cellSelectionAdditive)
+                    if (!_selectionAdditive)
                     {
                         _selectedCells.Clear();
                         foreach (var cell in GridCells)

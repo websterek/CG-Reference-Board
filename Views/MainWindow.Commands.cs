@@ -1078,15 +1078,30 @@ public partial class MainWindow
             var text = await data.TryGetTextAsync();
             if (!string.IsNullOrEmpty(text))
             {
-                var cell = GetOrCreateContentCellAt(new Point(preferredX, preferredY));
-                if (cell.HasContent && !cell.IsBoardElement)
-                { ShakeScreen(); return; }
+                Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, preferredX, preferredY, 2, 2, collisionLayer: 1);
+                if (emptySpace == null)
+                {
+                    ShakeScreen();
+                    return;
+                }
+
+                var newCell = new CellViewModel
+                {
+                    CanvasX = emptySpace.Value.X,
+                    CanvasY = emptySpace.Value.Y,
+                    ColSpan = 2,
+                    RowSpan = 2
+                };
+                GridCells.Add(newCell);
+                SelectAndPanToCell(newCell);
 
                 if (text.Contains("youtube.com") || text.Contains("youtu.be") || text.StartsWith("http"))
-                    await DownloadVideoToCell(cell, text);
+                    await DownloadVideoToCell(newCell, text);
                 else
-                    cell.SetText(text);
-                HighlightCell(cell);
+                    newCell.SetText(text);
+
+                HighlightCell(newCell);
+                MarkUnsaved();
                 SaveBoardData();
                 ShowToast("📋 Pasted");
                 return;
@@ -1174,6 +1189,7 @@ public partial class MainWindow
                     }
 
                     GridCells.Add(newCell);
+                    SelectAndPanToCell(newCell);
                     HighlightCell(newCell);
                     MarkUnsaved();
                     SaveBoardData();
@@ -1219,6 +1235,7 @@ public partial class MainWindow
                 };
                 newCell.SetImage(path);
                 GridCells.Add(newCell);
+                SelectAndPanToCell(newCell);
                 HighlightCell(newCell);
                 MarkUnsaved();
                 SaveBoardData();

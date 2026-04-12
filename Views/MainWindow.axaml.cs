@@ -424,7 +424,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly List<CellViewModel> _selectedCells = new();
     private bool _isSelectingCells;
     private Point _cellSelectionStart;
-    private bool _cellSelectionAdditive;
+    private bool _selectionAdditive;
 
     // Cell drag (single or group)
     private bool _isPointerDown;
@@ -915,6 +915,21 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         cell.IsHighlighted = true;
         await Task.Delay(800);
         cell.IsHighlighted = false;
+    }
+
+    /// <summary>
+    /// Selects a cell and pans the view to center on it without changing zoom.
+    /// </summary>
+    private void SelectAndPanToCell(CellViewModel cell)
+    {
+        ClearSelection();
+        cell.IsSelected = true;
+        _selectedCells.Add(cell);
+        UpdateSelectionState();
+
+        double centerX = cell.CanvasX + cell.ColSpan * Constants.GridSize / 2.0;
+        double centerY = cell.CanvasY + cell.RowSpan * Constants.GridSize / 2.0;
+        PanToPosition(centerX, centerY);
     }
 
     #endregion
