@@ -217,7 +217,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         set
         {
             _currentTool = value;
+            _isEraserMode = value == "Eraser";
+            _isMoveMode = value == "Move";
             OnPropertyChanged(nameof(CurrentTool));
+            OnPropertyChanged(nameof(IsEraserMode));
+            OnPropertyChanged(nameof(IsMoveMode));
             OnPropertyChanged(nameof(CanvasCursor));
             OnPropertyChanged(nameof(IsPencilSelected));
             OnPropertyChanged(nameof(IsTextSelected));
