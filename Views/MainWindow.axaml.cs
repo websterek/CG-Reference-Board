@@ -57,6 +57,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _redoStack.Push(current);
         RestoreBoardState(_undoStack.Peek());
         SaveBoardData();
+        ScheduleViewportUpdate();
 
         ShowToast("↩ Undo");
         _isRestoringState = false;
@@ -72,6 +73,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _undoStack.Push(next);
         RestoreBoardState(next);
         SaveBoardData();
+        ScheduleViewportUpdate();
 
         ShowToast("↪ Redo");
         _isRestoringState = false;
@@ -1022,8 +1024,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             return;
         _ = UpdateViewportLodAsync();
 
-        // Refresh the memory indicator in the status bar.
-        OnPropertyChanged(nameof(MemoryUsageText));
+
     }
 
     /// <summary>

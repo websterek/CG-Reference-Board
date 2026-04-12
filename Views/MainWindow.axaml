@@ -1316,7 +1316,7 @@
                 Padding="12,3"
                 Height="26"
             >
-                <Grid ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto, Auto, Auto, Auto, Auto, Auto">
+                <Grid ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto, Auto, Auto, Auto">
                     <!-- Mode indicator -->
                     <StackPanel
                         Grid.Column="0"
@@ -1376,19 +1376,9 @@
 
                     <Border Grid.Column="7" Classes="statusDivider" />
 
-                    <!-- Memory / LOD indicator -->
-                    <TextBlock
-                        Grid.Column="8"
-                        Text="{Binding MemoryUsageText}"
-                        Classes="statusText"
-                        Opacity="0.6"
-                    />
-
-                    <Border Grid.Column="9" Classes="statusDivider" />
-
                     <!-- App version -->
                     <TextBlock
-                        Grid.Column="10"
+                        Grid.Column="8"
                         Text="{Binding VersionText}"
                         Classes="statusText"
                         Opacity="0.5"
