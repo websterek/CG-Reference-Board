@@ -1,0 +1,180 @@
+<Styles
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+>
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Menu                                                       -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <Style Selector="MenuItem">
+        <Setter Property="Padding" Value="4,2" />
+        <Setter Property="MinHeight" Value="24" />
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Cell Root – idle state                                     -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <Style Selector="Border.CellRoot">
+        <Setter Property="BorderBrush" Value="#1AFFFFFF" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="ClipToBounds" Value="True" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.15" />
+                <BrushTransition Property="Background" Duration="0:0:0.15" />
+                <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.2" />
+            </Transitions>
+        </Setter>
+        <Setter Property="BoxShadow" Value="0 2 8 0 #18000000" />
+    </Style>
+
+    <!-- Cell Root – hover state -->
+    <Style Selector="Border.CellRoot:pointerover">
+        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+        <Setter Property="Background" Value="{StaticResource AccentBrushDim}" />
+        <Setter Property="BoxShadow" Value="0 4 16 0 #3044AAFF" />
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Resize Thumb – show on cell hover                          -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <Style Selector="Border.CellRoot Border#ResizeThumb">
+        <Setter Property="Opacity" Value="0" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.15" />
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Border.CellRoot:pointerover Border#ResizeThumb">
+        <Setter Property="Opacity" Value="0.7" />
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Window Control Buttons                                     -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <Style Selector="Button.windowBtn">
+        <Setter Property="Width" Value="46" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource TextDimmed}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.1" />
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Button.windowBtn:pointerover">
+        <Setter Property="Background" Value="#33FFFFFF" />
+    </Style>
+
+    <Style Selector="Button.windowBtnClose">
+        <Setter Property="Width" Value="46" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource TextDimmed}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.1" />
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Button.windowBtnClose:pointerover">
+        <Setter Property="Background" Value="#E81123" />
+        <Setter Property="Foreground" Value="White" />
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Context Menu                                               -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <Style Selector="ContextMenu">
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="4" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="#3AFFFFFF" />
+        <Setter Property="Background" Value="#E6222222" />
+    </Style>
+    <Style Selector="ContextMenu MenuItem">
+        <Setter Property="CornerRadius" Value="4" />
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Download Indicator – pulsing dot animation                 -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <Style Selector="Ellipse.PulsingDot">
+        <Style.Animations>
+            <Animation
+                Duration="0:0:1"
+                IterationCount="Infinite"
+                PlaybackDirection="Alternate"
+            >
+                <KeyFrame Cue="0%">
+                    <Setter Property="Opacity" Value="0.2" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Opacity" Value="1.0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Status Bar                                                 -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <Style Selector="TextBlock.statusText">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.statusDivider">
+        <Setter Property="Width" Value="1" />
+        <Setter Property="Background" Value="{StaticResource BorderBrushSubtle}" />
+        <Setter Property="Margin" Value="8,4" />
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Selection Highlights                                       -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <Style Selector="Border.SelectionHighlight">
+        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+        <Setter Property="BorderThickness" Value="2.5" />
+        <Setter Property="Background" Value="{StaticResource SelectionBrush}" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="IsHitTestVisible" Value="False" />
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Startup Overlay                                            -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <Style Selector="Button.startupBtn">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Padding" Value="24,12" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Overlay Close Button                                       -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <Style Selector="Button.overlayCloseBtn">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Background" Value="#33FFFFFF" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="HorizontalAlignment" Value="Right" />
+        <Setter Property="VerticalAlignment" Value="Top" />
+        <Setter Property="Margin" Value="20" />
+        <Setter Property="Padding" Value="14,8" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+</Styles>

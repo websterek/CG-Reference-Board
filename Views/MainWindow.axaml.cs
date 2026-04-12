@@ -45,7 +45,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void Undo()
     {
-        if (_undoStack.Count <= 1 || _isViewMode) return;
+        if (_undoStack.Count <= 1 || _isViewMode)
+            return;
         _isRestoringState = true;
 
         string current = _undoStack.Pop();
@@ -58,7 +59,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void Redo()
     {
-        if (_redoStack.Count == 0 || _isViewMode) return;
+        if (_redoStack.Count == 0 || _isViewMode)
+            return;
         _isRestoringState = true;
 
         string next = _redoStack.Pop();
@@ -81,8 +83,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _editingTextAnnotation = null;
 
         var (cells, annotations) = BoardSerializer.Deserialize(json);
-        foreach (var cell in cells) GridCells.Add(cell);
-        foreach (var ann in annotations) Annotations.Add(ann);
+        foreach (var cell in cells)
+            GridCells.Add(cell);
+        foreach (var ann in annotations)
+            Annotations.Add(ann);
     }
 
     #endregion
@@ -104,7 +108,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         get => _isDrawMode;
         set
         {
-            if (_isDrawMode == value) return;
+            if (_isDrawMode == value)
+                return;
             _isDrawMode = value;
             // Clear any lingering selection when switching modes to avoid confusion
             ClearSelection();
@@ -114,7 +119,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             OnPropertyChanged(nameof(ModeIndicatorColor));
             OnPropertyChanged(nameof(IsCursorIconVisible));
 
-            if (value) IsAnnotationsVisible = true;
+            if (value)
+                IsAnnotationsVisible = true;
         }
     }
 
@@ -299,7 +305,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     // Cell interaction
     private CellViewModel? _hoveredCell;
     private CellViewModel? _editingTextCell;
-    private static CellViewModel? _draggingCell;
+    private CellViewModel? _draggingCell;
 
     // Pan/Zoom
     private bool _isPanning;
@@ -355,7 +361,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _workspaceDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             Constants.ConfigDirName, "Assets");
-        if (!Directory.Exists(_workspaceDir)) Directory.CreateDirectory(_workspaceDir);
+        if (!Directory.Exists(_workspaceDir))
+            Directory.CreateDirectory(_workspaceDir);
 
         OnPropertyChanged(nameof(WindowTitle));
         CanvasGrid.ItemsSource = GridCells;
@@ -366,7 +373,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         tg.Children.Add(_scale);
 
         var mainCanvas = this.FindControl<Canvas>("MainCanvas");
-        if (mainCanvas != null) mainCanvas.RenderTransform = tg;
+        if (mainCanvas != null)
+            mainCanvas.RenderTransform = tg;
 
         // Initialize custom cursor icon position off-screen
         var cursorIcon = this.FindControl<Border>("CursorIconContainer");
@@ -405,7 +413,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             UpdateBoardDirectoryList();
 
             var startupOverlay = this.FindControl<Border>("StartupOverlay");
-            if (startupOverlay != null) startupOverlay.IsVisible = false;
+            if (startupOverlay != null)
+                startupOverlay.IsVisible = false;
 
             string json = await File.ReadAllTextAsync(_currentBoardFile);
 
@@ -416,8 +425,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _editingTextAnnotation = null;
 
             var (cells, annotations) = BoardSerializer.Deserialize(json);
-            foreach (var cell in cells) GridCells.Add(cell);
-            foreach (var ann in annotations) Annotations.Add(ann);
+            foreach (var cell in cells)
+                GridCells.Add(cell);
+            foreach (var ann in annotations)
+                Annotations.Add(ann);
 
             _hasUnsavedChanges = false;
             Title = $"{Constants.AppName} - {Path.GetFileName(_currentBoardFile)}" + (_isViewMode ? " [VIEW MODE]" : "");
@@ -438,7 +449,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     /// </summary>
     private async void SaveBoardData()
     {
-        if (string.IsNullOrEmpty(_currentBoardFile)) return;
+        if (string.IsNullOrEmpty(_currentBoardFile))
+            return;
 
         string json = BoardSerializer.Serialize(GridCells, Annotations);
 
@@ -461,7 +473,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void MarkUnsaved()
     {
-        if (_hasUnsavedChanges) return;
+        if (_hasUnsavedChanges)
+            return;
         _hasUnsavedChanges = true;
         Title = Constants.AppName
             + (string.IsNullOrEmpty(_currentBoardFile) ? "" : $" - {Path.GetFileName(_currentBoardFile)}")
@@ -472,7 +485,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     #region Recent Boards
 
-    private void LoadRecentBoards()
+    private async void LoadRecentBoards()
     {
         string path = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -482,7 +495,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             try
             {
-                var list = JsonSerializer.Deserialize<List<string>>(File.ReadAllText(path));
+                string json = await File.ReadAllTextAsync(path);
+                var list = JsonSerializer.Deserialize<List<string>>(json);
                 if (list != null)
                 {
                     foreach (var b in list.Where(File.Exists))
@@ -494,9 +508,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         OnPropertyChanged(nameof(HasRecentBoards));
     }
 
-    private void AddRecentBoard(string path)
+    private async void AddRecentBoard(string path)
     {
-        if (RecentBoards.Contains(path)) RecentBoards.Remove(path);
+        if (RecentBoards.Contains(path))
+            RecentBoards.Remove(path);
         RecentBoards.Insert(0, path);
         while (RecentBoards.Count > Constants.MaxRecentBoards)
             RecentBoards.RemoveAt(RecentBoards.Count - 1);
@@ -504,10 +519,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         string confDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             Constants.ConfigDirName);
-        if (!Directory.Exists(confDir)) Directory.CreateDirectory(confDir);
+        if (!Directory.Exists(confDir))
+            Directory.CreateDirectory(confDir);
 
         string confPath = Path.Combine(confDir, Constants.RecentBoardsFileName);
-        try { File.WriteAllText(confPath, JsonSerializer.Serialize(RecentBoards)); }
+        try
+        { await File.WriteAllTextAsync(confPath, JsonSerializer.Serialize(RecentBoards)); }
         catch { /* non-critical */ }
 
         OnPropertyChanged(nameof(HasRecentBoards));
@@ -516,7 +533,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void UpdateBoardDirectoryList()
     {
         BoardFilesInDirectory.Clear();
-        if (string.IsNullOrEmpty(_workspaceDir) || !Directory.Exists(_workspaceDir)) return;
+        if (string.IsNullOrEmpty(_workspaceDir) || !Directory.Exists(_workspaceDir))
+            return;
 
         foreach (var file in Directory.GetFiles(_workspaceDir, $"*{Constants.DefaultBoardExtension}").OrderBy(Path.GetFileName))
         {
@@ -542,7 +560,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         int gridY = (int)(Math.Floor(canvasPoint.Y / Constants.GridSize) * Constants.GridSize);
 
         var existing = GridCells.FirstOrDefault(c => (int)c.CanvasX == gridX && (int)c.CanvasY == gridY);
-        if (existing != null) return existing;
+        if (existing != null)
+            return existing;
 
         var newCell = new CellViewModel { CanvasX = gridX, CanvasY = gridY };
         GridCells.Add(newCell);
@@ -562,7 +581,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         var existing = GridCells.FirstOrDefault(c =>
             (int)c.CanvasX == gridX && (int)c.CanvasY == gridY && !c.IsBoardElement);
-        if (existing != null) return existing;
+        if (existing != null)
+            return existing;
 
         var newCell = new CellViewModel { CanvasX = gridX, CanvasY = gridY };
         GridCells.Add(newCell);
@@ -595,16 +615,22 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     #region Image / Video Loading
 
-    private void LoadImageToCell(CellViewModel cell, string sourcePath)
+    private async void LoadImageToCell(CellViewModel cell, string sourcePath)
     {
-        if (!File.Exists(sourcePath)) return;
+        if (!File.Exists(sourcePath))
+            return;
 
         string destDir = Path.Combine(_workspaceDir, "images");
-        if (!Directory.Exists(destDir)) Directory.CreateDirectory(destDir);
+        if (!Directory.Exists(destDir))
+            Directory.CreateDirectory(destDir);
 
         string destPath = Path.Combine(destDir, Path.GetFileName(sourcePath));
         if (sourcePath != destPath && !File.Exists(destPath))
-            File.Copy(sourcePath, destPath);
+        {
+            using var sourceStream = File.OpenRead(sourcePath);
+            using var destStream = File.Create(destPath);
+            await sourceStream.CopyToAsync(destStream);
+        }
 
         cell.SetImage(destPath);
         MarkUnsaved();
@@ -689,7 +715,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             }
         });
 
-        if (file == null) return;
+        if (file == null)
+            return;
 
         _currentBoardFile = file.Path.LocalPath;
         _workspaceDir = Path.GetDirectoryName(_currentBoardFile)!;
@@ -701,7 +728,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         Directory.CreateDirectory(Path.Combine(_workspaceDir, "videos"));
 
         var startupOverlay = this.FindControl<Border>("StartupOverlay");
-        if (startupOverlay != null) startupOverlay.IsVisible = false;
+        if (startupOverlay != null)
+            startupOverlay.IsVisible = false;
 
         SaveBoardData();
     }
@@ -736,7 +764,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         Title = Constants.AppName;
 
         var startupOverlay = this.FindControl<Border>("StartupOverlay");
-        if (startupOverlay != null) startupOverlay.IsVisible = false;
+        if (startupOverlay != null)
+            startupOverlay.IsVisible = false;
     }
 
     private async void ImportMedia_Click(object? sender, RoutedEventArgs e)
@@ -756,7 +785,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         };
 
         var files = await this.StorageProvider.OpenFilePickerAsync(options);
-        if (files == null || files.Count == 0) return;
+        if (files == null || files.Count == 0)
+            return;
 
         string[] videoExtensions = { ".mp4", ".webm", ".avi", ".mov", ".mkv" };
         int startX = 0, startY = 0;
@@ -769,7 +799,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             while (GridCells.Any(c => (int)c.CanvasX == x && (int)c.CanvasY == y))
             {
                 x += (int)Constants.GridSize;
-                if (x > 1600) { x = startX; y += (int)Constants.GridSize; }
+                if (x > 1600)
+                { x = startX; y += (int)Constants.GridSize; }
             }
 
             var cell = new CellViewModel { CanvasX = x, CanvasY = y };
@@ -848,13 +879,26 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private async void CopyImage_Click(object? sender, RoutedEventArgs e)
     {
-        if (sender is MenuItem { DataContext: CellViewModel { FilePath: not null } cell })
-        {
-            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
-            if (clipboard == null) return;
+        if (sender is not MenuItem { DataContext: CellViewModel { FilePath: not null } cell })
+            return;
 
-            var file = await TopLevel.GetTopLevel(this)!.StorageProvider.TryGetFileFromPathAsync(cell.FilePath);
-            // Clipboard image copy omitted due to Avalonia 12 API changes
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (clipboard == null || !System.IO.File.Exists(cell.FilePath))
+            return;
+
+        try
+        {
+            using var stream = System.IO.File.OpenRead(cell.FilePath);
+            var bitmap = new Avalonia.Media.Imaging.Bitmap(stream);
+            var dt = new DataTransfer();
+            var item = new DataTransferItem();
+            item.SetBitmap(bitmap);
+            dt.Add(item);
+            await clipboard.SetDataAsync(dt);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Failed to copy image: {ex.Message}");
         }
     }
 
@@ -863,7 +907,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (sender is MenuItem { DataContext: CellViewModel cell } && !string.IsNullOrEmpty(cell.TextContent))
         {
             var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
-            if (clipboard == null) return;
+            if (clipboard == null)
+                return;
 
             var dt = new DataTransfer();
             var item = new DataTransferItem();
@@ -878,7 +923,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (sender is MenuItem { DataContext: CellViewModel { FilePath: not null } cell })
         {
             var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
-            if (clipboard == null) return;
+            if (clipboard == null)
+                return;
 
             var dt = new DataTransfer();
             var item = new DataTransferItem();
@@ -896,7 +942,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void ChangeColor_Click(object? sender, RoutedEventArgs e)
     {
-        if (sender is not MenuItem { DataContext: CellViewModel cell }) return;
+        if (sender is not MenuItem { DataContext: CellViewModel cell })
+            return;
 
         if (cell.IsBackdrop)
         {
@@ -950,13 +997,17 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void FitToContent_Click(object? sender, RoutedEventArgs e)
     {
-        if (sender is not MenuItem { DataContext: CellViewModel cell }) return;
-        if (!cell.IsImage && !cell.IsVideo) return; // Only works for images/videos
-        if (string.IsNullOrEmpty(cell.FilePath)) return;
+        if (sender is not MenuItem { DataContext: CellViewModel cell })
+            return;
+        if (!cell.IsImage && !cell.IsVideo)
+            return; // Only works for images/videos
+        if (string.IsNullOrEmpty(cell.FilePath))
+            return;
 
         // Get image dimensions
         var dimensions = GetImageDimensions(cell.FilePath);
-        if (dimensions == null) return;
+        if (dimensions == null)
+            return;
 
         // Calculate optimal size
         var (newColSpan, newRowSpan) = CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height);
@@ -978,14 +1029,20 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void DeleteCell_Click(object? sender, RoutedEventArgs e)
     {
-        if (_isViewMode) return;
-        if (sender is not MenuItem { DataContext: CellViewModel cell }) return;
+        if (_isViewMode)
+            return;
+        if (sender is not MenuItem { DataContext: CellViewModel cell })
+            return;
 
         // Clean up files on disk
         if (cell.FilePath != null && File.Exists(cell.FilePath))
-            try { File.Delete(cell.FilePath); } catch { /* non-critical */ }
+            try
+            { File.Delete(cell.FilePath); }
+            catch { /* non-critical */ }
         if (cell.VideoPath != null && File.Exists(cell.VideoPath))
-            try { File.Delete(cell.VideoPath); } catch { /* non-critical */ }
+            try
+            { File.Delete(cell.VideoPath); }
+            catch { /* non-critical */ }
 
         cell.Clear();
         GridCells.Remove(cell);
@@ -999,9 +1056,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void AddText_Click(object? sender, RoutedEventArgs e)
     {
-        if (_isViewMode) return;
+        if (_isViewMode)
+            return;
         var hoverHighlight = this.FindControl<Border>("HoverHighlight");
-        if (hoverHighlight == null) return;
+        if (hoverHighlight == null)
+            return;
 
         double x = Canvas.GetLeft(hoverHighlight);
         double y = Canvas.GetTop(hoverHighlight);
@@ -1017,9 +1076,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void AddLabel_Click(object? sender, RoutedEventArgs e)
     {
-        if (_isViewMode) return;
+        if (_isViewMode)
+            return;
         var hoverHighlight = this.FindControl<Border>("HoverHighlight");
-        if (hoverHighlight == null) return;
+        if (hoverHighlight == null)
+            return;
 
         double x = Canvas.GetLeft(hoverHighlight);
         double y = Canvas.GetTop(hoverHighlight);
@@ -1035,7 +1096,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void AddBackdrop_Click(object? sender, RoutedEventArgs e)
     {
-        if (_isViewMode) return;
+        if (_isViewMode)
+            return;
 
         if (_selectedCells.Count > 0)
         {
@@ -1074,7 +1136,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             // Original behavior: create empty backdrop at mouse position
             var hoverHighlight = this.FindControl<Border>("HoverHighlight");
-            if (hoverHighlight == null) return;
+            if (hoverHighlight == null)
+                return;
 
             double x = Canvas.GetLeft(hoverHighlight);
             double y = Canvas.GetTop(hoverHighlight);
@@ -1091,7 +1154,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void ArrangeSelected_Click(object? sender, RoutedEventArgs e)
     {
-        if (_selectedCells.Count == 0) return;
+        if (_selectedCells.Count == 0)
+            return;
 
         // Find the topmost-leftmost position of selected cells
         double minX = _selectedCells.Min(c => c.CanvasX);
@@ -1152,7 +1216,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void ArrangeHorizontal_Click(object? sender, RoutedEventArgs e)
     {
-        if (_selectedCells.Count == 0) return;
+        if (_selectedCells.Count == 0)
+            return;
 
         // Find the leftmost position and tallest cell
         double minX = _selectedCells.Min(c => c.CanvasX);
@@ -1196,7 +1261,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void ArrangeVertical_Click(object? sender, RoutedEventArgs e)
     {
-        if (_selectedCells.Count == 0) return;
+        if (_selectedCells.Count == 0)
+            return;
 
         // Find the topmost position and widest cell
         double minX = _selectedCells.Min(c => c.CanvasX);
@@ -1250,7 +1316,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             double deltaY = cell.CanvasY - oldPos.Y;
 
             // Skip if cell didn't move
-            if (Math.Abs(deltaX) < 0.1 && Math.Abs(deltaY) < 0.1) continue;
+            if (Math.Abs(deltaX) < 0.1 && Math.Abs(deltaY) < 0.1)
+                continue;
 
             // Find annotations that were inside this cell's OLD bounds
             var cellRect = new Rect(oldPos.X, oldPos.Y, cell.PixelWidth, cell.PixelHeight);
@@ -1329,9 +1396,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     /// <summary>Deselects all cells and annotations, clears both selection lists.</summary>
     private void ClearSelection()
     {
-        foreach (var c in _selectedCells) c.IsSelected = false;
+        foreach (var c in _selectedCells)
+            c.IsSelected = false;
         _selectedCells.Clear();
-        foreach (var a in _selectedAnnotations) a.IsSelected = false;
+        foreach (var a in _selectedAnnotations)
+            a.IsSelected = false;
         _selectedAnnotations.Clear();
         OnPropertyChanged(nameof(SelectionCountText));
     }
@@ -1366,9 +1435,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void Cell_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (IsDrawMode || e.Handled || _isViewMode) return;
+        if (IsDrawMode || e.Handled || _isViewMode)
+            return;
 
-        if (sender is not Border { DataContext: CellViewModel cell }) return;
+        if (sender is not Border { DataContext: CellViewModel cell })
+            return;
         var props = e.GetCurrentPoint(this).Properties;
 
         // Alt+Drag: Duplicate cell
@@ -1424,64 +1495,40 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed
             && sender is Control { DataContext: CellViewModel { HasContent: true } })
         {
-            // If clicking a backdrop, select everything within its bounds using marquee logic
+            // If clicking a backdrop, handle selection behavior
             if (cell.IsBackdrop)
             {
-                // Clear current selection
-                ClearSelection();
+                bool isCtrlPressed = e.KeyModifiers.HasFlag(KeyModifiers.Control);
 
-                // Define the selection rectangle (backdrop's full bounds)
-                double left = cell.CanvasX;
-                double top = cell.CanvasY;
-                double right = left + cell.ColSpan * Constants.GridSize;
-                double bottom = top + cell.RowSpan * Constants.GridSize;
-
-                // Select the backdrop itself
-                cell.IsSelected = true;
-                _selectedCells.Add(cell);
-
-                // Select all cells within the backdrop bounds (using same logic as marquee)
-                foreach (var c in GridCells)
+                if (isCtrlPressed)
                 {
-                    if (c == cell) continue; // Already selected
-                    if (!c.HasContent) continue; // Skip empty cells
+                    // Ctrl+Click on backdrop: just toggle the backdrop itself
+                    cell.IsSelected = !cell.IsSelected;
+                    if (cell.IsSelected)
+                        _selectedCells.Add(cell);
+                    else
+                        _selectedCells.Remove(cell);
 
-                    // Select cells whose visual area intersects the backdrop
-                    double cx = c.CanvasX;
-                    double cy = c.CanvasY;
-                    double cw = c.ColSpan * Constants.GridSize;
-                    double ch = c.RowSpan * Constants.GridSize;
-
-                    bool intersects = cx < right && cx + cw > left
-                                   && cy < bottom && cy + ch > top;
-                    if (intersects)
-                    {
-                        c.IsSelected = true;
-                        _selectedCells.Add(c);
-                    }
+                    OnPropertyChanged(nameof(SelectionCountText));
                 }
-
-                // Select all annotations within bounds (using same logic as marquee)
-                foreach (var ann in Annotations)
+                else if (!cell.IsSelected)
                 {
-                    bool inRect = ann.Points.Any(p =>
-                    {
-                        double px = p.X + ann.CanvasX;
-                        double py = p.Y + ann.CanvasY;
-                        return px >= left && px <= right && py >= top && py <= bottom;
-                    });
-
-                    if (inRect)
-                    {
-                        ann.IsSelected = true;
-                        _selectedAnnotations.Add(ann);
-                    }
+                    // Plain click on unselected backdrop: clear selection and select only the backdrop
+                    ClearSelection();
+                    cell.IsSelected = true;
+                    _selectedCells.Add(cell);
+                    OnPropertyChanged(nameof(SelectionCountText));
                 }
+                // else: Plain click on already-selected backdrop - keep current selection (for dragging)
 
-                OnPropertyChanged(nameof(SelectionCountText));
+                _isPointerDown = true;
+                _pointerDownPos = e.GetPosition(this);
+                _lastPressedEventArgs = e;
+                e.Handled = true;
+                return;
             }
 
-            // If clicking a regular cell (not backdrop), select it and any annotations inside it
+            // If clicking a regular cell (not backdrop) that's not already selected and not Ctrl+clicking
             if (!cell.IsBackdrop && !cell.IsSelected && !e.KeyModifiers.HasFlag(KeyModifiers.Control))
             {
                 // Clear current selection
@@ -1527,6 +1574,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     _selectedCells.Add(cell);
                 else
                     _selectedCells.Remove(cell);
+
+                OnPropertyChanged(nameof(SelectionCountText));
             }
             else
             {
@@ -1550,10 +1599,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void Cell_PointerMoved(object? sender, PointerEventArgs e)
     {
-        if (IsDrawMode || e.Handled || _isViewMode) return;
+        if (IsDrawMode || e.Handled || _isViewMode)
+            return;
 
-        if (!_isPointerDown || _lastPressedEventArgs == null) return;
-        if (sender is not Control { DataContext: CellViewModel { HasContent: true } cell }) return;
+        if (!_isPointerDown || _lastPressedEventArgs == null)
+            return;
+        if (sender is not Control { DataContext: CellViewModel { HasContent: true } cell })
+            return;
 
         if (!_isDraggingCell)
         {
@@ -1564,14 +1616,60 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 _isDraggingCell = true;
                 _draggingCell = cell;
 
-                // Record start positions for ALL selected cells and annotations (group drag)
-                bool isGroupDrag = (_selectedCells.Count + _selectedAnnotations.Count) > 1
-                                   && _selectedCells.Contains(cell);
+                // Gather all contents of selected backdrops for dragging
+                var cellsToMove = new List<CellViewModel>(_selectedCells);
+                var annotationsToMove = new List<AnnotationViewModel>(_selectedAnnotations);
+
+                foreach (var backdrop in _selectedCells.Where(c => c.IsBackdrop).ToList())
+                {
+                    double left = backdrop.CanvasX;
+                    double top = backdrop.CanvasY;
+                    double right = left + backdrop.ColSpan * Constants.GridSize;
+                    double bottom = top + backdrop.RowSpan * Constants.GridSize;
+
+                    // Add all cells within this backdrop's bounds
+                    foreach (var c in GridCells)
+                    {
+                        if (!c.HasContent || cellsToMove.Contains(c))
+                            continue;
+
+                        double cx = c.CanvasX;
+                        double cy = c.CanvasY;
+                        double cw = c.ColSpan * Constants.GridSize;
+                        double ch = c.RowSpan * Constants.GridSize;
+
+                        bool intersects = cx < right && cx + cw > left
+                                       && cy < bottom && cy + ch > top;
+                        if (intersects)
+                            cellsToMove.Add(c);
+                    }
+
+                    // Add all annotations within this backdrop's bounds
+                    foreach (var ann in Annotations)
+                    {
+                        if (annotationsToMove.Contains(ann))
+                            continue;
+
+                        bool inRect = ann.Points.Any(p =>
+                        {
+                            double px = p.X + ann.CanvasX;
+                            double py = p.Y + ann.CanvasY;
+                            return px >= left && px <= right && py >= top && py <= bottom;
+                        });
+
+                        if (inRect)
+                            annotationsToMove.Add(ann);
+                    }
+                }
+
+                // Record start positions for ALL cells and annotations to move (group drag)
+                bool isGroupDrag = (cellsToMove.Count + annotationsToMove.Count) > 1
+                                   && cellsToMove.Contains(cell);
                 if (isGroupDrag)
                 {
-                    _groupDragStarts = _selectedCells
+                    _groupDragStarts = cellsToMove
                         .Select(c => (c, c.CanvasX, c.CanvasY)).ToList();
-                    _groupAnnotationDragStarts = _selectedAnnotations
+                    _groupAnnotationDragStarts = annotationsToMove
                         .Select(a => (a, a.CanvasX, a.CanvasY)).ToList();
                 }
                 else
@@ -1610,19 +1708,22 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             // Only move if there's actual delta and no collision
             if (Math.Abs(dx) > 0.1 || Math.Abs(dy) > 0.1)
             {
-                bool collision = HasGroupCollision(_selectedCells, dx, dy);
+                // Get all cells that will be moved (from _groupDragStarts)
+                var cellsToMove = _groupDragStarts.Select(s => s.Cell).ToList();
+                bool collision = HasGroupCollision(cellsToMove, dx, dy);
 
                 if (!collision)
                 {
-                    foreach (var c in _selectedCells)
+                    // Move all cells in the group (including backdrop contents)
+                    foreach (var (c, _, _) in _groupDragStarts)
                     {
                         c.CanvasX += dx;
                         c.CanvasY += dy;
                     }
-                    // Move selected annotations with the group
+                    // Move all annotations in the group
                     if (_groupAnnotationDragStarts != null)
                     {
-                        foreach (var a in _selectedAnnotations)
+                        foreach (var (a, _, _) in _groupAnnotationDragStarts)
                         {
                             a.CanvasX += dx;
                             a.CanvasY += dy;
@@ -1633,7 +1734,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
         else
         {
-            // Single cell drag (both backdrops and regular cells)
+            // Single cell drag
             var canvasPt = e.GetPosition(CanvasGrid);
             double newX = Math.Round((canvasPt.X - _dragOffsetX) / Constants.GridSize) * Constants.GridSize;
             double newY = Math.Round((canvasPt.Y - _dragOffsetY) / Constants.GridSize) * Constants.GridSize;
@@ -1648,7 +1749,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void Cell_PointerReleased(object? sender, PointerReleasedEventArgs e)
     {
-        if (IsDrawMode) return;
+        if (IsDrawMode)
+            return;
 
         if (_isDraggingCell && sender is Control)
         {
@@ -1675,7 +1777,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void ResizeThumb_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (IsDrawMode || _isViewMode) return;
+        if (IsDrawMode || _isViewMode)
+            return;
 
         if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed
             && sender is Control c && c.DataContext is CellViewModel cell)
@@ -1690,7 +1793,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void ResizeThumb_PointerMoved(object? sender, PointerEventArgs e)
     {
-        if (!_isResizing || _resizingCell == null) return;
+        if (!_isResizing || _resizingCell == null)
+            return;
         e.Handled = true;
 
         var pt = e.GetPosition(CanvasGrid);
@@ -1774,7 +1878,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             }
 
             _selectedAnnotations.Clear();
-            foreach (var a in Annotations) a.IsSelected = false;
+            foreach (var a in Annotations)
+                a.IsSelected = false;
             e.Pointer.Capture(sender as IInputElement);
             return;
         }
@@ -1847,7 +1952,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             }
 
             e.Pointer.Capture(sender as IInputElement);
-            foreach (var a in Annotations) a.IsSelected = false;
+            foreach (var a in Annotations)
+                a.IsSelected = false;
         }
     }
 
@@ -2139,7 +2245,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     foreach (var cell in GridCells)
                     {
                         cell.IsSelected = false;
-                        if (!cell.HasContent) continue;
+                        if (!cell.HasContent)
+                            continue;
 
                         // Select cells whose visual area intersects the marquee
                         double cx = cell.CanvasX;
@@ -2187,12 +2294,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void CanvasBorder_PointerExited(object? sender, PointerEventArgs e)
     {
         var hoverHighlight = this.FindControl<Border>("HoverHighlight");
-        if (hoverHighlight != null) hoverHighlight.IsVisible = false;
+        if (hoverHighlight != null)
+            hoverHighlight.IsVisible = false;
     }
 
     private void Canvas_PointerWheelChanged(object? sender, PointerWheelEventArgs e)
     {
-        if (e.Handled) return;
+        if (e.Handled)
+            return;
 
         double oldScale = _scale.ScaleX;
         double newScale = oldScale;
@@ -2202,7 +2311,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         else if (e.Delta.Y < 0)
             newScale = Math.Max(Constants.MinZoom, oldScale - Constants.ZoomStep);
 
-        if (Math.Abs(newScale - oldScale) < 0.001) return;
+        if (Math.Abs(newScale - oldScale) < 0.001)
+            return;
         newScale = Math.Clamp(newScale, Constants.MinZoom, Constants.MaxZoom);
 
         if (sender is Visual visual)
@@ -2229,9 +2339,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 && Math.Abs(p.Y + ann.CanvasY - pt.Y) < 15))
             .ToList();
 
-        if (toRemove.Count == 0) return;
+        if (toRemove.Count == 0)
+            return;
 
-        foreach (var ann in toRemove) Annotations.Remove(ann);
+        foreach (var ann in toRemove)
+            Annotations.Remove(ann);
         MarkUnsaved();
         SaveBoardData();
     }
@@ -2279,7 +2391,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         // Draw mode only from here
-        if (!IsDrawMode) return;
+        if (!IsDrawMode)
+            return;
 
         // Move mode: select and drag annotation
         if (IsMoveMode && sender is Control { DataContext: AnnotationViewModel annMove })
@@ -2287,7 +2400,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (!_selectedAnnotations.Contains(annMove))
             {
                 _selectedAnnotations.Clear();
-                foreach (var a in Annotations) a.IsSelected = false;
+                foreach (var a in Annotations)
+                    a.IsSelected = false;
                 _selectedAnnotations.Add(annMove);
                 annMove.IsSelected = true;
             }
@@ -2363,7 +2477,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     /// </summary>
     private void CancelTextAnnotationEditing()
     {
-        if (_editingTextAnnotation == null) return;
+        if (_editingTextAnnotation == null)
+            return;
 
         var editor = this.FindControl<TextBox>("AnnotationTextEditor");
         if (editor != null)
@@ -2392,7 +2507,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     /// </summary>
     private void CommitTextAnnotationEditing()
     {
-        if (_editingTextAnnotation == null) return;
+        if (_editingTextAnnotation == null)
+            return;
 
         var editor = this.FindControl<TextBox>("AnnotationTextEditor");
         if (editor != null)
@@ -2432,7 +2548,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void OnDrop(object? sender, DragEventArgs e)
     {
-        if (_isViewMode) { e.Handled = true; return; }
+        if (_isViewMode)
+        { e.Handled = true; return; }
         e.Handled = true;
 
         var dropPt = e.GetPosition(CanvasGrid);
@@ -2451,7 +2568,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             foreach (var file in files)
             {
                 string path = file.Path.LocalPath;
-                if (!File.Exists(path)) continue;
+                if (!File.Exists(path))
+                    continue;
 
                 // Calculate optimal size based on image dimensions
                 var dimensions = GetImageDimensions(path);
@@ -2529,21 +2647,27 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         bool collision = HasLayerCollision(dropLayer, _draggingCell,
             targetCell.CanvasX, targetCell.CanvasY, neededCols, neededRows);
 
-        if (collision) { ShakeScreen(); return; }
+        if (collision)
+        { ShakeScreen(); return; }
 
         // Handle single file drop from OS
         if (files != null && files.Any())
         {
-            try { LoadImageToCell(targetCell, files.First().Path.LocalPath); } catch { /* non-critical */ }
+            try
+            { LoadImageToCell(targetCell, files.First().Path.LocalPath); }
+            catch { /* non-critical */ }
             return;
         }
 
         // Handle internal cell move
         if (_draggingCell != null && _draggingCell != targetCell)
         {
-            if (_draggingCell.IsVideo) targetCell.SetVideo(_draggingCell.VideoPath!, _draggingCell.FilePath!);
-            else if (_draggingCell.IsImage) targetCell.SetImage(_draggingCell.FilePath!);
-            else if (_draggingCell.IsText) targetCell.SetText(_draggingCell.TextContent ?? "");
+            if (_draggingCell.IsVideo)
+                targetCell.SetVideo(_draggingCell.VideoPath!, _draggingCell.FilePath!);
+            else if (_draggingCell.IsImage)
+                targetCell.SetImage(_draggingCell.FilePath!);
+            else if (_draggingCell.IsText)
+                targetCell.SetText(_draggingCell.TextContent ?? "");
 
             targetCell.ColSpan = _draggingCell.ColSpan;
             targetCell.RowSpan = _draggingCell.RowSpan;
@@ -2566,23 +2690,28 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private async void Window_KeyDown(object? sender, KeyEventArgs e)
     {
         var startupOverlay = this.FindControl<Border>("StartupOverlay");
-        if (FullMediaOverlay.IsVisible || (startupOverlay?.IsVisible == true)) return;
+        if (FullMediaOverlay.IsVisible || (startupOverlay?.IsVisible == true))
+            return;
 
         bool isCtrl = e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Meta);
         bool isShift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         bool noModifiers = e.KeyModifiers == KeyModifiers.None;
 
         // Ctrl+N: New board
-        if (e.Key == Key.N && isCtrl) { NewBoard_Click(null, null!); return; }
+        if (e.Key == Key.N && isCtrl)
+        { NewBoard_Click(null, null!); return; }
 
         // Ctrl+O: Open board
-        if (e.Key == Key.O && isCtrl) { LoadBoard_Click(null, null!); return; }
+        if (e.Key == Key.O && isCtrl)
+        { LoadBoard_Click(null, null!); return; }
 
         // Ctrl+S: Save
         if (e.Key == Key.S && isCtrl)
         {
-            if (!string.IsNullOrEmpty(_currentBoardFile)) SaveBoardData();
-            else SaveBoard_Click(null, null!);
+            if (!string.IsNullOrEmpty(_currentBoardFile))
+                SaveBoardData();
+            else
+                SaveBoard_Click(null, null!);
             return;
         }
 
@@ -2590,28 +2719,36 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         // The IsVisible guard is a safety net: if the AnnotationTextEditor was somehow
         // still tracked by the FocusManager after being hidden, we must not block shortcuts.
         var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
-        if (focused is TextBox { IsVisible: true }) return;
+        if (focused is TextBox { IsVisible: true })
+            return;
 
         // Ctrl+Shift+Z or Ctrl+Y: Redo
-        if (e.Key == Key.Z && isCtrl && e.KeyModifiers.HasFlag(KeyModifiers.Shift)) { Redo(); return; }
-        if (e.Key == Key.Y && isCtrl) { Redo(); return; }
+        if (e.Key == Key.Z && isCtrl && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+        { Redo(); return; }
+        if (e.Key == Key.Y && isCtrl)
+        { Redo(); return; }
 
         // Ctrl+Z: Undo
-        if (e.Key == Key.Z && isCtrl) { Undo(); return; }
+        if (e.Key == Key.Z && isCtrl)
+        { Undo(); return; }
 
         // Ctrl+I: Import media
-        if (e.Key == Key.I && isCtrl) { ImportMedia_Click(null, null!); return; }
+        if (e.Key == Key.I && isCtrl)
+        { ImportMedia_Click(null, null!); return; }
 
         // Ctrl+V: Paste
         if (e.Key == Key.V && isCtrl)
         {
-            if (_isViewMode) return;
+            if (_isViewMode)
+                return;
 
             var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
-            if (clipboard == null) return;
+            if (clipboard == null)
+                return;
 
             var data = await clipboard.TryGetDataAsync();
-            if (data == null) return;
+            if (data == null)
+                return;
 
             // Determine preferred position for paste
             double preferredX, preferredY;
@@ -2650,7 +2787,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (!string.IsNullOrEmpty(text))
             {
                 var cell = GetOrCreateContentCellAt(new Point(preferredX, preferredY));
-                if (cell.HasContent && !cell.IsBoardElement) { ShakeScreen(); return; }
+                if (cell.HasContent && !cell.IsBoardElement)
+                { ShakeScreen(); return; }
 
                 if (text.Contains("youtube.com") || text.Contains("youtu.be") || text.StartsWith("http"))
                     await DownloadVideoToCell(cell, text);
@@ -2692,7 +2830,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
                     // Copy image to workspace
                     string destDir = Path.Combine(_workspaceDir, "images");
-                    if (!Directory.Exists(destDir)) Directory.CreateDirectory(destDir);
+                    if (!Directory.Exists(destDir))
+                        Directory.CreateDirectory(destDir);
                     string destPath = Path.Combine(destDir, Path.GetFileName(imagePath));
                     if (imagePath != destPath && !File.Exists(destPath))
                         File.Copy(imagePath, destPath);
@@ -2772,16 +2911,20 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         // Ctrl+1: Grid mode
-        if (e.Key == Key.D1 && isCtrl) { IsDrawMode = false; return; }
+        if (e.Key == Key.D1 && isCtrl)
+        { IsDrawMode = false; return; }
 
         // Ctrl+2: Annotation mode
-        if (e.Key == Key.D2 && isCtrl) { IsDrawMode = true; return; }
+        if (e.Key == Key.D2 && isCtrl)
+        { IsDrawMode = true; return; }
 
         // F: Show All (fit to view)
-        if (e.Key == Key.F && noModifiers) { ShowAll_Click(null, null!); return; }
+        if (e.Key == Key.F && noModifiers)
+        { ShowAll_Click(null, null!); return; }
 
         // Home: Center view
-        if (e.Key == Key.Home && noModifiers) { CenterView_Click(null, null!); return; }
+        if (e.Key == Key.Home && noModifiers)
+        { CenterView_Click(null, null!); return; }
 
         // Ctrl+Shift+F: Fit to Content
         if (e.Key == Key.F && isCtrl && isShift)
@@ -2791,11 +2934,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             {
                 foreach (var cell in _selectedCells.ToList())
                 {
-                    if (!cell.IsImage && !cell.IsVideo) continue;
-                    if (string.IsNullOrEmpty(cell.FilePath)) continue;
+                    if (!cell.IsImage && !cell.IsVideo)
+                        continue;
+                    if (string.IsNullOrEmpty(cell.FilePath))
+                        continue;
 
                     var dimensions = GetImageDimensions(cell.FilePath);
-                    if (dimensions == null) continue;
+                    if (dimensions == null)
+                        continue;
 
                     var (newColSpan, newRowSpan) = CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height);
 
@@ -2823,7 +2969,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         // Ctrl+T: Quick add text
         if (e.Key == Key.T && isCtrl)
         {
-            if (_isViewMode) return;
+            if (_isViewMode)
+                return;
             var cell = _hoveredCell ?? GetHighlightedCell();
             cell.SetText("New Description...");
             SaveBoardData();
@@ -2833,7 +2980,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         // Delete/Backspace: Remove all selected items (cells + annotations), or hovered cell
         if (e.Key == Key.Delete || e.Key == Key.Back)
         {
-            if (_isViewMode) return;
+            if (_isViewMode)
+                return;
 
             bool anyDeleted = false;
 
@@ -2843,9 +2991,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 foreach (var cell in _selectedCells.ToList())
                 {
                     if (cell.FilePath != null && File.Exists(cell.FilePath))
-                        try { File.Delete(cell.FilePath); } catch { /* non-critical */ }
+                        try
+                        { File.Delete(cell.FilePath); }
+                        catch { /* non-critical */ }
                     if (cell.VideoPath != null && File.Exists(cell.VideoPath))
-                        try { File.Delete(cell.VideoPath); } catch { /* non-critical */ }
+                        try
+                        { File.Delete(cell.VideoPath); }
+                        catch { /* non-critical */ }
                     cell.Clear();
                     GridCells.Remove(cell);
                 }
@@ -2871,9 +3023,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             else if (_hoveredCell != null)
             {
                 if (_hoveredCell.FilePath != null && File.Exists(_hoveredCell.FilePath))
-                    try { File.Delete(_hoveredCell.FilePath); } catch { /* non-critical */ }
+                    try
+                    { File.Delete(_hoveredCell.FilePath); }
+                    catch { /* non-critical */ }
                 if (_hoveredCell.VideoPath != null && File.Exists(_hoveredCell.VideoPath))
-                    try { File.Delete(_hoveredCell.VideoPath); } catch { /* non-critical */ }
+                    try
+                    { File.Delete(_hoveredCell.VideoPath); }
+                    catch { /* non-critical */ }
 
                 _hoveredCell.Clear();
                 GridCells.Remove(_hoveredCell);
@@ -2890,7 +3046,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void CanvasImage_DoubleTapped(object? sender, TappedEventArgs e)
     {
-        if (sender is not Control { DataContext: CellViewModel cell }) return;
+        if (sender is not Control { DataContext: CellViewModel cell })
+            return;
 
         string? pathToOpen = cell.IsImage ? cell.FilePath
                            : cell.IsVideo ? cell.VideoPath
@@ -2902,8 +3059,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void CanvasText_DoubleTapped(object? sender, TappedEventArgs e)
     {
-        if (sender is not Control { DataContext: CellViewModel cell }) return;
-        if (!cell.IsText && !cell.IsBoardElement) return;
+        if (sender is not Control { DataContext: CellViewModel cell })
+            return;
+        if (!cell.IsText && !cell.IsBoardElement)
+            return;
 
         FullImage.IsVisible = false;
         FullText.IsVisible = true;
@@ -2914,7 +3073,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void FullText_TextChanged(object? sender, TextChangedEventArgs e)
     {
-        if (_editingTextCell == null) return;
+        if (_editingTextCell == null)
+            return;
         _editingTextCell.TextContent = FullText.Text;
         MarkUnsaved();
         SaveBoardData();
@@ -2929,7 +3089,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void Overlay_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (e.Source is TextBox) return;
+        if (e.Source is TextBox)
+            return;
         FullMediaOverlay.IsVisible = false;
         FullText.IsVisible = false;
         _editingTextCell = null;
@@ -2945,21 +3106,27 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _translate.Y = 0;
         _scale.ScaleX = 1;
         _scale.ScaleY = 1;
+        OnPropertyChanged(nameof(ZoomLevelText));
     }
 
     private void ShowAll_Click(object? sender, RoutedEventArgs e)
     {
-        if (GridCells.Count == 0) { CenterView_Click(sender, e); return; }
+        if (GridCells.Count == 0)
+        { CenterView_Click(sender, e); return; }
 
         double minX = double.MaxValue, minY = double.MaxValue;
         double maxX = double.MinValue, maxY = double.MinValue;
 
         foreach (var cell in GridCells)
         {
-            if (cell.CanvasX < minX) minX = cell.CanvasX;
-            if (cell.CanvasY < minY) minY = cell.CanvasY;
-            if (cell.CanvasX + cell.PixelWidth > maxX) maxX = cell.CanvasX + cell.PixelWidth;
-            if (cell.CanvasY + cell.PixelHeight > maxY) maxY = cell.CanvasY + cell.PixelHeight;
+            if (cell.CanvasX < minX)
+                minX = cell.CanvasX;
+            if (cell.CanvasY < minY)
+                minY = cell.CanvasY;
+            if (cell.CanvasX + cell.PixelWidth > maxX)
+                maxX = cell.CanvasX + cell.PixelWidth;
+            if (cell.CanvasY + cell.PixelHeight > maxY)
+                maxY = cell.CanvasY + cell.PixelHeight;
         }
 
         double contentWidth = maxX - minX;
@@ -2976,6 +3143,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _scale.ScaleY = scale;
         _translate.X = (viewportWidth - contentWidth * scale) / 2 - minX * scale;
         _translate.Y = (viewportHeight - contentHeight * scale) / 2 - minY * scale;
+        OnPropertyChanged(nameof(ZoomLevelText));
     }
 
     #endregion
@@ -3007,15 +3175,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     /// </summary>
     private List<CellViewModel> GetBackdropChildren(CellViewModel backdrop)
     {
-        if (!backdrop.IsBackdrop) return new List<CellViewModel>();
+        if (!backdrop.IsBackdrop)
+            return new List<CellViewModel>();
 
         var children = new List<CellViewModel>();
         var backdropRect = new Rect(backdrop.CanvasX, backdrop.CanvasY, backdrop.PixelWidth, backdrop.PixelHeight);
 
         foreach (var cell in GridCells)
         {
-            if (cell == backdrop) continue;
-            if (cell.IsBackdrop) continue; // Don't nest backdrops
+            if (cell == backdrop)
+                continue;
+            if (cell.IsBackdrop)
+                continue; // Don't nest backdrops
 
             // Check if cell is inside backdrop
             var cellRect = new Rect(cell.CanvasX, cell.CanvasY, cell.PixelWidth, cell.PixelHeight);
@@ -3033,7 +3204,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     /// </summary>
     private List<AnnotationViewModel> GetBackdropAnnotations(CellViewModel backdrop)
     {
-        if (!backdrop.IsBackdrop) return new List<AnnotationViewModel>();
+        if (!backdrop.IsBackdrop)
+            return new List<AnnotationViewModel>();
 
         var annotations = new List<AnnotationViewModel>();
         var backdropRect = new Rect(backdrop.CanvasX, backdrop.CanvasY, backdrop.PixelWidth, backdrop.PixelHeight);
@@ -3066,8 +3238,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         foreach (var cell in GridCells)
         {
-            if (cell == excludeCell) continue;
-            if (cell.CollisionLayer != collisionLayer) continue;
+            if (cell == excludeCell)
+                continue;
+            if (cell.CollisionLayer != collisionLayer)
+                continue;
 
             // Backdrops get a half-grid margin to create visual spacing
             Rect cellRect;
@@ -3185,7 +3359,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         try
         {
             using var stream = File.OpenRead(imagePath);
-            var bitmap = new Bitmap(stream);
+            using var bitmap = new Bitmap(stream);
             return new Size(bitmap.PixelSize.Width, bitmap.PixelSize.Height);
         }
         catch

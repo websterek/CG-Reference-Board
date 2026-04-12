@@ -3,132 +3,19 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="clr-namespace:CGReferenceBoard.Controls"
     xmlns:vm="clr-namespace:CGReferenceBoard.ViewModels"
+    xmlns:views="clr-namespace:CGReferenceBoard.Views"
     x:Class="CGReferenceBoard.Views.MainWindow"
+    x:DataType="views:MainWindow"
     Title="CG Reference Board"
-    x:CompileBindings="False"
+    x:CompileBindings="True"
     Icon="avares://CGReferenceBoard/Images/icon.ico"
-    Background="#121212"
+    Background="{StaticResource SurfaceBrushDark}"
     Width="1200"
     Height="800"
     WindowDecorations="None"
     KeyDown="Window_KeyDown"
     DragDrop.AllowDrop="True"
 >
-    <Window.Styles>
-        <!-- Menu items compact sizing -->
-        <Style Selector="MenuItem">
-            <Setter Property="Padding" Value="4,2" />
-            <Setter Property="MinHeight" Value="24" />
-        </Style>
-
-        <!-- Cell hover effects with smooth transition -->
-        <Style Selector="Border.CellRoot">
-            <Setter Property="BorderBrush" Value="#1AFFFFFF" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="ClipToBounds" Value="True" />
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition
-                        Property="BorderBrush"
-                        Duration="0:0:0.15"
-                    />
-                    <BrushTransition
-                        Property="Background"
-                        Duration="0:0:0.15"
-                    />
-                    <BoxShadowsTransition
-                        Property="BoxShadow"
-                        Duration="0:0:0.2"
-                    />
-                </Transitions>
-            </Setter>
-            <Setter Property="BoxShadow" Value="0 2 8 0 #18000000" />
-        </Style>
-        <Style Selector="Border.CellRoot:pointerover">
-            <Setter Property="BorderBrush" Value="#44AAFF" />
-            <Setter Property="Background" Value="#1144AAFF" />
-            <Setter Property="BoxShadow" Value="0 4 16 0 #3044AAFF" />
-        </Style>
-
-        <!-- Resize thumb visibility on hover with transition -->
-        <Style Selector="Border.CellRoot Border#ResizeThumb">
-            <Setter Property="Opacity" Value="0" />
-            <Setter Property="Transitions">
-                <Transitions>
-                    <DoubleTransition Property="Opacity" Duration="0:0:0.15" />
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="Border.CellRoot:pointerover Border#ResizeThumb">
-            <Setter Property="Opacity" Value="0.7" />
-        </Style>
-
-        <!-- Window control button styles -->
-        <Style Selector="Button.windowBtn">
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.1" />
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="Button.windowBtn:pointerover">
-            <Setter Property="Background" Value="#33FFFFFF" />
-        </Style>
-        <Style Selector="Button.windowBtnClose">
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.1" />
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="Button.windowBtnClose:pointerover">
-            <Setter Property="Background" Value="#E81123" />
-            <Setter Property="Foreground" Value="White" />
-        </Style>
-
-        <!-- Context menu modern styling -->
-        <Style Selector="ContextMenu">
-            <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="Padding" Value="4" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="BorderBrush" Value="#3AFFFFFF" />
-            <Setter Property="Background" Value="#E6222222" />
-        </Style>
-        <Style Selector="ContextMenu MenuItem">
-            <Setter Property="CornerRadius" Value="4" />
-        </Style>
-
-        <!-- Download indicator pulsing animation -->
-        <Style Selector="Ellipse.PulsingDot">
-            <Style.Animations>
-                <Animation
-                    Duration="0:0:1"
-                    IterationCount="Infinite"
-                    PlaybackDirection="Alternate"
-                >
-                    <KeyFrame Cue="0%">
-                        <Setter Property="Opacity" Value="0.2" />
-                    </KeyFrame>
-                    <KeyFrame Cue="100%">
-                        <Setter Property="Opacity" Value="1.0" />
-                    </KeyFrame>
-                </Animation>
-            </Style.Animations>
-        </Style>
-
-        <!-- Status bar text styling -->
-        <Style Selector="TextBlock.statusText">
-            <Setter Property="FontSize" Value="11" />
-            <Setter Property="Foreground" Value="#888888" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
-        <Style Selector="Border.statusDivider">
-            <Setter Property="Width" Value="1" />
-            <Setter Property="Background" Value="#333333" />
-            <Setter Property="Margin" Value="8,4" />
-        </Style>
-    </Window.Styles>
 
     <Grid>
         <Grid RowDefinitions="Auto, *, Auto">
@@ -138,8 +25,8 @@
             <!-- ═══════════════════════════════════════════════════════════ -->
             <Border
                 Grid.Row="0"
-                Background="#1A1A1A"
-                BorderBrush="#2A2A2A"
+                Background="{StaticResource ChromeBrush}"
+                BorderBrush="{StaticResource SurfaceBrushLight}"
                 BorderThickness="0,0,0,1"
                 Padding="6,0,0,0"
                 DoubleTapped="TopBar_DoubleTapped"
@@ -217,7 +104,7 @@
                                 </Style>
                             </MenuItem.Styles>
                             <MenuItem.ItemTemplate>
-                                <DataTemplate>
+                                <DataTemplate DataType="vm:BoardMenuItemViewModel">
                                     <TextBlock Text="{Binding FileName}" />
                                 </DataTemplate>
                             </MenuItem.ItemTemplate>
@@ -239,7 +126,7 @@
                                         <TextBlock
                                             Grid.Column="1"
                                             Text="Ctrl+1"
-                                            Foreground="#888888"
+                                            Foreground="{StaticResource TextMuted}"
                                             Margin="24,0,0,0"
                                         />
                                     </Grid>
@@ -259,7 +146,7 @@
                                         <TextBlock
                                             Grid.Column="1"
                                             Text="Ctrl+2"
-                                            Foreground="#888888"
+                                            Foreground="{StaticResource TextMuted}"
                                             Margin="24,0,0,0"
                                         />
                                     </Grid>
@@ -301,7 +188,7 @@
                         Text="{Binding WindowTitle}"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
-                        Foreground="#AAAAAA"
+                        Foreground="{StaticResource TextSecondary}"
                         FontWeight="SemiBold"
                         IsHitTestVisible="False"
                     />
@@ -313,14 +200,6 @@
                         VerticalAlignment="Top"
                     >
                         <Button
-                            Width="46"
-                            Height="32"
-                            Background="Transparent"
-                            Foreground="#999999"
-                            BorderThickness="0"
-                            CornerRadius="0"
-                            HorizontalContentAlignment="Center"
-                            VerticalContentAlignment="Center"
                             Click="MinimizeWindow_Click"
                             Classes="windowBtn"
                         >
@@ -331,14 +210,6 @@
                             />
                         </Button>
                         <Button
-                            Width="46"
-                            Height="32"
-                            Background="Transparent"
-                            Foreground="#999999"
-                            BorderThickness="0"
-                            CornerRadius="0"
-                            HorizontalContentAlignment="Center"
-                            VerticalContentAlignment="Center"
                             Click="MaximizeWindow_Click"
                             Classes="windowBtn"
                         >
@@ -349,14 +220,6 @@
                             />
                         </Button>
                         <Button
-                            Width="46"
-                            Height="32"
-                            Background="Transparent"
-                            Foreground="#999999"
-                            BorderThickness="0"
-                            CornerRadius="0"
-                            HorizontalContentAlignment="Center"
-                            VerticalContentAlignment="Center"
                             Click="CloseWindow_Click"
                             Classes="windowBtnClose"
                         >
@@ -452,12 +315,6 @@
                                         Header="Add Backdrop"
                                         Click="AddBackdrop_Click"
                                         IsVisible="{Binding !IsDrawMode}"
-                                    />
-                                    <MenuItem
-                                        Header="Arrange Selected"
-                                        Click="ArrangeSelected_Click"
-                                        IsVisible="False"
-                                        IsEnabled="{Binding !!SelectionCountText}"
                                     />
 
                                     <!-- Annotation Mode: Tool Submenu -->
@@ -647,14 +504,14 @@
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemContainerTheme>
-                                <ControlTheme TargetType="ContentPresenter">
+                                <ControlTheme TargetType="ContentPresenter" x:DataType="vm:AnnotationViewModel">
                                     <Setter
                                         Property="Canvas.Left"
-                                        Value="{ReflectionBinding CanvasX}"
+                                        Value="{Binding CanvasX}"
                                     />
                                     <Setter
                                         Property="Canvas.Top"
-                                        Value="{ReflectionBinding CanvasY}"
+                                        Value="{Binding CanvasY}"
                                     />
                                 </ControlTheme>
                             </ItemsControl.ItemContainerTheme>
@@ -672,9 +529,9 @@
                         <!-- Marquee Selection Rectangle (annotation move mode) -->
                         <Border
                             x:Name="SelectionMarquee"
-                            BorderBrush="#FF44AAFF"
+                            BorderBrush="{StaticResource AccentBrush}"
                             BorderThickness="1.5"
-                            Background="#2244AAFF"
+                            Background="{StaticResource SelectionBrush}"
                             IsHitTestVisible="False"
                             IsVisible="False"
                             HorizontalAlignment="Left"
@@ -684,7 +541,7 @@
 
                         <Border
                             x:Name="CellSelectionMarquee"
-                            BorderBrush="#FF44AAFF"
+                            BorderBrush="{StaticResource AccentBrush}"
                             BorderThickness="2"
                             Background="#1844AAFF"
                             IsHitTestVisible="False"
@@ -776,7 +633,7 @@
                                                 />
                                                 <Separator
                                                     IsVisible="{Binding IsImage}"
-                                                    Background="#333"
+                                                    Background="{StaticResource BorderBrushSubtle}"
                                                 />
                                                 <MenuItem
                                                     Header="Copy Image"
@@ -834,11 +691,11 @@
                                                     Click="ArrangeSelected_Click"
                                                     IsVisible="{Binding IsSelected}"
                                                 />
-                                                <Separator Background="#333" />
+                                                <Separator Background="{StaticResource BorderBrushSubtle}" />
                                                 <MenuItem
                                                     Header="Delete"
                                                     Click="DeleteCell_Click"
-                                                    Foreground="#FF6666"
+                                                    Foreground="{StaticResource TextDanger}"
                                                 />
                                             </ContextMenu>
                                         </Border.ContextMenu>
@@ -846,12 +703,8 @@
                                         <Grid Background="Transparent">
                                             <!-- Selection highlight -->
                                             <Border
-                                                BorderBrush="#FF44AAFF"
-                                                BorderThickness="2.5"
-                                                Background="#2244AAFF"
-                                                CornerRadius="6"
+                                                Classes="SelectionHighlight"
                                                 IsVisible="{Binding IsSelected}"
-                                                IsHitTestVisible="False"
                                                 ZIndex="8"
                                             />
 
@@ -877,7 +730,7 @@
 
                                             <!-- Text Content -->
                                             <Border
-                                                Background="#2A2A2A"
+                                                Background="{StaticResource SurfaceBrushLight}"
                                                 IsVisible="{Binding IsText}"
                                                 Padding="10"
                                                 DoubleTapped="CanvasText_DoubleTapped"
@@ -932,7 +785,7 @@
 
                                             <!-- Download Progress Indicator -->
                                             <Border
-                                                Background="#1A1A1A"
+                                                Background="{StaticResource ChromeBrush}"
                                                 IsVisible="{Binding IsDownloading}"
                                             >
                                                 <StackPanel
@@ -945,7 +798,7 @@
                                                         Classes="PulsingDot"
                                                         Width="10"
                                                         Height="10"
-                                                        Fill="#44AAFF"
+                                                        Fill="{StaticResource AccentBrush}"
                                                     />
                                                     <TextBlock
                                                         Text="Downloading..."
@@ -976,7 +829,7 @@
 
                                             <!-- Resize Thumb (edit mode only) -->
                                             <Panel
-                                                IsVisible="{Binding !IsViewMode, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                IsVisible="{ReflectionBinding !IsViewMode, RelativeSource={RelativeSource AncestorType=Window}}"
                                                 ZIndex="10"
                                             >
                                                 <Border
@@ -1010,9 +863,9 @@
                             IsVisible="False"
                             AcceptsReturn="True"
                             TextWrapping="Wrap"
-                            Background="#333"
+                            Background="{StaticResource BorderBrushSubtle}"
                             Foreground="White"
-                            BorderBrush="#FF44AAFF"
+                            BorderBrush="{StaticResource AccentBrush}"
                             BorderThickness="1"
                             Padding="4"
                             HorizontalAlignment="Left"
@@ -1042,9 +895,9 @@
                         Margin="60"
                         AcceptsReturn="True"
                         TextWrapping="Wrap"
-                        Background="#222"
+                        Background="{StaticResource SurfaceBrushLight}"
                         BorderThickness="1"
-                        BorderBrush="#555"
+                        BorderBrush="{StaticResource BorderBrushMedium}"
                         Foreground="White"
                         FontSize="24"
                         IsVisible="False"
@@ -1052,16 +905,7 @@
                     />
 
                     <Button
-                        FontSize="14"
-                        FontWeight="SemiBold"
-                        Background="#33FFFFFF"
-                        Foreground="White"
-                        HorizontalAlignment="Right"
-                        VerticalAlignment="Top"
-                        Margin="20"
-                        Padding="14,8"
-                        CornerRadius="6"
-                        BorderThickness="0"
+                        Classes="overlayCloseBtn"
                         Click="CloseFullMedia_Click"
                     >
                         <StackPanel Orientation="Horizontal" Spacing="6">
@@ -1118,7 +962,7 @@
                     <Border
                         Height="2"
                         Width="60"
-                        Background="#44AAFF"
+                        Background="{StaticResource AccentBrush}"
                         CornerRadius="1"
                         HorizontalAlignment="Center"
                         Margin="0,4,0,4"
@@ -1128,7 +972,7 @@
                     <TextBlock
                         Text="Open or create a board to get started"
                         FontSize="14"
-                        Foreground="#888"
+                        Foreground="{StaticResource TextMuted}"
                         HorizontalAlignment="Center"
                         Margin="0,0,0,24"
                     />
@@ -1141,26 +985,18 @@
                     >
                         <Button
                             Content="Open Board..."
-                            FontSize="14"
-                            FontWeight="SemiBold"
-                            Padding="24,12"
+                            Classes="startupBtn"
                             Click="LoadBoard_Click"
-                            Background="#2A2A2A"
-                            Foreground="#CCCCCC"
-                            BorderBrush="#444"
-                            BorderThickness="1"
-                            CornerRadius="6"
+                            Background="{StaticResource SurfaceBrushLight}"
+                            Foreground="{StaticResource TextLight}"
+                            BorderBrush="{StaticResource BorderBrushMedium}"
                         />
                         <Button
                             Content="New Board"
-                            FontSize="14"
-                            FontWeight="SemiBold"
-                            Padding="24,12"
+                            Classes="startupBtn"
                             Click="SaveBoard_Click"
-                            Background="#44AAFF"
+                            Background="{StaticResource AccentBrush}"
                             Foreground="White"
-                            BorderThickness="0"
-                            CornerRadius="6"
                         />
                     </StackPanel>
 
@@ -1169,7 +1005,7 @@
                         Text="Recent"
                         FontSize="12"
                         FontWeight="SemiBold"
-                        Foreground="#666"
+                        Foreground="{StaticResource TextTertiary}"
                         HorizontalAlignment="Center"
                         Margin="0,32,0,4"
                         IsVisible="{Binding HasRecentBoards}"
@@ -1180,11 +1016,11 @@
                         HorizontalAlignment="Center"
                     >
                         <ItemsControl.ItemTemplate>
-                            <DataTemplate>
+                            <DataTemplate x:DataType="x:String">
                                 <Button
                                     Content="{Binding}"
                                     Background="Transparent"
-                                    Foreground="#44AAFF"
+                                    Foreground="{StaticResource AccentBrush}"
                                     FontSize="13"
                                     Padding="8,4"
                                     Click="RecentBoard_Click"
@@ -1203,8 +1039,8 @@
             <!-- ═══════════════════════════════════════════════════════════ -->
             <Border
                 Grid.Row="2"
-                Background="#1A1A1A"
-                BorderBrush="#2A2A2A"
+                Background="{StaticResource ChromeBrush}"
+                BorderBrush="{StaticResource SurfaceBrushLight}"
                 BorderThickness="0,1,0,0"
                 Padding="12,3"
                 Height="26"
@@ -1252,7 +1088,7 @@
                         Grid.Column="4"
                         Text="{Binding SelectionCountText}"
                         Classes="statusText"
-                        Foreground="#44AAFF"
+                        Foreground="{StaticResource AccentBrush}"
                     />
 
                     <Border Grid.Column="5" Classes="statusDivider" />

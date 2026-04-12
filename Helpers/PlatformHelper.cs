@@ -6,13 +6,12 @@ using System.Runtime.InteropServices;
 namespace CGReferenceBoard.Helpers;
 
 /// <summary>
-/// Cross-platform helper utilities for file/process operations.
+/// Helper utilities for file/process operations on Windows and Linux.
 /// </summary>
 public static class PlatformHelper
 {
     public static bool IsWindows => RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
     public static bool IsLinux => RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
-    public static bool IsMacOS => RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
 
     /// <summary>
     /// Opens a file or directory with the system's default application.
@@ -25,8 +24,6 @@ public static class PlatformHelper
                 Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
             else if (IsLinux)
                 Process.Start(new ProcessStartInfo { FileName = "xdg-open", Arguments = $"\"{path}\"", UseShellExecute = false });
-            else if (IsMacOS)
-                Process.Start(new ProcessStartInfo { FileName = "open", Arguments = $"\"{path}\"", UseShellExecute = false });
         }
         catch (Exception ex)
         {
@@ -39,7 +36,8 @@ public static class PlatformHelper
     /// </summary>
     public static void ShowInFileExplorer(string path)
     {
-        if (string.IsNullOrEmpty(path) || !File.Exists(path)) return;
+        if (string.IsNullOrEmpty(path) || !File.Exists(path))
+            return;
 
         try
         {
@@ -63,15 +61,6 @@ public static class PlatformHelper
                     UseShellExecute = true
                 });
             }
-            else if (IsMacOS)
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = "open",
-                    Arguments = $"-R \"{path}\"",
-                    UseShellExecute = true
-                });
-            }
         }
         catch (Exception ex)
         {
@@ -84,7 +73,8 @@ public static class PlatformHelper
     /// </summary>
     public static void OpenDirectory(string directoryPath)
     {
-        if (string.IsNullOrEmpty(directoryPath) || !Directory.Exists(directoryPath)) return;
+        if (string.IsNullOrEmpty(directoryPath) || !Directory.Exists(directoryPath))
+            return;
         OpenWithDefaultApp(directoryPath);
     }
 }

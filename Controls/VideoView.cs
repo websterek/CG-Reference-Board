@@ -15,7 +15,7 @@ namespace CGReferenceBoard.Controls;
 
 /// <summary>
 /// Avalonia VideoView control for embedded video playback via LibVLC.
-/// Supports Windows, Linux, and macOS. Reserved for future built-in player feature.
+/// Supports Windows and Linux. Reserved for future built-in player feature.
 /// </summary>
 public class VideoView : NativeControlHost
 {
@@ -87,8 +87,6 @@ public class VideoView : NativeControlHost
             _mediaPlayer.Hwnd = _platformHandle.Handle;
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             _mediaPlayer.XWindow = (uint)_platformHandle.Handle;
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            _mediaPlayer.NsObject = _platformHandle.Handle;
     }
 
     private void Detach()
@@ -100,8 +98,6 @@ public class VideoView : NativeControlHost
             _mediaPlayer.Hwnd = IntPtr.Zero;
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             _mediaPlayer.XWindow = 0;
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            _mediaPlayer.NsObject = IntPtr.Zero;
     }
 
     #endregion
@@ -210,7 +206,8 @@ public class VideoView : NativeControlHost
     private static RectangleGeometry? ComputeVisibleRegion(Visual parent, Visual child, Thickness childMargin)
     {
         var childPosition = child.TranslatePoint(new Point(0, 0), parent);
-        if (!childPosition.HasValue) return null;
+        if (!childPosition.HasValue)
+            return null;
 
         double topDist = childPosition.Value.Y + childMargin.Top;
         double leftDist = childPosition.Value.X + childMargin.Left;
@@ -219,10 +216,14 @@ public class VideoView : NativeControlHost
 
         var region = new Rect(0, 0, child.Bounds.Width, child.Bounds.Height);
 
-        if (topDist < 0) region = new Rect(region.X, region.Y - topDist, region.Width, region.Height + topDist);
-        if (leftDist < 0) region = new Rect(region.X - leftDist, region.Y, region.Width + leftDist, region.Height);
-        if (rightDist < 0) region = region.WithWidth(region.Width + rightDist);
-        if (bottomDist < 0) region = region.WithHeight(region.Height + bottomDist);
+        if (topDist < 0)
+            region = new Rect(region.X, region.Y - topDist, region.Width, region.Height + topDist);
+        if (leftDist < 0)
+            region = new Rect(region.X - leftDist, region.Y, region.Width + leftDist, region.Height);
+        if (rightDist < 0)
+            region = region.WithWidth(region.Width + rightDist);
+        if (bottomDist < 0)
+            region = region.WithHeight(region.Height + bottomDist);
 
         return new RectangleGeometry(region);
     }
@@ -267,7 +268,8 @@ public class VideoView : NativeControlHost
 
     private void OnParentDetachedFromVisualTree(object? sender, VisualTreeAttachmentEventArgs e)
     {
-        if (VisualRoot is not Window visualRoot) return;
+        if (VisualRoot is not Window visualRoot)
+            return;
         visualRoot.LayoutUpdated -= OnVisualRootLayoutUpdated;
         visualRoot.PositionChanged -= OnVisualRootLayoutUpdated;
     }
