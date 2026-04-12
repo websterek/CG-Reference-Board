@@ -464,6 +464,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _undoStack.Clear();
             _redoStack.Clear();
             SaveBoardData();
+
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => ShowAll_Click(null, null!));
         }
         catch (Exception ex)
         {

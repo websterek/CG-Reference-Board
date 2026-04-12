@@ -543,19 +543,17 @@ public partial class MainWindow
 
     #region View Navigation
 
-    private void CenterView_Click(object? sender, RoutedEventArgs e)
-    {
-        _translate.X = 0;
-        _translate.Y = 0;
-        _scale.ScaleX = 1;
-        _scale.ScaleY = 1;
-        OnPropertyChanged(nameof(ZoomLevelText));
-    }
-
     private void ShowAll_Click(object? sender, RoutedEventArgs e)
     {
         if (GridCells.Count == 0)
-        { CenterView_Click(sender, e); return; }
+        {
+            _translate.X = 0;
+            _translate.Y = 0;
+            _scale.ScaleX = 1;
+            _scale.ScaleY = 1;
+            OnPropertyChanged(nameof(ZoomLevelText));
+            return;
+        }
 
         double minX = double.MaxValue, minY = double.MaxValue;
         double maxX = double.MinValue, maxY = double.MinValue;
@@ -584,8 +582,63 @@ public partial class MainWindow
 
         _scale.ScaleX = scale;
         _scale.ScaleY = scale;
-        _translate.X = (viewportWidth - contentWidth * scale) / 2 - minX * scale;
-        _translate.Y = (viewportHeight - contentHeight * scale) / 2 - minY * scale;
+        _translate.X = viewportWidth / 2 / scale - (minX + maxX) / 2;
+        _translate.Y = viewportHeight / 2 / scale - (minY + maxY) / 2;
+        OnPropertyChanged(nameof(ZoomLevelText));
+    }
+
+    private void ShowSelected_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_selectedCells.Count == 0 && _selectedAnnotations.Count == 0)
+        { ShowAll_Click(sender, e); return; }
+
+        double minX = double.MaxValue, minY = double.MaxValue;
+        double maxX = double.MinValue, maxY = double.MinValue;
+
+        foreach (var cell in _selectedCells)
+        {
+            if (cell.CanvasX < minX)
+                minX = cell.CanvasX;
+            if (cell.CanvasY < minY)
+                minY = cell.CanvasY;
+            if (cell.CanvasX + cell.PixelWidth > maxX)
+                maxX = cell.CanvasX + cell.PixelWidth;
+            if (cell.CanvasY + cell.PixelHeight > maxY)
+                maxY = cell.CanvasY + cell.PixelHeight;
+        }
+
+        foreach (var ann in _selectedAnnotations)
+        {
+            if (ann != null)
+            {
+                foreach (var pt in ann.Points)
+                {
+                    if (pt.X < minX)
+                        minX = pt.X;
+                    if (pt.Y < minY)
+                        minY = pt.Y;
+                    if (pt.X > maxX)
+                        maxX = pt.X;
+                    if (pt.Y > maxY)
+                        maxY = pt.Y;
+                }
+            }
+        }
+
+        double contentWidth = Math.Max(0, maxX - minX);
+        double contentHeight = Math.Max(0, maxY - minY);
+        double viewportWidth = MainCanvas.Bounds.Width > 0 ? MainCanvas.Bounds.Width : this.Bounds.Width;
+        double viewportHeight = MainCanvas.Bounds.Height > 0 ? MainCanvas.Bounds.Height : this.Bounds.Height;
+
+        const double padding = 100;
+        double scaleX = contentWidth > 0 ? viewportWidth / (contentWidth + padding) : 2.0;
+        double scaleY = contentHeight > 0 ? viewportHeight / (contentHeight + padding) : 2.0;
+        double scale = Math.Clamp(Math.Min(scaleX, scaleY), Constants.MinZoom, 2.0);
+
+        _scale.ScaleX = scale;
+        _scale.ScaleY = scale;
+        _translate.X = viewportWidth / 2 / scale - (minX + maxX) / 2;
+        _translate.Y = viewportHeight / 2 / scale - (minY + maxY) / 2;
         OnPropertyChanged(nameof(ZoomLevelText));
     }
 

@@ -132,6 +132,7 @@ public partial class MainWindow
 
         OnPropertyChanged(nameof(WindowTitle));
         ShowToast("📄 New Board");
+        ShowAll_Click(null, null!);
     }
 
     private async void ImportMedia_Click(object? sender, RoutedEventArgs e)
@@ -1024,8 +1025,8 @@ public partial class MainWindow
         if (e.Key == Key.F && noModifiers)
         { ShowAll_Click(null, null!); return; }
 
-        if (e.Key == Key.Home && noModifiers)
-        { CenterView_Click(null, null!); return; }
+        if (e.Key == Key.F && isShift && !isCtrl)
+        { ShowSelected_Click(null, null!); return; }
 
         if (e.Key == Key.F && isCtrl && isShift)
         {
