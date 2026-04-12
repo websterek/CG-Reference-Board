@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using SkiaSharp;
 
 namespace CGReferenceBoard.Services;
@@ -217,12 +218,14 @@ public static class ImageManager
             if (info.Width <= maxWidth)
                 return new Bitmap(path); // already small enough
 
-            // Decode at reduced resolution via sample-size trick
+            // Decode at reduced resolution via sample-size trick.
+            // Use Bgra8888 — Avalonia's native pixel format — so no channel
+            // conversion is needed when writing to WriteableBitmap later.
             int sampleSize = Math.Max(1, info.Width / maxWidth);
             var scaledInfo = new SKImageInfo(
                 Math.Max(1, info.Width / sampleSize),
                 Math.Max(1, info.Height / sampleSize),
-                SKColorType.Rgba8888,
+                SKColorType.Bgra8888,
                 SKAlphaType.Premul);
 
             using var skBitmap = new SKBitmap(scaledInfo);
@@ -236,24 +239,41 @@ public static class ImageManager
             int targetH = Math.Max(1, (int)(skBitmap.Height * scale));
 
             using var resized = skBitmap.Resize(
-                new SKImageInfo(targetW, targetH, SKColorType.Rgba8888, SKAlphaType.Premul),
+                new SKImageInfo(targetW, targetH, SKColorType.Bgra8888, SKAlphaType.Premul),
                 SKSamplingOptions.Default);
             var source = resized ?? skBitmap;
 
-            // Encode to a compact in-memory format, then create the Avalonia Bitmap.
-            // Use JPEG for opaque images (fast, small), PNG when alpha is present.
-            using var image = SKImage.FromBitmap(source);
-            bool hasAlpha = info.AlphaType != SKAlphaType.Opaque;
-            using var encoded = hasAlpha
-                ? image.Encode(SKEncodedImageFormat.Png, 100)
-                : image.Encode(SKEncodedImageFormat.Jpeg, 92);
-            if (encoded == null)
-                return new Bitmap(path);
+            // Write pixels directly into an Avalonia WriteableBitmap — this eliminates
+            // the previous encode (JPEG/PNG) → MemoryStream → Avalonia-decode round-trip,
+            // saving a full compress+decompress cycle for every large image loaded.
+            var wb = new WriteableBitmap(
+                new Avalonia.PixelSize(source.Width, source.Height),
+                new Avalonia.Vector(96, 96),
+                PixelFormat.Bgra8888,
+                AlphaFormat.Premul);
 
-            var ms = new MemoryStream();
-            encoded.SaveTo(ms);
-            ms.Position = 0;
-            return new Bitmap(ms);
+            using (var fb = wb.Lock())
+            {
+                unsafe
+                {
+                    int srcRowBytes = source.RowBytes;
+                    int dstRowBytes = fb.RowBytes;
+                    int copyRowBytes = Math.Min(srcRowBytes, dstRowBytes);
+                    nint srcBase = source.GetPixels();
+                    nint dstBase = fb.Address;
+
+                    for (int y = 0; y < source.Height; y++)
+                    {
+                        Buffer.MemoryCopy(
+                            (void*)(srcBase + y * srcRowBytes),
+                            (void*)(dstBase + y * dstRowBytes),
+                            dstRowBytes,
+                            copyRowBytes);
+                    }
+                }
+            }
+
+            return wb;
         }
         catch
         {

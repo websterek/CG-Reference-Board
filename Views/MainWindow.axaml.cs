@@ -1251,7 +1251,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             vpRight += margin;
             vpBottom += margin;
 
-            var tasks = new System.Collections.Generic.List<Task>();
+            // Viewport centre used for distance-based priority ordering of loads.
+            double vpCenterX = (vpLeft + vpRight) / 2.0;
+            double vpCenterY = (vpTop + vpBottom) / 2.0;
+
+            // Separate changes into two buckets:
+            //  • Unloads — synchronous, no I/O; executed immediately on the UI thread.
+            //  • Loads   — async disk I/O; sorted nearest-to-centre first so the most
+            //              visible content appears before edge-of-viewport content.
+            var unloads = new System.Collections.Generic.List<CellViewModel>();
+            var loads = new System.Collections.Generic.List<(CellViewModel Cell, ImageLod Target, double Distance)>();
 
             foreach (var cell in GridCells)
             {
@@ -1271,15 +1280,56 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
                 var targetLod = ImageManager.DetermineLod(cellScreenWidth, isVisible);
 
-                if (targetLod != cell.CurrentLod)
-                    tasks.Add(cell.ApplyLodAsync(targetLod));
+                if (targetLod == cell.CurrentLod)
+                    continue;
+
+                if (targetLod == ImageLod.Placeholder)
+                {
+                    unloads.Add(cell);
+                }
+                else
+                {
+                    // Manhattan distance from cell centre to viewport centre.
+                    double cx = cell.CanvasX + cell.PixelWidth / 2.0;
+                    double cy = cell.CanvasY + cell.PixelHeight / 2.0;
+                    double dist = Math.Abs(cx - vpCenterX) + Math.Abs(cy - vpCenterY);
+                    loads.Add((cell, targetLod, dist));
+                }
             }
 
-            if (tasks.Count > 0)
+            // ── 1. Unloads: synchronous on UI thread — just Dispose() + null ─────
+            foreach (var cell in unloads)
+                cell.UnloadImage();
+
+            // ── 2. Loads: throttled async, centre-nearest first ──────────────────
+            if (loads.Count > 0)
             {
+                // Sort so cells closest to the viewport centre get their I/O slot first.
+                loads.Sort(static (a, b) => a.Distance.CompareTo(b.Distance));
+
+                // Cap concurrent image decodes at 4 to avoid flooding the thread pool
+                // when many cells become visible at once (e.g. after a zoom-out jump).
+                var sem = new System.Threading.SemaphoreSlim(4, 4);
+
+                async Task LoadThrottled(CellViewModel cell, ImageLod lod)
+                {
+                    await sem.WaitAsync().ConfigureAwait(false);
+                    try
+                    { await cell.ApplyLodAsync(lod).ConfigureAwait(false); }
+                    finally { sem.Release(); }
+                }
+
+                var tasks = new System.Collections.Generic.List<Task>(loads.Count);
+                foreach (var (cell, lod, _) in loads)
+                    tasks.Add(LoadThrottled(cell, lod));
+
                 await Task.WhenAll(tasks);
+            }
+
+            if (unloads.Count > 0 || loads.Count > 0)
+            {
                 // Nudge the GC to reclaim large bitmap buffers from disposed images.
-                // Optimized mode lets the GC decide whether collection is worthwhile.
+                // Optimised mode lets the GC decide whether collection is worthwhile.
                 GC.Collect(2, GCCollectionMode.Optimized, false);
             }
 
