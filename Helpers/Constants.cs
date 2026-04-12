@@ -93,4 +93,18 @@ public static class Constants
 
     /// <summary>Extra padding around annotation shapes to avoid clipping effects.</summary>
     public const double AnnotationEffectPadding = 8.0;
+
+    // ───────── Grid visual settings ─────────
+
+    /// <summary>Color of the main intersection dots on the grid background.</summary>
+    public const string GridDotColor = "#2D2D2D";
+
+    /// <summary>Size in pixels of each quarter-dot at tile corners (4 combine into one dot).</summary>
+    public const double GridDotSize = 1.5;
+
+    /// <summary>Color of the grid lines drawn between intersection points.</summary>
+    public const string GridLineColor = "#1E1E1E";
+
+    /// <summary>Thickness in pixels of the grid lines.</summary>
+    public const double GridLineThickness = 0.5;
 }

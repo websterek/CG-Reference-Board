@@ -162,6 +162,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         set { _isAnnotationsVisible = value; OnPropertyChanged(nameof(IsAnnotationsVisible)); }
     }
 
+
+
     private bool _isPointerOverCanvas;
     public bool IsPointerOverCanvas
     {
@@ -701,6 +703,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (settings != null)
             {
                 AnnotationEffectMode = settings.AnnotationEffect ?? "None";
+
             }
         }
         catch { /* ignore corrupt settings */ }

@@ -295,6 +295,7 @@
                                     <PathIcon Data="M16 12V4H17V2H7V4H8V12L6 14V16H11.2V22H12.8V16H18V14L16 12Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
                                 </MenuItem.Icon>
                             </MenuItem>
+
                         </MenuItem>
                     </Menu>
 
@@ -606,27 +607,21 @@
                                 >
                                     <VisualBrush.Visual>
                                         <Canvas Width="160" Height="160">
-                                            <Ellipse
-                                                Width="3"
-                                                Height="3"
-                                                Fill="#2D2D2D"
-                                                Canvas.Left="78.5"
-                                                Canvas.Top="78.5"
-                                            />
-                                            <Ellipse
-                                                Width="1.5"
-                                                Height="1.5"
-                                                Fill="#222222"
-                                                Canvas.Left="79.25"
-                                                Canvas.Top="-0.25"
-                                            />
-                                            <Ellipse
-                                                Width="1.5"
-                                                Height="1.5"
-                                                Fill="#222222"
-                                                Canvas.Left="-0.25"
-                                                Canvas.Top="79.25"
-                                            />
+                                            <!-- Grid lines (thin rectangles at tile edges) -->
+                                            <Rectangle Width="160" Height="0.5" Fill="#1E1E1E"
+                                                Canvas.Left="0" Canvas.Top="0" />
+                                            <Rectangle Width="0.5" Height="160" Fill="#1E1E1E"
+                                                Canvas.Left="0" Canvas.Top="0" />
+                                            <!-- Grid intersection dots (quarter-dots at corners;
+                                                 tiling combines them into ~3px dots at intersections) -->
+                                            <Ellipse Width="1.5" Height="1.5" Fill="#2D2D2D"
+                                                Canvas.Left="0" Canvas.Top="0" />
+                                            <Ellipse Width="1.5" Height="1.5" Fill="#2D2D2D"
+                                                Canvas.Left="158.5" Canvas.Top="0" />
+                                            <Ellipse Width="1.5" Height="1.5" Fill="#2D2D2D"
+                                                Canvas.Left="0" Canvas.Top="158.5" />
+                                            <Ellipse Width="1.5" Height="1.5" Fill="#2D2D2D"
+                                                Canvas.Left="158.5" Canvas.Top="158.5" />
                                         </Canvas>
                                     </VisualBrush.Visual>
                                 </VisualBrush>
@@ -1198,6 +1193,8 @@
                             </TextBlock>
                         </Border>
                     </Canvas>
+
+
                 </Grid>
             </Border>
 

@@ -1164,6 +1164,8 @@ public partial class MainWindow
             }
         }
 
+
+
         if (e.Key == Key.F && noModifiers)
         { ShowAll_Click(null, null!); return; }
 
