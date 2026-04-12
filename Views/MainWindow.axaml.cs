@@ -1230,21 +1230,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             double tx = _translate.X;
             double ty = _translate.Y;
 
-            // Determine viewport size in screen pixels (same pattern as ShowAll_Click).
             double viewW = MainCanvas.Bounds.Width > 0 ? MainCanvas.Bounds.Width : this.Bounds.Width;
             double viewH = MainCanvas.Bounds.Height > 0 ? MainCanvas.Bounds.Height : this.Bounds.Height;
             if (viewW <= 0 || viewH <= 0)
                 return;
 
-            // Convert viewport rect to canvas coordinates.
-            //   screen = (canvas + translate) × scale
-            //   canvas = screen / scale − translate
             double vpLeft = -tx;
             double vpTop = -ty;
             double vpRight = viewW / scale - tx;
             double vpBottom = viewH / scale - ty;
 
-            // Generous margin (2 grid cells) to pre-load cells about to scroll into view.
+            // Generous margin so cells about to scroll into view pre-load their bitmaps
+            // and don't vanish while still within one-cell distance of the edge.
             double margin = Constants.GridSize * 2;
             vpLeft -= margin;
             vpTop -= margin;
@@ -1255,30 +1252,46 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             double vpCenterX = (vpLeft + vpRight) / 2.0;
             double vpCenterY = (vpTop + vpBottom) / 2.0;
 
-            // Separate changes into two buckets:
-            //  • Unloads — synchronous, no I/O; executed immediately on the UI thread.
-            //  • Loads   — async disk I/O; sorted nearest-to-centre first so the most
-            //              visible content appears before edge-of-viewport content.
+            // Pre-build a set of cells that are currently mid-drag so we never
+            // cull them (they can briefly leave the margin zone during edge-scroll).
+            var draggedCells = new System.Collections.Generic.HashSet<CellViewModel>();
+            if (_draggingCell != null)
+                draggedCells.Add(_draggingCell);
+            if (_groupDragStarts != null)
+                foreach (var g in _groupDragStarts)
+                    draggedCells.Add(g.Cell);
+
             var unloads = new System.Collections.Generic.List<CellViewModel>();
             var loads = new System.Collections.Generic.List<(CellViewModel Cell, ImageLod Target, double Distance)>();
 
             foreach (var cell in GridCells)
             {
-                if (!cell.NeedsImage)
-                    continue;
-
-                // Cell bounding rectangle in canvas coordinates.
                 double cellLeft = cell.CanvasX;
                 double cellTop = cell.CanvasY;
                 double cellRight = cellLeft + cell.PixelWidth;
                 double cellBottom = cellTop + cell.PixelHeight;
 
-                bool isVisible = cellRight > vpLeft && cellLeft < vpRight
-                              && cellBottom > vpTop && cellTop < vpBottom;
+                bool isInViewport = cellRight > vpLeft && cellLeft < vpRight
+                                 && cellBottom > vpTop && cellTop < vpBottom;
+
+                // Dragged cells are always kept visible regardless of position.
+                if (draggedCells.Contains(cell))
+                    isInViewport = true;
 
                 double cellScreenWidth = cell.PixelWidth * scale;
 
-                var targetLod = ImageManager.DetermineLod(cellScreenWidth, isVisible);
+                // Detail elements (text bodies, icon badges) are only worth rendering
+                // when the cell is large enough on screen to be legible.
+                bool showDetail = isInViewport && cellScreenWidth >= 50.0;
+
+                cell.IsInViewport = isInViewport;
+                cell.IsDetailVisible = showDetail;
+
+                // ── Bitmap LOD (image and video cells only) ────────────────────────
+                if (!cell.NeedsImage)
+                    continue;
+
+                var targetLod = ImageManager.DetermineLod(cellScreenWidth, isInViewport);
 
                 if (targetLod == cell.CurrentLod)
                     continue;
@@ -1289,7 +1302,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 }
                 else
                 {
-                    // Manhattan distance from cell centre to viewport centre.
                     double cx = cell.CanvasX + cell.PixelWidth / 2.0;
                     double cy = cell.CanvasY + cell.PixelHeight / 2.0;
                     double dist = Math.Abs(cx - vpCenterX) + Math.Abs(cy - vpCenterY);
@@ -1297,18 +1309,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 }
             }
 
-            // ── 1. Unloads: synchronous on UI thread — just Dispose() + null ─────
+            // ── 1. Unloads: synchronous on UI thread ───────────────────────────────
             foreach (var cell in unloads)
                 cell.UnloadImage();
 
-            // ── 2. Loads: throttled async, centre-nearest first ──────────────────
+            // ── 2. Loads: throttled async, centre-nearest first ───────────────────
             if (loads.Count > 0)
             {
-                // Sort so cells closest to the viewport centre get their I/O slot first.
                 loads.Sort(static (a, b) => a.Distance.CompareTo(b.Distance));
 
-                // Cap concurrent image decodes at 4 to avoid flooding the thread pool
-                // when many cells become visible at once (e.g. after a zoom-out jump).
                 var sem = new System.Threading.SemaphoreSlim(4, 4);
 
                 async Task LoadThrottled(CellViewModel cell, ImageLod lod)
@@ -1327,15 +1336,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             }
 
             if (unloads.Count > 0 || loads.Count > 0)
-            {
-                // Nudge the GC to reclaim large bitmap buffers from disposed images.
-                // Optimised mode lets the GC decide whether collection is worthwhile.
                 GC.Collect(2, GCCollectionMode.Optimized, false);
-            }
 
-            // ── Annotation viewport culling ──────────────────────────────────────
-            // Use a generous margin (3 grid cells) so annotations near the edge
-            // are never hidden prematurely due to bounding-box imprecision.
+            // ── Annotation viewport culling ────────────────────────────────────────
             double annMargin = Constants.GridSize * 3;
             double annVpLeft = vpLeft - annMargin;
             double annVpTop = vpTop - annMargin;
@@ -1346,7 +1349,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             {
                 if (ann.Points.Count == 0)
                 {
-                    ann.IsInViewport = true;   // no bounds yet — keep visible
+                    ann.IsInViewport = true;
                     continue;
                 }
 

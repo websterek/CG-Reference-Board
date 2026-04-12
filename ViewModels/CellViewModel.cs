@@ -114,6 +114,9 @@ public class CellViewModel : ViewModelBase
             OnPropertyChanged(nameof(ZIndex));
             OnPropertyChanged(nameof(NeedsImage));
             OnPropertyChanged(nameof(ShowPlaceholder));
+            OnPropertyChanged(nameof(ShowTextContent));
+            OnPropertyChanged(nameof(ShowLabelContent));
+            OnPropertyChanged(nameof(ShowIconBadge));
         }
     }
 
@@ -175,6 +178,38 @@ public class CellViewModel : ViewModelBase
         set => SetProperty(ref _isHighlighted, value);
     }
 
+    private bool _isInViewport = true;
+    /// <summary>
+    /// Controlled by the viewport LOD system. When false the cell lies outside
+    /// the padded viewport region; its entire visual tree is collapsed to save
+    /// layout and render work. Defaults to true so cells appear immediately on load.
+    /// </summary>
+    public bool IsInViewport
+    {
+        get => _isInViewport;
+        set => SetProperty(ref _isInViewport, value);
+    }
+
+    private bool _isDetailVisible = true;
+    /// <summary>
+    /// True when the cell is large enough on screen to justify rendering
+    /// text bodies, icon badges, and other detail elements.
+    /// False when zoomed far out. Updated by the viewport LOD system.
+    /// </summary>
+    public bool IsDetailVisible
+    {
+        get => _isDetailVisible;
+        set
+        {
+            if (SetProperty(ref _isDetailVisible, value))
+            {
+                OnPropertyChanged(nameof(ShowTextContent));
+                OnPropertyChanged(nameof(ShowLabelContent));
+                OnPropertyChanged(nameof(ShowIconBadge));
+            }
+        }
+    }
+
     public bool HasAppearanceOptions => IsBoardElement || IsFile || IsImage;
     public bool HasArrangeOptions => !IsBackdrop;
     public bool HasFileOptions => IsFile;
@@ -205,6 +240,15 @@ public class CellViewModel : ViewModelBase
 
     /// <summary>Whether to show the type icon overlay (shown for content cells, hidden for board elements).</summary>
     public bool ShowIcon => HasContent && !IsBoardElement;
+
+    /// <summary>True when the Text-cell content body should be rendered.</summary>
+    public bool ShowTextContent => IsText && _isDetailVisible;
+
+    /// <summary>True when the Label-cell content body should be rendered.</summary>
+    public bool ShowLabelContent => IsLabel && _isDetailVisible;
+
+    /// <summary>True when the type icon badge should be rendered.</summary>
+    public bool ShowIconBadge => ShowIcon && _isDetailVisible;
 
     /// <summary>True when this cell type uses a bitmap (Image or Video).</summary>
     public bool NeedsImage => Type == CellType.Image || Type == CellType.Video;

@@ -788,6 +788,10 @@
                                         Property="ZIndex"
                                         Value="{Binding ZIndex}"
                                     />
+                                    <Setter
+                                        Property="IsVisible"
+                                        Value="{Binding IsInViewport}"
+                                    />
                                 </ControlTheme>
                             </ItemsControl.ItemContainerTheme>
 
@@ -1076,7 +1080,7 @@
                                             <!-- Text Content -->
                                             <Border
                                                 Background="{StaticResource SurfaceBrushLight}"
-                                                IsVisible="{Binding IsText}"
+                                                IsVisible="{Binding ShowTextContent}"
                                                 Padding="10"
                                                 DoubleTapped="CanvasText_DoubleTapped"
                                             >
@@ -1099,7 +1103,7 @@
                                             <!-- Label Content -->
                                             <Border
                                                 Background="Transparent"
-                                                IsVisible="{Binding IsLabel}"
+                                                IsVisible="{Binding ShowLabelContent}"
                                                 Padding="10"
                                                 DoubleTapped="CanvasText_DoubleTapped"
                                                 ZIndex="5"
@@ -1170,7 +1174,7 @@
                                                 VerticalAlignment="Top"
                                                 Margin="5"
                                                 Padding="4,2"
-                                                IsVisible="{Binding ShowIcon}"
+                                                IsVisible="{Binding ShowIconBadge}"
                                             >
                                                 <PathIcon
                                                     Data="{Binding TypeIcon}"

@@ -365,6 +365,11 @@ public static class ImageManager
         if (!isVisible)
             return ImageLod.Placeholder;
 
+        // Below 30 px the image is just a few pixels square — the average-colour
+        // placeholder rectangle gives equivalent visual information at zero cost.
+        if (cellScreenWidth < 30)
+            return ImageLod.Placeholder;
+
         // Any visible cell gets at least a thumbnail — no colour-only
         // placeholders for on-screen content.
         // Full resolution kicks in once the cell is large enough on screen
