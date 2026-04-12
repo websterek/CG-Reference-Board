@@ -162,8 +162,6 @@ public partial class MainWindow
             }
 
             e.Pointer.Capture(sender as IInputElement);
-            foreach (var a in Annotations)
-                a.IsSelected = false;
         }
     }
 
@@ -474,8 +472,28 @@ public partial class MainWindow
                             _selectedCells.Add(cell);
                         }
                     }
+
+                    // Also select annotations in grid mode
+                    _selectedAnnotations.Clear();
+                    foreach (var ann in Annotations)
+                    {
+                        ann.IsSelected = false;
+
+                        if (ann.Points.Count == 0)
+                            continue;
+
+                        double px = ann.Points[0].X + ann.CanvasX;
+                        double py = ann.Points[0].Y + ann.CanvasY;
+
+                        if (px >= left && px <= right && py >= top && py <= bottom)
+                        {
+                            ann.IsSelected = true;
+                            _selectedAnnotations.Add(ann);
+                        }
+                    }
                 }
             }
+            OnPropertyChanged(nameof(SelectionCountText));
             return;
         }
 
