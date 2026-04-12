@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
@@ -23,6 +24,9 @@ public partial class MainWindow
     private void MainCanvas_PointerExited(object? sender, PointerEventArgs e)
     {
         IsPointerOverCanvas = false;
+        var brushCircle = this.FindControl<Ellipse>("BrushCursorCircle");
+        if (brushCircle != null)
+            brushCircle.IsVisible = false;
     }
 
     private void Canvas_PointerPressed(object? sender, PointerPressedEventArgs e)
@@ -148,7 +152,9 @@ public partial class MainWindow
         // Left-click on empty canvas space: start cell marquee selection
         else if (!e.Handled && props.IsLeftButtonPressed && !IsDrawMode)
         {
-            ClearSelection();
+            _cellSelectionAdditive = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+            if (!_cellSelectionAdditive)
+                ClearSelection();
             _isSelectingCells = true;
             _cellSelectionStart = e.GetPosition(mainCanvas);
 
@@ -180,6 +186,22 @@ public partial class MainWindow
         {
             Canvas.SetLeft(cursorIcon, _lastPointerPosition.X + 15);
             Canvas.SetTop(cursorIcon, _lastPointerPosition.Y + 15);
+        }
+
+        // Update brush size cursor circle (screen-space size = brush thickness × zoom)
+        var brushCircle = this.FindControl<Ellipse>("BrushCursorCircle");
+        if (brushCircle != null)
+        {
+            bool showCircle = IsDrawMode && CurrentTool == "Brush";
+            brushCircle.IsVisible = showCircle;
+            if (showCircle)
+            {
+                double sizeInScreen = CurrentBrushThickness * _scale.ScaleX;
+                brushCircle.Width = sizeInScreen;
+                brushCircle.Height = sizeInScreen;
+                Canvas.SetLeft(brushCircle, _lastPointerPosition.X - sizeInScreen / 2.0);
+                Canvas.SetTop(brushCircle, _lastPointerPosition.Y - sizeInScreen / 2.0);
+            }
         }
 
         // Update placement preview for backdrop positioning
@@ -509,10 +531,18 @@ public partial class MainWindow
 
                 if (cellMarquee.Width > 4 || cellMarquee.Height > 4)
                 {
-                    _selectedCells.Clear();
+                    if (!_cellSelectionAdditive)
+                    {
+                        _selectedCells.Clear();
+                        foreach (var cell in GridCells)
+                            cell.IsSelected = false;
+                        _selectedAnnotations.Clear();
+                        foreach (var ann in Annotations)
+                            ann.IsSelected = false;
+                    }
+
                     foreach (var cell in GridCells)
                     {
-                        cell.IsSelected = false;
                         if (!cell.HasContent)
                             continue;
 
@@ -523,7 +553,7 @@ public partial class MainWindow
 
                         bool intersects = cx < right && cx + cw > left
                                        && cy < bottom && cy + ch > top;
-                        if (intersects)
+                        if (intersects && !cell.IsSelected)
                         {
                             cell.IsSelected = true;
                             _selectedCells.Add(cell);
@@ -531,18 +561,15 @@ public partial class MainWindow
                     }
 
                     // Also select annotations in grid mode
-                    _selectedAnnotations.Clear();
                     foreach (var ann in Annotations)
                     {
-                        ann.IsSelected = false;
-
                         if (ann.Points.Count == 0)
                             continue;
 
                         double px = ann.Points[0].X + ann.CanvasX;
                         double py = ann.Points[0].Y + ann.CanvasY;
 
-                        if (px >= left && px <= right && py >= top && py <= bottom)
+                        if (px >= left && px <= right && py >= top && py <= bottom && !ann.IsSelected)
                         {
                             ann.IsSelected = true;
                             _selectedAnnotations.Add(ann);

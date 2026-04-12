@@ -1213,6 +1213,19 @@
                                 </TextBlock.Effect>
                             </TextBlock>
                         </Border>
+
+                        <!-- Brush size indicator circle – follows cursor in annotation/brush mode -->
+                        <Ellipse
+                            x:Name="BrushCursorCircle"
+                            IsHitTestVisible="False"
+                            IsVisible="False"
+                            ZIndex="9999"
+                            Stroke="{Binding CurrentBrushColorBrush}"
+                            StrokeThickness="1.5"
+                            Fill="Transparent"
+                            Canvas.Left="-100"
+                            Canvas.Top="-100"
+                        />
                     </Canvas>
 
 

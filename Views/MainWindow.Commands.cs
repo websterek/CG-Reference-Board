@@ -1186,7 +1186,10 @@ public partial class MainWindow
                 return;
             }
 
-            var bitmap = await data.TryGetBitmapAsync();
+            Avalonia.Media.Imaging.Bitmap? bitmap = null;
+            try
+            { bitmap = await data.TryGetBitmapAsync(); }
+            catch { /* X11 clipboard may throw when data is not a valid bitmap */ }
             if (bitmap != null)
             {
                 string destDir = Path.Combine(_workspaceDir, "images");

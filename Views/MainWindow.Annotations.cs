@@ -110,6 +110,13 @@ public partial class MainWindow
                 annMove.IsSelected = true;
             }
 
+            // Bring all selected annotations to front (end of collection = highest z-order)
+            foreach (var a in _selectedAnnotations.ToList())
+            {
+                Annotations.Remove(a);
+                Annotations.Add(a);
+            }
+
             _isDraggingAnnotations = true;
             _annotationDragCellOriginals = null;
             _annotationDragStart = e.GetPosition(this.FindControl<Canvas>("MainCanvas"));

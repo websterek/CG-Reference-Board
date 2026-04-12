@@ -424,6 +424,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly List<CellViewModel> _selectedCells = new();
     private bool _isSelectingCells;
     private Point _cellSelectionStart;
+    private bool _cellSelectionAdditive;
 
     // Cell drag (single or group)
     private bool _isPointerDown;
