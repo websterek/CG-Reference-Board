@@ -1392,14 +1392,16 @@ public partial class MainWindow
 
         if (cell.IsVideo)
         {
-            // Video: Always open in native player
-            string? videoPath = cell.VideoPath;
-            if (!string.IsNullOrEmpty(videoPath) && File.Exists(videoPath))
-                PlatformHelper.OpenWithDefaultApp(videoPath);
-
-            // Normal double-click also zooms to the video
-            if (!isShift)
+            if (isShift)
             {
+                // Shift+double-click: Open in system video player
+                string? videoPath = cell.VideoPath;
+                if (!string.IsNullOrEmpty(videoPath) && File.Exists(videoPath))
+                    PlatformHelper.OpenWithDefaultApp(videoPath);
+            }
+            else
+            {
+                // Normal double-click: Zoom to fill screen completely
                 ClearSelection();
                 cell.IsSelected = true;
                 _selectedCells.Add(cell);

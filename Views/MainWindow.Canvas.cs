@@ -370,6 +370,7 @@ public partial class MainWindow
                 _translate.Y += _middleZoomAnchor.Y * (1.0 / newScale - 1.0 / oldScale);
                 _scale.ScaleX = newScale;
                 _scale.ScaleY = newScale;
+                InvalidateZoomRestore();
                 NotifyZoomChanged();
             }
 
@@ -382,6 +383,7 @@ public partial class MainWindow
             _translate.X += (screenPt.X - _panStartPoint.X) / _scale.ScaleX;
             _translate.Y += (screenPt.Y - _panStartPoint.Y) / _scale.ScaleY;
             _panStartPoint = screenPt;
+            InvalidateZoomRestore();
         }
     }
 
@@ -591,6 +593,7 @@ public partial class MainWindow
 
         _scale.ScaleX = newScale;
         _scale.ScaleY = newScale;
+        InvalidateZoomRestore();
         NotifyZoomChanged();
     }
 
@@ -606,6 +609,7 @@ public partial class MainWindow
             _translate.Y = 0;
             _scale.ScaleX = 1;
             _scale.ScaleY = 1;
+            InvalidateZoomRestore();
             NotifyZoomChanged();
             return;
         }
@@ -659,6 +663,7 @@ public partial class MainWindow
         _scale.ScaleY = scale;
         _translate.X = viewportWidth / 2 / scale - (minX + maxX) / 2;
         _translate.Y = viewportHeight / 2 / scale - (minY + maxY) / 2;
+        InvalidateZoomRestore();
         NotifyZoomChanged();
     }
 
@@ -716,15 +721,40 @@ public partial class MainWindow
         _scale.ScaleY = scale;
         _translate.X = viewportWidth / 2 / scale - (minX + maxX) / 2;
         _translate.Y = viewportHeight / 2 / scale - (minY + maxY) / 2;
+        InvalidateZoomRestore();
         NotifyZoomChanged();
     }
 
     /// <summary>
     /// Zooms to a specific cell, filling the screen completely (fit to longest edge, no padding).
     /// Centers the cell in the viewport.
+    /// PureRef-style toggle: double-clicking the same cell again restores the previous view,
+    /// but only if the view hasn't been manually modified since the zoom.
     /// </summary>
     private void ZoomToCell(CellViewModel cell)
     {
+        // Check if we can restore the previous view (same cell, view not manually modified)
+        if (_canRestoreView && _zoomedToCell == cell)
+        {
+            // Restore previous view state
+            _translate.X = _savedTranslateX;
+            _translate.Y = _savedTranslateY;
+            _scale.ScaleX = _savedScale;
+            _scale.ScaleY = _savedScale;
+
+            // Clear zoom toggle state
+            _canRestoreView = false;
+            _zoomedToCell = null;
+
+            NotifyZoomChanged();
+            return;
+        }
+
+        // Save current view state before zooming
+        _savedTranslateX = _translate.X;
+        _savedTranslateY = _translate.Y;
+        _savedScale = _scale.ScaleX;
+
         double contentWidth = cell.PixelWidth;
         double contentHeight = cell.PixelHeight;
         double viewportWidth = MainCanvas.Bounds.Width > 0 ? MainCanvas.Bounds.Width : this.Bounds.Width;
@@ -744,6 +774,10 @@ public partial class MainWindow
         _translate.X = viewportWidth / 2 / scale - cellCenterX;
         _translate.Y = viewportHeight / 2 / scale - cellCenterY;
 
+        // Mark that we can restore this view on next double-click
+        _canRestoreView = true;
+        _zoomedToCell = cell;
+
         NotifyZoomChanged();
     }
 
@@ -751,6 +785,7 @@ public partial class MainWindow
     {
         _scale.ScaleX = 1;
         _scale.ScaleY = 1;
+        InvalidateZoomRestore();
         NotifyZoomChanged();
         ScheduleViewportUpdate();
     }
@@ -765,6 +800,16 @@ public partial class MainWindow
 
         _translate.X = viewportWidth / 2 / _scale.ScaleX - canvasX;
         _translate.Y = viewportHeight / 2 / _scale.ScaleY - canvasY;
+    }
+
+    /// <summary>
+    /// Invalidates the zoom toggle state when the user manually pans or zooms.
+    /// Called from all manual view manipulation operations (wheel zoom, drag pan, etc.)
+    /// </summary>
+    private void InvalidateZoomRestore()
+    {
+        _canRestoreView = false;
+        _zoomedToCell = null;
     }
 
     #endregion

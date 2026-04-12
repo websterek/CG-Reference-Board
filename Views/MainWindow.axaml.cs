@@ -403,6 +403,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly TranslateTransform _translate = new(0, 0);
     private readonly ScaleTransform _scale = new(1, 1);
 
+    // Zoom toggle state (PureRef-style: double-click to zoom in, double-click again to restore)
+    private double _savedTranslateX;
+    private double _savedTranslateY;
+    private double _savedScale;
+    private CellViewModel? _zoomedToCell;
+    private bool _canRestoreView;
+
     // Middle-button drag-to-zoom (Nuke-style)
     private double _middleZoomStartY;
     private double _middleZoomOriginY;
