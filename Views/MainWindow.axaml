@@ -337,37 +337,7 @@
                         PointerEntered="MainCanvas_PointerEntered"
                         PointerExited="MainCanvas_PointerExited"
                     >
-                        <!-- Custom Cursor Icon Overlay -->
-                        <Border
-                            x:Name="CursorIconContainer"
-                            Canvas.Left="-100"
-                            Canvas.Top="-100"
-                            IsHitTestVisible="False"
-                            IsVisible="{Binding IsCursorIconVisible}"
-                            ZIndex="10000"
-                            Background="Transparent"
-                            CornerRadius="4"
-                            Padding="4"
-                        >
-                            <TextBlock
-                                Text="{Binding CanvasCursor}"
-                                FontSize="16"
-                                FontWeight="Bold"
-                                Foreground="White"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                            >
-                                <TextBlock.Effect>
-                                    <DropShadowEffect
-                                        BlurRadius="3"
-                                        OffsetX="0"
-                                        OffsetY="0"
-                                        Color="Black"
-                                        Opacity="0.8" />
-                                </TextBlock.Effect>
-                            </TextBlock>
-                        </Border>
-
+                        <!-- Cell Layer -->
                         <!-- Placement Preview Rectangle -->
                         <Border
                             x:Name="PlacementPreviewBorder"
@@ -1132,6 +1102,40 @@
                             ZIndex="200"
 
                         />
+                    </Canvas>
+
+                    <Canvas x:Name="OverlayCanvas" IsHitTestVisible="False">
+                        <!-- Custom Cursor Icon Overlay -->
+                        <Border
+                            x:Name="CursorIconContainer"
+                            Canvas.Left="-100"
+                            Canvas.Top="-100"
+                            IsHitTestVisible="False"
+                            IsVisible="{Binding IsCursorIconVisible}"
+                            ZIndex="10000"
+                            Background="Transparent"
+                            CornerRadius="4"
+                            Padding="4"
+                        >
+                            <TextBlock
+                                Text="{Binding CanvasCursor}"
+                                FontSize="16"
+                                FontWeight="Bold"
+                                Foreground="White"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                            >
+                                <TextBlock.Effect>
+                                    <DropShadowEffect
+                                        BlurRadius="3"
+                                        OffsetX="0"
+                                        OffsetY="1"
+                                        Color="Black"
+                                        Opacity="0.8"
+                                    />
+                                </TextBlock.Effect>
+                            </TextBlock>
+                        </Border>
                     </Canvas>
                 </Grid>
             </Border>

@@ -34,9 +34,9 @@ public partial class MainWindow
         var cursorIcon = this.FindControl<Border>("CursorIconContainer");
         if (cursorIcon != null)
         {
-            var pt = e.GetPosition(mainCanvas);
-            Canvas.SetLeft(cursorIcon, pt.X + 15);
-            Canvas.SetTop(cursorIcon, pt.Y + 15);
+            var ptScreen = e.GetPosition(this.FindControl<Border>("CanvasBorder"));
+            Canvas.SetLeft(cursorIcon, ptScreen.X + 15);
+            Canvas.SetTop(cursorIcon, ptScreen.Y + 15);
         }
 
         // Handle placement preview click (backdrop positioning)
@@ -177,8 +177,8 @@ public partial class MainWindow
         var cursorIcon = this.FindControl<Border>("CursorIconContainer");
         if (cursorIcon != null)
         {
-            Canvas.SetLeft(cursorIcon, pt.X + 15);
-            Canvas.SetTop(cursorIcon, pt.Y + 15);
+            Canvas.SetLeft(cursorIcon, _lastPointerPosition.X + 15);
+            Canvas.SetTop(cursorIcon, _lastPointerPosition.Y + 15);
         }
 
         // Update placement preview for backdrop positioning
