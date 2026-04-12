@@ -498,7 +498,7 @@
                                             </MenuItem.Icon>
                                         </MenuItem>
                                         <MenuItem
-                                            Header="Move"
+                                            Header="Select/Move"
                                             Click="MoveMode_Click"
                                             ToggleType="CheckBox"
                                             IsChecked="{Binding IsMoveSelected}"

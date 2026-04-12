@@ -91,10 +91,14 @@ public class AnnotationShape : Control
 
         foreach (var pt in vm.Points)
         {
-            if (pt.X < _minX) _minX = pt.X;
-            if (pt.X > maxX) maxX = pt.X;
-            if (pt.Y < _minY) _minY = pt.Y;
-            if (pt.Y > maxY) maxY = pt.Y;
+            if (pt.X < _minX)
+                _minX = pt.X;
+            if (pt.X > maxX)
+                maxX = pt.X;
+            if (pt.Y < _minY)
+                _minY = pt.Y;
+            if (pt.Y > maxY)
+                maxY = pt.Y;
         }
 
         if (vm.Type == "Text")
@@ -148,45 +152,76 @@ public class AnnotationShape : Control
 
     private static void RenderPencil(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, double ox, double oy)
     {
-        if (vm.Points.Count < 2) return;
+        if (vm.Points.Count < 2)
+            return;
 
-        for (int i = 0; i < vm.Points.Count - 1; i++)
+        var geometry = new StreamGeometry();
+        using (var gc = geometry.Open())
         {
-            var p1 = new Point(vm.Points[i].X - ox, vm.Points[i].Y - oy);
-            var p2 = new Point(vm.Points[i + 1].X - ox, vm.Points[i + 1].Y - oy);
-            if (selectPen != null) ctx.DrawLine(selectPen, p1, p2);
-            ctx.DrawLine(pen, p1, p2);
+            var p0 = new Point(vm.Points[0].X - ox, vm.Points[0].Y - oy);
+            gc.BeginFigure(p0, isFilled: false);
+
+            if (vm.Points.Count == 2)
+            {
+                var p1 = new Point(vm.Points[1].X - ox, vm.Points[1].Y - oy);
+                gc.LineTo(p1);
+            }
+            else
+            {
+                for (int i = 1; i < vm.Points.Count - 1; i++)
+                {
+                    var curr = new Point(vm.Points[i].X - ox, vm.Points[i].Y - oy);
+                    var next = new Point(vm.Points[i + 1].X - ox, vm.Points[i + 1].Y - oy);
+                    var mid = new Point((curr.X + next.X) / 2, (curr.Y + next.Y) / 2);
+
+                    gc.QuadraticBezierTo(curr, mid);
+                }
+
+                var last = new Point(vm.Points[^1].X - ox, vm.Points[^1].Y - oy);
+                gc.LineTo(last);
+            }
+            gc.EndFigure(isClosed: false);
         }
+
+        if (selectPen != null)
+            ctx.DrawGeometry(null, selectPen, geometry);
+        ctx.DrawGeometry(null, pen, geometry);
     }
 
     private static void RenderRectangle(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, double ox, double oy)
     {
-        if (vm.Points.Count < 2) return;
+        if (vm.Points.Count < 2)
+            return;
         var start = new Point(vm.Points[0].X - ox, vm.Points[0].Y - oy);
         var end = new Point(vm.Points[^1].X - ox, vm.Points[^1].Y - oy);
-        var rect = new Rect(start, end);
-        if (selectPen != null) ctx.DrawRectangle(null, selectPen, rect);
+        var rect = new Rect(Math.Min(start.X, end.X), Math.Min(start.Y, end.Y), Math.Abs(end.X - start.X), Math.Abs(end.Y - start.Y));
+        if (selectPen != null)
+            ctx.DrawRectangle(null, selectPen, rect);
         ctx.DrawRectangle(null, pen, rect);
     }
 
     private static void RenderEllipse(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, double ox, double oy)
     {
-        if (vm.Points.Count < 2) return;
+        if (vm.Points.Count < 2)
+            return;
         var start = new Point(vm.Points[0].X - ox, vm.Points[0].Y - oy);
         var end = new Point(vm.Points[^1].X - ox, vm.Points[^1].Y - oy);
-        var rect = new Rect(start, end);
+        var rect = new Rect(Math.Min(start.X, end.X), Math.Min(start.Y, end.Y), Math.Abs(end.X - start.X), Math.Abs(end.Y - start.Y));
         var center = rect.Center;
-        if (selectPen != null) ctx.DrawEllipse(null, selectPen, center, rect.Width / 2, rect.Height / 2);
+        if (selectPen != null)
+            ctx.DrawEllipse(null, selectPen, center, rect.Width / 2, rect.Height / 2);
         ctx.DrawEllipse(null, pen, center, rect.Width / 2, rect.Height / 2);
     }
 
     private static void RenderArrow(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, double ox, double oy)
     {
-        if (vm.Points.Count < 2) return;
+        if (vm.Points.Count < 2)
+            return;
         var start = new Point(vm.Points[0].X - ox, vm.Points[0].Y - oy);
         var end = new Point(vm.Points[^1].X - ox, vm.Points[^1].Y - oy);
 
-        if (selectPen != null) ctx.DrawLine(selectPen, start, end);
+        if (selectPen != null)
+            ctx.DrawLine(selectPen, start, end);
         ctx.DrawLine(pen, start, end);
 
         // Arrowhead
@@ -206,7 +241,8 @@ public class AnnotationShape : Control
 
     private static void RenderText(DrawingContext ctx, AnnotationViewModel vm, IBrush brush, Pen? selectPen, double ox, double oy)
     {
-        if (vm.Points.Count == 0) return;
+        if (vm.Points.Count == 0)
+            return;
         var start = new Point(vm.Points[0].X - ox, vm.Points[0].Y - oy);
         var typeface = new Typeface("Inter, Arial");
         double fontSize = Math.Max(12, vm.Thickness * 4 + 10);
