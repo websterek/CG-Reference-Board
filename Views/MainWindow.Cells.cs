@@ -54,9 +54,13 @@ public partial class MainWindow
 
             if (cell.IsImage || cell.IsVideo)
             {
+                // Copy paths only — do NOT share the Bitmap reference.
+                // The LOD system will load its own bitmap; sharing causes
+                // ObjectDisposedException when either cell's LOD transitions.
                 duplicate.FilePath = cell.FilePath;
                 duplicate.VideoPath = cell.VideoPath;
-                duplicate.Image = cell.Image;
+                duplicate.PlaceholderColor = cell.PlaceholderColor;
+                duplicate.ThumbnailPath = cell.ThumbnailPath;
             }
 
             GridCells.Add(duplicate);
@@ -71,6 +75,8 @@ public partial class MainWindow
             _isPointerDown = true;
             _isDraggingCell = true;
             _draggingCell = duplicate;
+            _lastPressedEventArgs = e;
+            _pointerDownPos = e.GetPosition(this);
             _dragStartX = cell.CanvasX;
             _dragStartY = cell.CanvasY;
             _groupDragStarts = null;
@@ -329,14 +335,18 @@ public partial class MainWindow
         {
             StartEdgeScrollIfNeeded(_lastPointerPosition);
 
+            // Use _draggingCell for movement — `cell` from sender DataContext
+            // points to the original cell, which is wrong for alt-duplicate drags.
+            var dragTarget = _draggingCell ?? cell;
+
             var canvasPt = e.GetPosition(CanvasGrid);
             double newX = Math.Round((canvasPt.X - _dragOffsetX) / Constants.GridSize) * Constants.GridSize;
             double newY = Math.Round((canvasPt.Y - _dragOffsetY) / Constants.GridSize) * Constants.GridSize;
 
-            bool collision = GridLayoutService.HasLayerCollision(GridCells, cell.CollisionLayer, cell, newX, newY, cell.ColSpan, cell.RowSpan);
-            cell.IsDragInvalid = collision;
-            cell.CanvasX = newX;
-            cell.CanvasY = newY;
+            bool collision = GridLayoutService.HasLayerCollision(GridCells, dragTarget.CollisionLayer, dragTarget, newX, newY, dragTarget.ColSpan, dragTarget.RowSpan);
+            dragTarget.IsDragInvalid = collision;
+            dragTarget.CanvasX = newX;
+            dragTarget.CanvasY = newY;
         }
     }
 
@@ -400,10 +410,15 @@ public partial class MainWindow
                 {
                     if (_isAltDuplicateDrag)
                     {
-                        // Alt-duplicate dropped on invalid spot: remove the clone entirely
-                        _draggingCell.Clear();
+                        // Alt-duplicate dropped on invalid spot: discard the clone.
+                        // Bitmap was never shared, so no dispose risk.
+                        _draggingCell.IsDragInvalid = false;
+                        _draggingCell.IsDragging = false;
                         GridCells.Remove(_draggingCell);
                         _selectedCells.Remove(_draggingCell);
+                        // Skip the IsDragInvalid/IsDragging lines below —
+                        // _draggingCell is already cleaned up and removed.
+                        _draggingCell = null;
                     }
                     else
                     {
@@ -411,8 +426,11 @@ public partial class MainWindow
                         _draggingCell.CanvasY = _dragStartY;
                     }
                 }
-                _draggingCell.IsDragInvalid = false;
-                _draggingCell.IsDragging = false;
+                if (_draggingCell != null)
+                {
+                    _draggingCell.IsDragInvalid = false;
+                    _draggingCell.IsDragging = false;
+                }
             }
 
             e.Pointer.Capture(null);
