@@ -948,6 +948,34 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
 
+    private void FitToContent_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { DataContext: CellViewModel cell }) return;
+        if (!cell.IsImage && !cell.IsVideo) return; // Only works for images/videos
+        if (string.IsNullOrEmpty(cell.FilePath)) return;
+
+        // Get image dimensions
+        var dimensions = GetImageDimensions(cell.FilePath);
+        if (dimensions == null) return;
+
+        // Calculate optimal size
+        var (newColSpan, newRowSpan) = CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height);
+
+        // Check if new size would cause collision
+        if (!IsSpaceEmpty(cell.CanvasX, cell.CanvasY, newColSpan, newRowSpan, cell.CollisionLayer, excludeCell: cell))
+        {
+            ShakeScreen();
+            return;
+        }
+
+        // Resize cell
+        cell.ColSpan = newColSpan;
+        cell.RowSpan = newRowSpan;
+
+        MarkUnsaved();
+        SaveBoardData();
+    }
+
     private void DeleteCell_Click(object? sender, RoutedEventArgs e)
     {
         if (_isViewMode) return;
@@ -1008,19 +1036,240 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void AddBackdrop_Click(object? sender, RoutedEventArgs e)
     {
         if (_isViewMode) return;
-        var hoverHighlight = this.FindControl<Border>("HoverHighlight");
-        if (hoverHighlight == null) return;
 
-        double x = Canvas.GetLeft(hoverHighlight);
-        double y = Canvas.GetTop(hoverHighlight);
+        if (_selectedCells.Count > 0)
+        {
+            // Create backdrop around selected cells
+            double minX = _selectedCells.Min(c => c.CanvasX);
+            double minY = _selectedCells.Min(c => c.CanvasY);
+            double maxX = _selectedCells.Max(c => c.CanvasX + c.PixelWidth);
+            double maxY = _selectedCells.Max(c => c.CanvasY + c.PixelHeight);
 
-        var newCell = new CellViewModel { CanvasX = x, CanvasY = y, ColSpan = 6, RowSpan = 4 };
-        newCell.Type = CellType.Backdrop;
-        newCell.SetText("New Backdrop");
+            // Snap to grid
+            int gridX = (int)(Math.Floor(minX / Constants.GridSize) * Constants.GridSize);
+            int gridY = (int)(Math.Floor(minY / Constants.GridSize) * Constants.GridSize);
 
-        GridCells.Add(newCell);
+            // Calculate size (add padding)
+            double width = maxX - gridX + Constants.BackdropPadding;
+            double height = maxY - gridY + Constants.BackdropPadding;
+
+            int colSpan = (int)Math.Ceiling(width / Constants.GridSize);
+            int rowSpan = (int)Math.Ceiling(height / Constants.GridSize);
+
+            var backdrop = new CellViewModel
+            {
+                CanvasX = gridX,
+                CanvasY = gridY,
+                ColSpan = colSpan,
+                RowSpan = rowSpan,
+                Type = CellType.Backdrop,
+                TextContent = "Backdrop"
+            };
+
+            GridCells.Add(backdrop);
+            MarkUnsaved();
+            SaveBoardData();
+        }
+        else
+        {
+            // Original behavior: create empty backdrop at mouse position
+            var hoverHighlight = this.FindControl<Border>("HoverHighlight");
+            if (hoverHighlight == null) return;
+
+            double x = Canvas.GetLeft(hoverHighlight);
+            double y = Canvas.GetTop(hoverHighlight);
+
+            var newCell = new CellViewModel { CanvasX = x, CanvasY = y, ColSpan = 6, RowSpan = 4 };
+            newCell.Type = CellType.Backdrop;
+            newCell.SetText("New Backdrop");
+
+            GridCells.Add(newCell);
+            MarkUnsaved();
+            SaveBoardData();
+        }
+    }
+
+    private void ArrangeSelected_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_selectedCells.Count == 0) return;
+
+        // Find the topmost-leftmost position of selected cells
+        double minX = _selectedCells.Min(c => c.CanvasX);
+        double minY = _selectedCells.Min(c => c.CanvasY);
+
+        // Sort cells by position (top-to-bottom, left-to-right)
+        var sortedCells = _selectedCells.OrderBy(c => c.CanvasY).ThenBy(c => c.CanvasX).ToList();
+
+        // Track old positions for moving annotations
+        var oldPositions = new Dictionary<CellViewModel, Point>();
+        foreach (var cell in sortedCells)
+        {
+            oldPositions[cell] = new Point(cell.CanvasX, cell.CanvasY);
+        }
+
+        // Arrange in a compact grid starting at (minX, minY)
+        int itemsPerRow = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(sortedCells.Count)));
+        double currentX = minX;
+        double currentY = minY;
+        double maxRowHeight = 0;
+        int itemsInCurrentRow = 0;
+
+        foreach (var cell in sortedCells)
+        {
+            // Find empty space near desired position
+            var emptySpace = FindEmptySpace(currentX, currentY, cell.ColSpan, cell.RowSpan, cell.CollisionLayer, excludeCell: cell);
+
+            if (emptySpace != null)
+            {
+                // Move cell to new position
+                cell.CanvasX = emptySpace.Value.X;
+                cell.CanvasY = emptySpace.Value.Y;
+            }
+
+            // Track row height
+            maxRowHeight = Math.Max(maxRowHeight, cell.PixelHeight);
+
+            // Move to next position
+            currentX += cell.PixelWidth; // No spacing - tidy layout
+            itemsInCurrentRow++;
+
+            // Move to next row if needed
+            if (itemsInCurrentRow >= itemsPerRow)
+            {
+                currentX = minX;
+                currentY += maxRowHeight; // No spacing - tidy layout
+                maxRowHeight = 0;
+                itemsInCurrentRow = 0;
+            }
+        }
+
+        // Move annotations with their cells
+        MoveAnnotationsWithCells(oldPositions);
+
         MarkUnsaved();
         SaveBoardData();
+    }
+
+    private void ArrangeHorizontal_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_selectedCells.Count == 0) return;
+
+        // Find the leftmost position and tallest cell
+        double minX = _selectedCells.Min(c => c.CanvasX);
+        double minY = _selectedCells.Min(c => c.CanvasY);
+        double maxHeight = _selectedCells.Max(c => c.PixelHeight);
+
+        // Sort cells by X position (left to right)
+        var sortedCells = _selectedCells.OrderBy(c => c.CanvasX).ThenBy(c => c.CanvasY).ToList();
+
+        // Track old positions for moving annotations
+        var oldPositions = new Dictionary<CellViewModel, Point>();
+        foreach (var cell in sortedCells)
+        {
+            oldPositions[cell] = new Point(cell.CanvasX, cell.CanvasY);
+        }
+
+        // Arrange in a horizontal row, matching height to tallest
+        double currentX = minX;
+
+        foreach (var cell in sortedCells)
+        {
+            // Find empty space at desired position
+            var emptySpace = FindEmptySpace(currentX, minY, cell.ColSpan, cell.RowSpan, cell.CollisionLayer, cell);
+
+            if (emptySpace != null)
+            {
+                cell.CanvasX = emptySpace.Value.X;
+                cell.CanvasY = emptySpace.Value.Y;
+            }
+
+            // Move to next position
+            currentX += cell.PixelWidth; // No spacing - tidy layout
+        }
+
+        // Move annotations with their cells
+        MoveAnnotationsWithCells(oldPositions);
+
+        MarkUnsaved();
+        SaveBoardData();
+    }
+
+    private void ArrangeVertical_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_selectedCells.Count == 0) return;
+
+        // Find the topmost position and widest cell
+        double minX = _selectedCells.Min(c => c.CanvasX);
+        double minY = _selectedCells.Min(c => c.CanvasY);
+        double maxWidth = _selectedCells.Max(c => c.PixelWidth);
+
+        // Sort cells by Y position (top to bottom)
+        var sortedCells = _selectedCells.OrderBy(c => c.CanvasY).ThenBy(c => c.CanvasX).ToList();
+
+        // Track old positions for moving annotations
+        var oldPositions = new Dictionary<CellViewModel, Point>();
+        foreach (var cell in sortedCells)
+        {
+            oldPositions[cell] = new Point(cell.CanvasX, cell.CanvasY);
+        }
+
+        // Arrange in a vertical column
+        double currentY = minY;
+
+        foreach (var cell in sortedCells)
+        {
+            // Find empty space at desired position
+            var emptySpace = FindEmptySpace(minX, currentY, cell.ColSpan, cell.RowSpan, cell.CollisionLayer, cell);
+
+            if (emptySpace != null)
+            {
+                cell.CanvasX = emptySpace.Value.X;
+                cell.CanvasY = emptySpace.Value.Y;
+            }
+
+            // Move to next position
+            currentY += cell.PixelHeight; // No spacing - tidy layout
+        }
+
+        // Move annotations with their cells
+        MoveAnnotationsWithCells(oldPositions);
+
+        MarkUnsaved();
+        SaveBoardData();
+    }
+
+    /// <summary>
+    /// Helper method to move annotations that were inside cells after the cells moved.
+    /// </summary>
+    private void MoveAnnotationsWithCells(Dictionary<CellViewModel, Point> oldPositions)
+    {
+        foreach (var cell in oldPositions.Keys)
+        {
+            var oldPos = oldPositions[cell];
+            double deltaX = cell.CanvasX - oldPos.X;
+            double deltaY = cell.CanvasY - oldPos.Y;
+
+            // Skip if cell didn't move
+            if (Math.Abs(deltaX) < 0.1 && Math.Abs(deltaY) < 0.1) continue;
+
+            // Find annotations that were inside this cell's OLD bounds
+            var cellRect = new Rect(oldPos.X, oldPos.Y, cell.PixelWidth, cell.PixelHeight);
+
+            foreach (var annotation in Annotations.ToList())
+            {
+                // Check if annotation's first point was inside the cell
+                if (annotation.Points.Count > 0)
+                {
+                    var pt = annotation.Points[0];
+                    if (cellRect.Contains(pt))
+                    {
+                        // Update annotation canvas position (only modify CanvasX/Y, not Points)
+                        annotation.CanvasX += deltaX;
+                        annotation.CanvasY += deltaY;
+                    }
+                }
+            }
+        }
     }
 
     #endregion
@@ -1078,7 +1327,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             double newX = cell.CanvasX + dx;
             double newY = cell.CanvasY + dy;
-            if (HasLayerCollision(cell.CollisionLayer, group, newX, newY, cell.ColSpan, cell.RowSpan))
+            bool collision = HasLayerCollision(cell.CollisionLayer, group, newX, newY, cell.ColSpan, cell.RowSpan);
+            Console.WriteLine($"  Checking cell at ({cell.CanvasX:F0}, {cell.CanvasY:F0}) layer={cell.CollisionLayer}, moving to ({newX:F0}, {newY:F0}), collision={collision}");
+            if (collision)
                 return true;
         }
         return false;
@@ -1102,9 +1353,157 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         if (IsDrawMode || e.Handled || _isViewMode) return;
 
-        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed
-            && sender is Control { DataContext: CellViewModel { HasContent: true } cell })
+        if (sender is not Border { DataContext: CellViewModel cell }) return;
+        var props = e.GetCurrentPoint(this).Properties;
+
+        // Alt+Drag: Duplicate cell
+        if (props.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Alt))
         {
+            // Find empty space near the cell
+            var emptySpace = FindEmptySpace(
+                cell.CanvasX + Constants.GridSize,
+                cell.CanvasY + Constants.GridSize,
+                cell.ColSpan,
+                cell.RowSpan,
+                cell.CollisionLayer
+            );
+
+            if (emptySpace == null)
+            {
+                ShakeScreen();
+                e.Handled = true;
+                return;
+            }
+
+            // Create duplicate
+            var duplicate = new CellViewModel
+            {
+                CanvasX = emptySpace.Value.X,
+                CanvasY = emptySpace.Value.Y,
+                ColSpan = cell.ColSpan,
+                RowSpan = cell.RowSpan,
+                Type = cell.Type,
+                BackgroundColor = cell.BackgroundColor,
+                ForegroundColor = cell.ForegroundColor,
+                ImageStretch = cell.ImageStretch,
+                FontSize = cell.FontSize,
+                TextContent = cell.TextContent
+            };
+
+            // Copy file content if applicable
+            if (cell.IsImage || cell.IsVideo)
+            {
+                duplicate.FilePath = cell.FilePath;
+                duplicate.VideoPath = cell.VideoPath;
+                duplicate.Image = cell.Image;
+            }
+
+            GridCells.Add(duplicate);
+            MarkUnsaved();
+            SaveBoardData();
+
+            e.Handled = true;
+            return;
+        }
+
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed
+            && sender is Control { DataContext: CellViewModel { HasContent: true } })
+        {
+            // If clicking a backdrop, select everything within its bounds using marquee logic
+            if (cell.IsBackdrop)
+            {
+                // Clear current selection
+                ClearSelection();
+
+                // Define the selection rectangle (backdrop's full bounds)
+                double left = cell.CanvasX;
+                double top = cell.CanvasY;
+                double right = left + cell.ColSpan * Constants.GridSize;
+                double bottom = top + cell.RowSpan * Constants.GridSize;
+
+                // Select the backdrop itself
+                cell.IsSelected = true;
+                _selectedCells.Add(cell);
+                Console.WriteLine($"Backdrop clicked at ({cell.CanvasX}, {cell.CanvasY})");
+
+                // Select all cells within the backdrop bounds (using same logic as marquee)
+                foreach (var c in GridCells)
+                {
+                    if (c == cell) continue; // Already selected
+                    if (!c.HasContent) continue; // Skip empty cells
+
+                    // Select cells whose visual area intersects the backdrop
+                    double cx = c.CanvasX;
+                    double cy = c.CanvasY;
+                    double cw = c.ColSpan * Constants.GridSize;
+                    double ch = c.RowSpan * Constants.GridSize;
+
+                    bool intersects = cx < right && cx + cw > left
+                                   && cy < bottom && cy + ch > top;
+                    if (intersects)
+                    {
+                        c.IsSelected = true;
+                        _selectedCells.Add(c);
+                    }
+                }
+
+                // Select all annotations within bounds (using same logic as marquee)
+                foreach (var ann in Annotations)
+                {
+                    bool inRect = ann.Points.Any(p =>
+                    {
+                        double px = p.X + ann.CanvasX;
+                        double py = p.Y + ann.CanvasY;
+                        return px >= left && px <= right && py >= top && py <= bottom;
+                    });
+
+                    if (inRect)
+                    {
+                        ann.IsSelected = true;
+                        _selectedAnnotations.Add(ann);
+                    }
+                }
+
+                OnPropertyChanged(nameof(SelectionCountText));
+                Console.WriteLine($"Backdrop selection complete: {_selectedCells.Count} cells and {_selectedAnnotations.Count} annotations selected");
+            }
+
+            // If clicking a regular cell (not backdrop), select it and any annotations inside it
+            if (!cell.IsBackdrop && !cell.IsSelected && !e.KeyModifiers.HasFlag(KeyModifiers.Control))
+            {
+                // Clear current selection
+                ClearSelection();
+
+                // Select the clicked cell
+                cell.IsSelected = true;
+                _selectedCells.Add(cell);
+
+                // Define the cell's bounds
+                double left = cell.CanvasX;
+                double top = cell.CanvasY;
+                double right = left + cell.ColSpan * Constants.GridSize;
+                double bottom = top + cell.RowSpan * Constants.GridSize;
+
+                // Select all annotations within the cell's bounds (using same logic as marquee)
+                foreach (var ann in Annotations)
+                {
+                    bool inRect = ann.Points.Any(p =>
+                    {
+                        double px = p.X + ann.CanvasX;
+                        double py = p.Y + ann.CanvasY;
+                        return px >= left && px <= right && py >= top && py <= bottom;
+                    });
+
+                    if (inRect)
+                    {
+                        ann.IsSelected = true;
+                        _selectedAnnotations.Add(ann);
+                    }
+                }
+
+                OnPropertyChanged(nameof(SelectionCountText));
+            }
+
             bool isCtrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
 
             if (isCtrl)
@@ -1195,43 +1594,34 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (Math.Abs(dy) > Constants.GridSize)
                 dy = Math.Sign(dy) * Constants.GridSize;
 
-            if (Math.Abs(dx) < 0.1 && Math.Abs(dy) < 0.1) return;
-
-            // Check collision for every cell in the group at its new position
-            // Use current positions + incremental delta (not original starts)
-            bool collision = false;
-            foreach (var c in _selectedCells)
+            // Only move if there's actual delta and no collision
+            if (Math.Abs(dx) > 0.1 || Math.Abs(dy) > 0.1)
             {
-                double newX = c.CanvasX + dx;
-                double newY = c.CanvasY + dy;
-                if (HasLayerCollision(c.CollisionLayer, _selectedCells, newX, newY, c.ColSpan, c.RowSpan))
-                {
-                    collision = true;
-                    break;
-                }
-            }
+                bool collision = HasGroupCollision(_selectedCells, dx, dy);
+                Console.WriteLine($"Group drag: dx={dx:F1}, dy={dy:F1}, collision={collision}, selected cells={_selectedCells.Count}, annotations={_selectedAnnotations.Count}");
 
-            if (!collision)
-            {
-                foreach (var c in _selectedCells)
+                if (!collision)
                 {
-                    c.CanvasX += dx;
-                    c.CanvasY += dy;
-                }
-                // Move selected annotations with the group
-                if (_groupAnnotationDragStarts != null)
-                {
-                    foreach (var a in _selectedAnnotations)
+                    foreach (var c in _selectedCells)
                     {
-                        a.CanvasX += dx;
-                        a.CanvasY += dy;
+                        c.CanvasX += dx;
+                        c.CanvasY += dy;
+                    }
+                    // Move selected annotations with the group
+                    if (_groupAnnotationDragStarts != null)
+                    {
+                        foreach (var a in _selectedAnnotations)
+                        {
+                            a.CanvasX += dx;
+                            a.CanvasY += dy;
+                        }
                     }
                 }
             }
         }
         else
         {
-            // Single cell drag
+            // Single cell drag (both backdrops and regular cells)
             var canvasPt = e.GetPosition(CanvasGrid);
             double newX = Math.Round((canvasPt.X - _dragOffsetX) / Constants.GridSize) * Constants.GridSize;
             double newY = Math.Round((canvasPt.Y - _dragOffsetY) / Constants.GridSize) * Constants.GridSize;
@@ -1250,31 +1640,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         if (_isDraggingCell && sender is Control)
         {
-            // Safety rollback for group drag
-            if (_groupDragStarts != null && _groupDragStarts.Count > 0)
-            {
-                // Compute current delta
-                double dx = (_draggingCell?.CanvasX ?? 0) - _dragStartX;
-                double dy = (_draggingCell?.CanvasY ?? 0) - _dragStartY;
-                if (HasGroupCollision(_selectedCells, dx, dy))
-                {
-                    foreach (var (c, startX, startY) in _groupDragStarts)
-                    {
-                        c.CanvasX = startX;
-                        c.CanvasY = startY;
-                    }
-                    if (_groupAnnotationDragStarts != null)
-                    {
-                        foreach (var (a, startX, startY) in _groupAnnotationDragStarts)
-                        {
-                            a.CanvasX = startX;
-                            a.CanvasY = startY;
-                        }
-                    }
-                }
-            }
             // Safety rollback for single drag
-            else if (_draggingCell != null && HasLayerCollision(_draggingCell.CollisionLayer, _draggingCell,
+            if (_draggingCell != null && HasLayerCollision(_draggingCell.CollisionLayer, _draggingCell,
                     _draggingCell.CanvasX, _draggingCell.CanvasY,
                     _draggingCell.ColSpan, _draggingCell.RowSpan))
             {
@@ -2026,6 +2393,70 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         int gridX = (int)(Math.Floor(dropPt.X / Constants.GridSize) * Constants.GridSize);
         int gridY = (int)(Math.Floor(dropPt.Y / Constants.GridSize) * Constants.GridSize);
 
+        // Handle multi-file drop from OS
+        var files = e.DataTransfer.TryGetFiles();
+        if (files != null && files.Count() > 1)
+        {
+            // Multi-file drop: arrange in grid layout
+            int filesPerRow = 4;
+            int currentRow = 0;
+            int currentCol = 0;
+
+            foreach (var file in files)
+            {
+                string path = file.Path.LocalPath;
+                if (!File.Exists(path)) continue;
+
+                // Calculate optimal size based on image dimensions
+                var dimensions = GetImageDimensions(path);
+                var (colSpan, rowSpan) = dimensions.HasValue
+                    ? CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height)
+                    : (2, 2);
+
+                // Calculate preferred position in grid layout
+                // Space items 3 cells apart for better visual separation
+                double preferredX = gridX + (currentCol * Constants.GridSize * 3);
+                double preferredY = gridY + (currentRow * Constants.GridSize * 3);
+
+                // Find actual empty space (uses spiral search from preferred position)
+                var emptySpace = FindEmptySpace(preferredX, preferredY, colSpan, rowSpan, collisionLayer: 1);
+
+                if (emptySpace != null)
+                {
+                    // Copy file to workspace
+                    string destDir = Path.Combine(_workspaceDir, "images");
+                    Directory.CreateDirectory(destDir);
+                    string destPath = Path.Combine(destDir, Path.GetFileName(path));
+                    if (path != destPath && !File.Exists(destPath))
+                        File.Copy(path, destPath);
+
+                    // Create cell with proper size and position
+                    var cell = new CellViewModel
+                    {
+                        CanvasX = emptySpace.Value.X,
+                        CanvasY = emptySpace.Value.Y,
+                        ColSpan = colSpan,
+                        RowSpan = rowSpan
+                    };
+                    cell.SetImage(destPath);
+                    GridCells.Add(cell);
+                }
+
+                // Move to next position in grid layout
+                currentCol++;
+                if (currentCol >= filesPerRow)
+                {
+                    currentCol = 0;
+                    currentRow++;
+                }
+            }
+
+            MarkUnsaved();
+            SaveBoardData();
+            e.Handled = true;
+            return;
+        }
+
         // For internal cell moves, find the cell on any layer; for external file drops,
         // skip board elements so content lands on the content layer.
         CellViewModel targetCell;
@@ -2054,8 +2485,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         if (collision) { ShakeScreen(); return; }
 
-        // Handle file drop from OS
-        var files = e.DataTransfer.TryGetFiles();
+        // Handle single file drop from OS
         if (files != null && files.Any())
         {
             try { LoadImageToCell(targetCell, files.First().Path.LocalPath); } catch { /* non-critical */ }
@@ -2093,6 +2523,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (FullMediaOverlay.IsVisible || (startupOverlay?.IsVisible == true)) return;
 
         bool isCtrl = e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Meta);
+        bool isShift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         bool noModifiers = e.KeyModifiers == KeyModifiers.None;
 
         // Ctrl+N: New board
@@ -2130,9 +2561,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             if (_isViewMode) return;
 
-            // If hovering a board element (backdrop/label), ignore it and resolve
-            // the content-layer cell at the cursor's actual grid position instead.
-            CellViewModel cell;
+            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+            if (clipboard == null) return;
+
+            var data = await clipboard.TryGetDataAsync();
+            if (data == null) return;
+
+            // Determine preferred position for paste
+            double preferredX, preferredY;
             if (_hoveredCell is { IsBoardElement: true } || _hoveredCell == null)
             {
                 var hoverHighlight = this.FindControl<Border>("HoverHighlight");
@@ -2141,35 +2577,35 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     double left = Canvas.GetLeft(hoverHighlight);
                     double top = Canvas.GetTop(hoverHighlight);
                     if (!double.IsNaN(left) && !double.IsNaN(top))
-                        cell = GetOrCreateContentCellAt(new Point(left + 80, top + 80));
+                    {
+                        preferredX = left + 80;
+                        preferredY = top + 80;
+                    }
                     else
-                        cell = GetOrCreateContentCellAt(new Point(
-                            Bounds.Width / 2 / _scale.ScaleX - _translate.X,
-                            Bounds.Height / 2 / _scale.ScaleY - _translate.Y));
+                    {
+                        preferredX = Bounds.Width / 2 / _scale.ScaleX - _translate.X;
+                        preferredY = Bounds.Height / 2 / _scale.ScaleY - _translate.Y;
+                    }
                 }
                 else
                 {
-                    cell = GetOrCreateContentCellAt(new Point(
-                        Bounds.Width / 2 / _scale.ScaleX - _translate.X,
-                        Bounds.Height / 2 / _scale.ScaleY - _translate.Y));
+                    preferredX = Bounds.Width / 2 / _scale.ScaleX - _translate.X;
+                    preferredY = Bounds.Height / 2 / _scale.ScaleY - _translate.Y;
                 }
             }
             else
             {
-                cell = _hoveredCell;
+                preferredX = _hoveredCell.CanvasX;
+                preferredY = _hoveredCell.CanvasY;
             }
-            if (cell.HasContent && !cell.IsBoardElement) { ShakeScreen(); return; }
-
-            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
-            if (clipboard == null) return;
-
-            var data = await clipboard.TryGetDataAsync();
-            if (data == null) return;
 
             // Try text (URL or plain text)
             var text = await data.TryGetTextAsync();
             if (!string.IsNullOrEmpty(text))
             {
+                var cell = GetOrCreateContentCellAt(new Point(preferredX, preferredY));
+                if (cell.HasContent && !cell.IsBoardElement) { ShakeScreen(); return; }
+
                 if (text.Contains("youtube.com") || text.Contains("youtu.be") || text.StartsWith("http"))
                     await DownloadVideoToCell(cell, text);
                 else
@@ -2178,15 +2614,61 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 return;
             }
 
-            // Try file
+            // Try file (use smart sizing for images)
             var pastedFiles = await data.TryGetFilesAsync();
             if (pastedFiles != null && pastedFiles.Any())
             {
-                try { LoadImageToCell(cell, pastedFiles.First().Path.LocalPath); } catch { /* non-critical */ }
+                try
+                {
+                    string imagePath = pastedFiles.First().Path.LocalPath;
+
+                    // Get image dimensions and calculate optimal cell size
+                    var dimensions = GetImageDimensions(imagePath);
+                    int colSpan, rowSpan;
+                    if (dimensions == null)
+                    {
+                        // Fallback to default 2x2 if we can't read the image
+                        (colSpan, rowSpan) = (2, 2);
+                    }
+                    else
+                    {
+                        (colSpan, rowSpan) = CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height);
+                    }
+
+                    // Find empty space near the preferred position
+                    Point? emptySpace = FindEmptySpace(preferredX, preferredY, colSpan, rowSpan, collisionLayer: 1);
+
+                    if (emptySpace == null)
+                    {
+                        ShakeScreen();
+                        return;
+                    }
+
+                    // Copy image to workspace
+                    string destDir = Path.Combine(_workspaceDir, "images");
+                    if (!Directory.Exists(destDir)) Directory.CreateDirectory(destDir);
+                    string destPath = Path.Combine(destDir, Path.GetFileName(imagePath));
+                    if (imagePath != destPath && !File.Exists(destPath))
+                        File.Copy(imagePath, destPath);
+
+                    // Create cell at the found position with calculated span
+                    var newCell = new CellViewModel
+                    {
+                        CanvasX = emptySpace.Value.X,
+                        CanvasY = emptySpace.Value.Y,
+                        ColSpan = colSpan,
+                        RowSpan = rowSpan
+                    };
+                    newCell.SetImage(destPath);
+                    GridCells.Add(newCell);
+                    MarkUnsaved();
+                    SaveBoardData();
+                }
+                catch { /* non-critical */ }
                 return;
             }
 
-            // Try bitmap
+            // Try bitmap (use smart sizing)
             var bitmap = await data.TryGetBitmapAsync();
             if (bitmap != null)
             {
@@ -2194,7 +2676,40 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 Directory.CreateDirectory(destDir);
                 string path = Path.Combine(destDir, Guid.NewGuid() + ".png");
                 bitmap.Save(path);
-                cell.SetImage(path);
+
+                // Get image dimensions and calculate optimal cell size
+                var dimensions = GetImageDimensions(path);
+                int colSpan, rowSpan;
+                if (dimensions == null)
+                {
+                    // Fallback to default 2x2 if we can't read the image
+                    (colSpan, rowSpan) = (2, 2);
+                }
+                else
+                {
+                    (colSpan, rowSpan) = CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height);
+                }
+
+                // Find empty space near the preferred position
+                Point? emptySpace = FindEmptySpace(preferredX, preferredY, colSpan, rowSpan, collisionLayer: 1);
+
+                if (emptySpace == null)
+                {
+                    ShakeScreen();
+                    return;
+                }
+
+                // Create cell at the found position with calculated span
+                var newCell = new CellViewModel
+                {
+                    CanvasX = emptySpace.Value.X,
+                    CanvasY = emptySpace.Value.Y,
+                    ColSpan = colSpan,
+                    RowSpan = rowSpan
+                };
+                newCell.SetImage(path);
+                GridCells.Add(newCell);
+                MarkUnsaved();
                 SaveBoardData();
                 return;
             }
@@ -2221,6 +2736,35 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         // Home: Center view
         if (e.Key == Key.Home && noModifiers) { CenterView_Click(null, null!); return; }
+
+        // Ctrl+Shift+F: Fit to Content
+        if (e.Key == Key.F && isCtrl && isShift)
+        {
+            // Get selected cells
+            if (_selectedCells.Count > 0)
+            {
+                foreach (var cell in _selectedCells.ToList())
+                {
+                    if (!cell.IsImage && !cell.IsVideo) continue;
+                    if (string.IsNullOrEmpty(cell.FilePath)) continue;
+
+                    var dimensions = GetImageDimensions(cell.FilePath);
+                    if (dimensions == null) continue;
+
+                    var (newColSpan, newRowSpan) = CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height);
+
+                    if (IsSpaceEmpty(cell.CanvasX, cell.CanvasY, newColSpan, newRowSpan, cell.CollisionLayer, excludeCell: cell))
+                    {
+                        cell.ColSpan = newColSpan;
+                        cell.RowSpan = newRowSpan;
+                    }
+                }
+
+                MarkUnsaved();
+                SaveBoardData();
+            }
+            return;
+        }
 
         // Ctrl+Shift+T: Toggle Always on Top
         if (e.Key == Key.T && e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift))
@@ -2406,6 +2950,241 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             await Task.Delay(30);
         }
         Position = startPos;
+    }
+
+    #endregion
+
+    #region Grid Helper Methods
+
+    /// <summary>
+    /// Finds all cells that are visually contained within a backdrop.
+    /// </summary>
+    private List<CellViewModel> GetBackdropChildren(CellViewModel backdrop)
+    {
+        if (!backdrop.IsBackdrop) return new List<CellViewModel>();
+
+        var children = new List<CellViewModel>();
+        var backdropRect = new Rect(backdrop.CanvasX, backdrop.CanvasY, backdrop.PixelWidth, backdrop.PixelHeight);
+
+        foreach (var cell in GridCells)
+        {
+            if (cell == backdrop) continue;
+            if (cell.IsBackdrop) continue; // Don't nest backdrops
+
+            // Check if cell is inside backdrop
+            var cellRect = new Rect(cell.CanvasX, cell.CanvasY, cell.PixelWidth, cell.PixelHeight);
+            if (backdropRect.Contains(cellRect))
+            {
+                children.Add(cell);
+            }
+        }
+
+        return children;
+    }
+
+    /// <summary>
+    /// Finds all annotations that are visually contained within a backdrop.
+    /// </summary>
+    private List<AnnotationViewModel> GetBackdropAnnotations(CellViewModel backdrop)
+    {
+        if (!backdrop.IsBackdrop) return new List<AnnotationViewModel>();
+
+        var annotations = new List<AnnotationViewModel>();
+        var backdropRect = new Rect(backdrop.CanvasX, backdrop.CanvasY, backdrop.PixelWidth, backdrop.PixelHeight);
+
+        foreach (var annotation in Annotations)
+        {
+            // Check if annotation's first point is inside backdrop
+            if (annotation.Points.Count > 0 && backdropRect.Contains(annotation.Points[0]))
+            {
+                annotations.Add(annotation);
+            }
+        }
+
+        return annotations;
+    }
+
+    /// <summary>
+    /// Checks if a rectangular area is free (no collision with existing cells on the same layer).
+    /// </summary>
+    /// <param name="x">Grid-snapped X position</param>
+    /// <param name="y">Grid-snapped Y position</param>
+    /// <param name="colSpan">Number of columns</param>
+    /// <param name="rowSpan">Number of rows</param>
+    /// <param name="collisionLayer">Collision layer to check (0=backdrop, 1=content, 2=label)</param>
+    /// <param name="excludeCell">Optional cell to exclude from collision check (for resize operations)</param>
+    /// <returns>True if the space is empty</returns>
+    private bool IsSpaceEmpty(double x, double y, int colSpan, int rowSpan, int collisionLayer, CellViewModel? excludeCell = null)
+    {
+        var rect = new Rect(x, y, colSpan * Constants.GridSize, rowSpan * Constants.GridSize);
+
+        foreach (var cell in GridCells)
+        {
+            if (cell == excludeCell) continue;
+            if (cell.CollisionLayer != collisionLayer) continue;
+
+            var cellRect = new Rect(cell.CanvasX, cell.CanvasY, cell.ColSpan * Constants.GridSize, cell.RowSpan * Constants.GridSize);
+            if (rect.Intersects(cellRect))
+                return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Finds the nearest empty grid position that can fit the specified size.
+    /// </summary>
+    /// <param name="preferredX">Preferred X position (will snap to grid)</param>
+    /// <param name="preferredY">Preferred Y position (will snap to grid)</param>
+    /// <param name="colSpan">Number of columns needed</param>
+    /// <param name="rowSpan">Number of rows needed</param>
+    /// <param name="collisionLayer">Collision layer (0=backdrop, 1=content, 2=label)</param>
+    /// <returns>Point with grid-snapped coordinates, or null if no space found in reasonable area</returns>
+    private Point? FindEmptySpace(double preferredX, double preferredY, int colSpan, int rowSpan, int collisionLayer)
+    {
+        // Snap to grid
+        int gridX = (int)(Math.Floor(preferredX / Constants.GridSize) * Constants.GridSize);
+        int gridY = (int)(Math.Floor(preferredY / Constants.GridSize) * Constants.GridSize);
+
+        // Try the preferred position first
+        if (IsSpaceEmpty(gridX, gridY, colSpan, rowSpan, collisionLayer))
+            return new Point(gridX, gridY);
+
+        // Spiral search outward from preferred position
+        int maxDistance = 20; // Search up to 20 grid cells away
+        for (int distance = 1; distance <= maxDistance; distance++)
+        {
+            // Try positions at this distance in a spiral pattern
+            for (int dx = -distance; dx <= distance; dx++)
+            {
+                for (int dy = -distance; dy <= distance; dy++)
+                {
+                    // Only check the "ring" at this distance, not interior
+                    if (Math.Abs(dx) != distance && Math.Abs(dy) != distance)
+                        continue;
+
+                    int testX = gridX + dx * (int)Constants.GridSize;
+                    int testY = gridY + dy * (int)Constants.GridSize;
+
+                    if (IsSpaceEmpty(testX, testY, colSpan, rowSpan, collisionLayer))
+                        return new Point(testX, testY);
+                }
+            }
+        }
+
+        return null; // No space found
+    }
+
+    /// <summary>
+    /// Finds an empty grid-aligned space near a preferred position, excluding a specific cell from collision checks.
+    /// </summary>
+    private Point? FindEmptySpace(double preferredX, double preferredY, int colSpan, int rowSpan, int collisionLayer, CellViewModel? excludeCell)
+    {
+        // Snap to grid
+        int gridX = (int)(Math.Floor(preferredX / Constants.GridSize) * Constants.GridSize);
+        int gridY = (int)(Math.Floor(preferredY / Constants.GridSize) * Constants.GridSize);
+
+        // Try the preferred position first
+        if (IsSpaceEmpty(gridX, gridY, colSpan, rowSpan, collisionLayer, excludeCell))
+            return new Point(gridX, gridY);
+
+        // Spiral search outward from preferred position
+        int maxDistance = 20; // Search up to 20 grid cells away
+        for (int distance = 1; distance <= maxDistance; distance++)
+        {
+            // Try positions at this distance in a spiral pattern
+            for (int dx = -distance; dx <= distance; dx++)
+            {
+                for (int dy = -distance; dy <= distance; dy++)
+                {
+                    // Only check the "ring" at this distance, not interior
+                    if (Math.Abs(dx) != distance && Math.Abs(dy) != distance)
+                        continue;
+
+                    int testX = gridX + dx * (int)Constants.GridSize;
+                    int testY = gridY + dy * (int)Constants.GridSize;
+
+                    if (IsSpaceEmpty(testX, testY, colSpan, rowSpan, collisionLayer, excludeCell))
+                        return new Point(testX, testY);
+                }
+            }
+        }
+
+        return null; // No space found
+    }
+
+    /// <summary>
+    /// Gets the actual image dimensions from a file path.
+    /// </summary>
+    /// <param name="imagePath">Path to image file</param>
+    /// <returns>Size with width and height, or null if cannot read</returns>
+    private Size? GetImageDimensions(string imagePath)
+    {
+        try
+        {
+            using var stream = File.OpenRead(imagePath);
+            var bitmap = new Bitmap(stream);
+            return new Size(bitmap.PixelSize.Width, bitmap.PixelSize.Height);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Calculates optimal ColSpan and RowSpan for an image based on its aspect ratio.
+    /// Default is 2x2, but wide images get 3x1, 4x1, etc., and tall images get 1x3, 1x4, etc.
+    /// </summary>
+    /// <param name="imageWidth">Image width in pixels</param>
+    /// <param name="imageHeight">Image height in pixels</param>
+    /// <returns>Tuple of (colSpan, rowSpan)</returns>
+    private (int colSpan, int rowSpan) CalculateOptimalCellSize(double imageWidth, double imageHeight)
+    {
+        // Default 2x2
+        int colSpan = 2;
+        int rowSpan = 2;
+
+        if (imageWidth == 0 || imageHeight == 0)
+            return (colSpan, rowSpan);
+
+        double aspectRatio = imageWidth / imageHeight;
+
+        // Very wide images (panoramas, UI elements)
+        if (aspectRatio >= 3.0)
+        {
+            colSpan = 4;
+            rowSpan = 1;
+        }
+        else if (aspectRatio >= 2.0)
+        {
+            colSpan = 3;
+            rowSpan = 1;
+        }
+        else if (aspectRatio >= 1.5)
+        {
+            colSpan = 3;
+            rowSpan = 2;
+        }
+        // Very tall images (character portraits, etc.)
+        else if (aspectRatio <= 0.33)
+        {
+            colSpan = 1;
+            rowSpan = 4;
+        }
+        else if (aspectRatio <= 0.5)
+        {
+            colSpan = 1;
+            rowSpan = 3;
+        }
+        else if (aspectRatio <= 0.66)
+        {
+            colSpan = 2;
+            rowSpan = 3;
+        }
+        // Near-square images remain 2x2
+
+        return (colSpan, rowSpan);
     }
 
     #endregion

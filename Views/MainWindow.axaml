@@ -453,6 +453,12 @@
                                         Click="AddBackdrop_Click"
                                         IsVisible="{Binding !IsDrawMode}"
                                     />
+                                    <MenuItem
+                                        Header="Arrange Selected"
+                                        Click="ArrangeSelected_Click"
+                                        IsVisible="False"
+                                        IsEnabled="{Binding !!SelectionCountText}"
+                                    />
 
                                     <!-- Annotation Mode: Tool Submenu -->
                                     <MenuItem
@@ -806,6 +812,27 @@
                                                     Header="Decrease Font Size"
                                                     Click="DecreaseFontSize_Click"
                                                     IsVisible="{Binding IsLabel}"
+                                                />
+                                                <MenuItem
+                                                    Header="Fit to Content"
+                                                    Click="FitToContent_Click"
+                                                    HotKey="Ctrl+Shift+F"
+                                                    IsVisible="{Binding IsFile}"
+                                                />
+                                                <MenuItem
+                                                    Header="Arrange Horizontal"
+                                                    Click="ArrangeHorizontal_Click"
+                                                    IsVisible="{Binding IsSelected}"
+                                                />
+                                                <MenuItem
+                                                    Header="Arrange Vertical"
+                                                    Click="ArrangeVertical_Click"
+                                                    IsVisible="{Binding IsSelected}"
+                                                />
+                                                <MenuItem
+                                                    Header="Arrange Grid"
+                                                    Click="ArrangeSelected_Click"
+                                                    IsVisible="{Binding IsSelected}"
                                                 />
                                                 <Separator Background="#333" />
                                                 <MenuItem
