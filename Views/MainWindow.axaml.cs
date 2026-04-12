@@ -111,6 +111,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             OnPropertyChanged(nameof(IsDrawMode));
             OnPropertyChanged(nameof(WindowTitle));
             OnPropertyChanged(nameof(CurrentModeText));
+            OnPropertyChanged(nameof(ModeIndicatorColor));
+            OnPropertyChanged(nameof(IsCursorIconVisible));
 
             if (value) IsAnnotationsVisible = true;
         }
@@ -136,6 +138,23 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         get => _isAnnotationsVisible;
         set { _isAnnotationsVisible = value; OnPropertyChanged(nameof(IsAnnotationsVisible)); }
     }
+
+    private bool _isPointerOverCanvas;
+    public bool IsPointerOverCanvas
+    {
+        get => _isPointerOverCanvas;
+        set
+        {
+            if (_isPointerOverCanvas != value)
+            {
+                _isPointerOverCanvas = value;
+                OnPropertyChanged(nameof(IsPointerOverCanvas));
+                OnPropertyChanged(nameof(IsCursorIconVisible));
+            }
+        }
+    }
+
+    public bool IsCursorIconVisible => IsDrawMode && IsPointerOverCanvas;
 
     private bool _isAlwaysOnTop;
     public bool IsAlwaysOnTop
@@ -170,7 +189,19 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string CurrentTool
     {
         get => _currentTool;
-        set { _currentTool = value; OnPropertyChanged(nameof(CurrentTool)); }
+        set
+        {
+            _currentTool = value;
+            OnPropertyChanged(nameof(CurrentTool));
+            OnPropertyChanged(nameof(CanvasCursor));
+            OnPropertyChanged(nameof(IsPencilSelected));
+            OnPropertyChanged(nameof(IsTextSelected));
+            OnPropertyChanged(nameof(IsArrowSelected));
+            OnPropertyChanged(nameof(IsRectangleSelected));
+            OnPropertyChanged(nameof(IsEllipseSelected));
+            OnPropertyChanged(nameof(IsEraserSelected));
+            OnPropertyChanged(nameof(IsMoveSelected));
+        }
     }
 
     private string _currentBoardName = Constants.AppName;
@@ -213,6 +244,37 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     /// <summary>Current mode display text for the status bar.</summary>
     public string CurrentModeText => IsDrawMode ? "Annotation" : "Grid";
+
+    /// <summary>Mode indicator color for the status bar - red for Annotation, blue for Grid.</summary>
+    public string ModeIndicatorColor => IsDrawMode ? "#FF4444" : "#44AAFF";
+
+    /// <summary>Material icon kind for the canvas cursor based on the current tool.</summary>
+    public string CanvasCursor
+    {
+        get
+        {
+            return CurrentTool switch
+            {
+                "Pencil" => "🖌️",      // Paintbrush emoji
+                "Move" => "✥",         // Four teardrop-spoked asterisk
+                "Text" => "T",         // Text
+                "Arrow" => "→",        // Arrow
+                "Rectangle" => "▭",    // Rectangle
+                "Ellipse" => "○",      // Circle
+                "Eraser" => "⌫",       // Erase symbol
+                _ => "✏️"             // Pencil emoji default
+            };
+        }
+    }
+
+    /// <summary>Tool selection properties for menu checkmarks.</summary>
+    public bool IsPencilSelected => CurrentTool == "Pencil";
+    public bool IsTextSelected => CurrentTool == "Text";
+    public bool IsArrowSelected => CurrentTool == "Arrow";
+    public bool IsRectangleSelected => CurrentTool == "Rectangle";
+    public bool IsEllipseSelected => CurrentTool == "Ellipse";
+    public bool IsEraserSelected => CurrentTool == "Eraser";
+    public bool IsMoveSelected => CurrentTool == "Move";
 
     #endregion
 
@@ -305,6 +367,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         var mainCanvas = this.FindControl<Canvas>("MainCanvas");
         if (mainCanvas != null) mainCanvas.RenderTransform = tg;
+
+        // Initialize custom cursor icon position off-screen
+        var cursorIcon = this.FindControl<Border>("CursorIconContainer");
+        if (cursorIcon != null)
+        {
+            Canvas.SetLeft(cursorIcon, -100);
+            Canvas.SetTop(cursorIcon, -100);
+        }
 
         // Wire up drag-drop
         AddHandler(DragDrop.DropEvent, OnDrop);
@@ -1275,10 +1345,29 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     #region Canvas Pointer Handlers (Pan, Draw, Hover)
 
+    private void MainCanvas_PointerEntered(object? sender, PointerEventArgs e)
+    {
+        IsPointerOverCanvas = true;
+    }
+
+    private void MainCanvas_PointerExited(object? sender, PointerEventArgs e)
+    {
+        IsPointerOverCanvas = false;
+    }
+
     private void Canvas_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
         var props = e.GetCurrentPoint(this).Properties;
         var mainCanvas = this.FindControl<Canvas>("MainCanvas");
+
+        // Update custom cursor icon position
+        var cursorIcon = this.FindControl<Border>("CursorIconContainer");
+        if (cursorIcon != null)
+        {
+            var pt = e.GetPosition(mainCanvas);
+            Canvas.SetLeft(cursorIcon, pt.X + 15);
+            Canvas.SetTop(cursorIcon, pt.Y + 15);
+        }
 
         // Annotation mode: Eraser
         // Skip when the middle button is also held — that combination is the Nuke-style drag-to-zoom gesture.
@@ -1387,6 +1476,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         var mainCanvas = this.FindControl<Canvas>("MainCanvas");
         var pt = e.GetPosition(mainCanvas);
+
+        // Update custom cursor icon position
+        var cursorIcon = this.FindControl<Border>("CursorIconContainer");
+        if (cursorIcon != null)
+        {
+            Canvas.SetLeft(cursorIcon, pt.X + 15);
+            Canvas.SetTop(cursorIcon, pt.Y + 15);
+        }
 
         // Eraser drag — but not when the middle button is also held (that's the Nuke-style zoom gesture)
         if (IsDrawMode && IsEraserMode

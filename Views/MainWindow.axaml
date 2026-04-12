@@ -394,7 +394,40 @@
                         HorizontalAlignment="Stretch"
                         VerticalAlignment="Stretch"
                         RenderTransformOrigin="0,0"
+                        PointerEntered="MainCanvas_PointerEntered"
+                        PointerExited="MainCanvas_PointerExited"
                     >
+                        <!-- Custom Cursor Icon Overlay -->
+                        <Border
+                            x:Name="CursorIconContainer"
+                            Canvas.Left="-100"
+                            Canvas.Top="-100"
+                            IsHitTestVisible="False"
+                            IsVisible="{Binding IsCursorIconVisible}"
+                            ZIndex="10000"
+                            Background="Transparent"
+                            CornerRadius="4"
+                            Padding="4"
+                        >
+                            <TextBlock
+                                Text="{Binding CanvasCursor}"
+                                FontSize="16"
+                                FontWeight="Bold"
+                                Foreground="White"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                            >
+                                <TextBlock.Effect>
+                                    <DropShadowEffect
+                                        BlurRadius="3"
+                                        OffsetX="0"
+                                        OffsetY="0"
+                                        Color="Black"
+                                        Opacity="0.8" />
+                                </TextBlock.Effect>
+                            </TextBlock>
+                        </Border>
+
                         <!-- Grid Background Pattern + Context Menu -->
                         <Border
                             Width="1000000"
@@ -429,30 +462,44 @@
                                         <MenuItem
                                             Header="Pencil"
                                             Click="PencilMode_Click"
+                                            ToggleType="CheckBox"
+                                            IsChecked="{Binding IsPencilSelected}"
                                         />
                                         <MenuItem
                                             Header="Text"
                                             Click="TextMode_Click"
+                                            ToggleType="CheckBox"
+                                            IsChecked="{Binding IsTextSelected}"
                                         />
                                         <MenuItem
                                             Header="Arrow"
                                             Click="ArrowMode_Click"
+                                            ToggleType="CheckBox"
+                                            IsChecked="{Binding IsArrowSelected}"
                                         />
                                         <MenuItem
                                             Header="Square"
                                             Click="SquareMode_Click"
+                                            ToggleType="CheckBox"
+                                            IsChecked="{Binding IsRectangleSelected}"
                                         />
                                         <MenuItem
                                             Header="Circle"
                                             Click="CircleMode_Click"
+                                            ToggleType="CheckBox"
+                                            IsChecked="{Binding IsEllipseSelected}"
                                         />
                                         <MenuItem
                                             Header="Eraser"
                                             Click="EraserMode_Click"
+                                            ToggleType="CheckBox"
+                                            IsChecked="{Binding IsEraserSelected}"
                                         />
                                         <MenuItem
                                             Header="Move"
                                             Click="MoveMode_Click"
+                                            ToggleType="CheckBox"
+                                            IsChecked="{Binding IsMoveSelected}"
                                         />
                                     </MenuItem>
 
@@ -1146,13 +1193,19 @@
                         <Ellipse
                             Width="7"
                             Height="7"
-                            Fill="#44AAFF"
+                            Fill="{Binding ModeIndicatorColor}"
                             VerticalAlignment="Center"
                         />
                         <TextBlock
                             Text="{Binding CurrentModeText}"
                             Classes="statusText"
                             FontWeight="SemiBold"
+                        />
+                        <TextBlock
+                            Text="{Binding CurrentTool, StringFormat='Tool: {0}'}"
+                            Classes="statusText"
+                            IsVisible="{Binding IsDrawMode}"
+                            Margin="10,0,0,0"
                         />
                     </StackPanel>
 
