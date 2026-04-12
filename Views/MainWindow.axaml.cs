@@ -394,6 +394,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private double _dragStartY;
     private List<(CellViewModel Cell, double StartX, double StartY)>? _groupDragStarts;
     private List<(AnnotationViewModel Ann, double StartX, double StartY)>? _groupAnnotationDragStarts;
+    private bool _isAltDuplicateDrag;
 
     // Cell resize
     private bool _isResizing;

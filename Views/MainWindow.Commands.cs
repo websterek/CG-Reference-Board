@@ -1119,11 +1119,50 @@ public partial class MainWindow
             return;
         }
 
+        if (e.Key == Key.Home && noModifiers)
+        { ZoomReset_Click(null, null!); return; }
+
         if (e.Key == Key.D1 && isCtrl)
         { IsDrawMode = false; return; }
 
         if (e.Key == Key.D2 && isCtrl)
         { IsDrawMode = true; return; }
+
+        // Annotation tool shortcuts (Photoshop-style)
+        if (IsDrawMode && noModifiers)
+        {
+            switch (e.Key)
+            {
+                case Key.B:
+                    CurrentTool = "Pencil";
+                    ShowToast("✏️ Pencil");
+                    return;
+                case Key.E:
+                    CurrentTool = "Eraser";
+                    ShowToast("🧹 Eraser");
+                    return;
+                case Key.T:
+                    CurrentTool = "Text";
+                    ShowToast("🔤 Text");
+                    return;
+                case Key.L:
+                    CurrentTool = "Arrow";
+                    ShowToast("➡️ Arrow");
+                    return;
+                case Key.U:
+                    CurrentTool = "Rectangle";
+                    ShowToast("▪️ Rectangle");
+                    return;
+                case Key.O:
+                    CurrentTool = "Ellipse";
+                    ShowToast("⚪ Ellipse");
+                    return;
+                case Key.V:
+                    CurrentTool = "Move";
+                    ShowToast("✥ Select/Move");
+                    return;
+            }
+        }
 
         if (e.Key == Key.F && noModifiers)
         { ShowAll_Click(null, null!); return; }

@@ -718,6 +718,14 @@ public partial class MainWindow
         OnPropertyChanged(nameof(ZoomLevelText));
     }
 
+    private void ZoomReset_Click(object? sender, RoutedEventArgs e)
+    {
+        _scale.ScaleX = 1;
+        _scale.ScaleY = 1;
+        OnPropertyChanged(nameof(ZoomLevelText));
+        ScheduleViewportUpdate();
+    }
+
     /// <summary>
     /// Pans the view to center on a specific canvas position without changing zoom.
     /// </summary>

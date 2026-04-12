@@ -35,29 +35,13 @@ public partial class MainWindow
             return;
         var props = e.GetCurrentPoint(this).Properties;
 
-        // Alt+Drag: Duplicate cell
+        // Alt+Drag: Duplicate cell and start dragging the clone
         if (props.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Alt))
         {
-            var emptySpace = GridLayoutService.FindEmptySpace(
-                GridCells,
-                cell.CanvasX + Constants.GridSize,
-                cell.CanvasY + Constants.GridSize,
-                cell.ColSpan,
-                cell.RowSpan,
-                cell.CollisionLayer
-            );
-
-            if (emptySpace == null)
-            {
-                ShakeScreen();
-                e.Handled = true;
-                return;
-            }
-
             var duplicate = new CellViewModel
             {
-                CanvasX = emptySpace.Value.X,
-                CanvasY = emptySpace.Value.Y,
+                CanvasX = cell.CanvasX,
+                CanvasY = cell.CanvasY,
                 ColSpan = cell.ColSpan,
                 RowSpan = cell.RowSpan,
                 Type = cell.Type,
@@ -76,8 +60,29 @@ public partial class MainWindow
             }
 
             GridCells.Add(duplicate);
-            MarkUnsaved();
-            SaveBoardData();
+
+            // Clear current selection and select the duplicate
+            ClearSelection();
+            duplicate.IsSelected = true;
+            _selectedCells.Add(duplicate);
+            UpdateSelectionState();
+
+            // Immediately start dragging the duplicate
+            _isPointerDown = true;
+            _isDraggingCell = true;
+            _draggingCell = duplicate;
+            _dragStartX = cell.CanvasX;
+            _dragStartY = cell.CanvasY;
+            _groupDragStarts = null;
+            _groupAnnotationDragStarts = null;
+            _isAltDuplicateDrag = true;
+
+            duplicate.IsDragging = true;
+
+            var canvasPt = e.GetPosition(CanvasGrid);
+            _dragOffsetX = canvasPt.X - duplicate.CanvasX;
+            _dragOffsetY = canvasPt.Y - duplicate.CanvasY;
+            e.Pointer.Capture(sender as Control);
 
             e.Handled = true;
             return;
@@ -103,6 +108,9 @@ public partial class MainWindow
         {
             if (cell.IsBackdrop)
             {
+                // NOTE: Ctrl+Click selects/deselects the backdrop individually.
+                // This intentionally allows dragging a backdrop WITHOUT its content
+                // when Ctrl is held during click (since children aren't auto-selected).
                 bool isCtrlPressed = e.KeyModifiers.HasFlag(KeyModifiers.Control);
 
                 if (isCtrlPressed)
@@ -385,12 +393,23 @@ public partial class MainWindow
             // Handle single cell drag
             else if (_draggingCell != null)
             {
-                if (GridLayoutService.HasLayerCollision(GridCells, _draggingCell.CollisionLayer, _draggingCell,
+                bool hasCollision = GridLayoutService.HasLayerCollision(GridCells, _draggingCell.CollisionLayer, _draggingCell,
                         _draggingCell.CanvasX, _draggingCell.CanvasY,
-                        _draggingCell.ColSpan, _draggingCell.RowSpan))
+                        _draggingCell.ColSpan, _draggingCell.RowSpan);
+                if (hasCollision)
                 {
-                    _draggingCell.CanvasX = _dragStartX;
-                    _draggingCell.CanvasY = _dragStartY;
+                    if (_isAltDuplicateDrag)
+                    {
+                        // Alt-duplicate dropped on invalid spot: remove the clone entirely
+                        _draggingCell.Clear();
+                        GridCells.Remove(_draggingCell);
+                        _selectedCells.Remove(_draggingCell);
+                    }
+                    else
+                    {
+                        _draggingCell.CanvasX = _dragStartX;
+                        _draggingCell.CanvasY = _dragStartY;
+                    }
                 }
                 _draggingCell.IsDragInvalid = false;
                 _draggingCell.IsDragging = false;
@@ -401,6 +420,7 @@ public partial class MainWindow
             _draggingCell = null;
             _groupDragStarts = null;
             _groupAnnotationDragStarts = null;
+            _isAltDuplicateDrag = false;
             MarkUnsaved();
             SaveBoardData();
         }
