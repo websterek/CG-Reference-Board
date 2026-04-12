@@ -507,5 +507,15 @@ public partial class MainWindow
         }
     }
 
+    /// <summary>
+    /// Prevents ScrollViewer from consuming wheel events so canvas zoom still works.
+    /// Text scrolling is only available via click-drag on scrollbar.
+    /// </summary>
+    private void TextScroll_PointerWheelChanged(object? sender, PointerWheelEventArgs e)
+    {
+        // Don't handle the event - let it bubble up to canvas for zooming
+        e.Handled = false;
+    }
+
     #endregion
 }

@@ -1046,12 +1046,20 @@
                                                 Padding="10"
                                                 DoubleTapped="CanvasText_DoubleTapped"
                                             >
-                                                <TextBlock
-                                                    local:TextBlockLinkify.Text="{Binding TextContent}"
-                                                    TextWrapping="Wrap"
-                                                    Background="Transparent"
-                                                    Foreground="White"
-                                                />
+                                                <ScrollViewer
+                                                    Classes="TextCellScroll"
+                                                    HorizontalScrollBarVisibility="Disabled"
+                                                    VerticalScrollBarVisibility="Auto"
+                                                    AllowAutoHide="True"
+                                                    PointerWheelChanged="TextScroll_PointerWheelChanged"
+                                                >
+                                                    <TextBlock
+                                                        local:TextBlockLinkify.Text="{Binding TextContent}"
+                                                        TextWrapping="Wrap"
+                                                        Background="Transparent"
+                                                        Foreground="White"
+                                                    />
+                                                </ScrollViewer>
                                             </Border>
 
                                             <!-- Label Content -->

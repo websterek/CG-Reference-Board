@@ -168,6 +168,24 @@
     </Style>
 
     <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Text Cell Scrollbar                                        -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <Style Selector="ScrollViewer.TextCellScroll">
+        <Setter Property="Padding" Value="0,0,4,0" />
+    </Style>
+    <Style Selector="ScrollViewer.TextCellScroll ScrollBar">
+        <Setter Property="Width" Value="6" />
+        <Setter Property="Opacity" Value="0.5" />
+    </Style>
+    <Style Selector="ScrollViewer.TextCellScroll ScrollBar:pointerover">
+        <Setter Property="Opacity" Value="0.8" />
+    </Style>
+    <Style Selector="ScrollViewer.TextCellScroll ScrollBar Thumb">
+        <Setter Property="Background" Value="#80FFFFFF" />
+        <Setter Property="MinHeight" Value="20" />
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
     <!-- Startup Overlay                                            -->
     <!-- ═══════════════════════════════════════════════════════════ -->
     <Style Selector="Button.startupBtn">
