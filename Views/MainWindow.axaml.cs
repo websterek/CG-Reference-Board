@@ -1538,29 +1538,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 cell.IsSelected = true;
                 _selectedCells.Add(cell);
 
-                // Define the cell's bounds
-                double left = cell.CanvasX;
-                double top = cell.CanvasY;
-                double right = left + cell.ColSpan * Constants.GridSize;
-                double bottom = top + cell.RowSpan * Constants.GridSize;
-
-                // Select all annotations within the cell's bounds (using same logic as marquee)
-                foreach (var ann in Annotations)
-                {
-                    bool inRect = ann.Points.Any(p =>
-                    {
-                        double px = p.X + ann.CanvasX;
-                        double py = p.Y + ann.CanvasY;
-                        return px >= left && px <= right && py >= top && py <= bottom;
-                    });
-
-                    if (inRect)
-                    {
-                        ann.IsSelected = true;
-                        _selectedAnnotations.Add(ann);
-                    }
-                }
-
                 OnPropertyChanged(nameof(SelectionCountText));
             }
 
@@ -1618,8 +1595,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
                 // Gather all contents of selected backdrops for dragging
                 var cellsToMove = new List<CellViewModel>(_selectedCells);
-                var annotationsToMove = new List<AnnotationViewModel>(_selectedAnnotations);
+                var annotationsToMove = new List<AnnotationViewModel>();
 
+                // First, gather cells from backdrops
                 foreach (var backdrop in _selectedCells.Where(c => c.IsBackdrop).ToList())
                 {
                     double left = backdrop.CanvasX;
@@ -1643,8 +1621,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                         if (intersects)
                             cellsToMove.Add(c);
                     }
+                }
 
-                    // Add all annotations within this backdrop's bounds
+                // Now gather all annotations that are within ANY cell being moved
+                foreach (var cellToMove in cellsToMove)
+                {
+                    double left = cellToMove.CanvasX;
+                    double top = cellToMove.CanvasY;
+                    double right = left + cellToMove.ColSpan * Constants.GridSize;
+                    double bottom = top + cellToMove.RowSpan * Constants.GridSize;
+
                     foreach (var ann in Annotations)
                     {
                         if (annotationsToMove.Contains(ann))
@@ -2263,23 +2249,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                         }
                     }
 
-                    // Also select annotations that intersect the marquee
-                    _selectedAnnotations.Clear();
-                    foreach (var ann in Annotations)
-                    {
-                        ann.IsSelected = false;
-                        bool inRect = ann.Points.Any(p =>
-                        {
-                            double px = p.X + ann.CanvasX;
-                            double py = p.Y + ann.CanvasY;
-                            return px >= left && px <= right && py >= top && py <= bottom;
-                        });
-                        if (inRect)
-                        {
-                            ann.IsSelected = true;
-                            _selectedAnnotations.Add(ann);
-                        }
-                    }
+
                 }
             }
             return;
