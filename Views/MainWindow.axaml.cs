@@ -296,6 +296,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private bool _isSelectingAnnotations;
     private Point _annotationSelectionStart;
     private Point _annotationDragStart;
+    private List<(CellViewModel Cell, double StartX, double StartY)>? _annotationDragCellOriginals;
     private AnnotationViewModel? _editingTextAnnotation;
     private string? _editingTextAnnotationOriginalText;
 

@@ -856,9 +856,18 @@
                                                     </MenuItem.Icon>
                                                 </MenuItem>
                                                 <MenuItem
+                                                    Header="Select Content"
+                                                    Click="SelectContent_Click"
+                                                    IsVisible="{Binding IsBackdrop}"
+                                                >
+                                                    <MenuItem.Icon>
+                                                        <PathIcon Data="M4 4H20V20H4V4M6 6V18H18V6H6M8 8H16V16H8V8Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                                                    </MenuItem.Icon>
+                                                </MenuItem>
+                                                <MenuItem
                                                     Header="Arrange Horizontal"
                                                     Click="ArrangeHorizontal_Click"
-                                                    IsVisible="{Binding IsSelected}"
+                                                    IsVisible="{Binding !IsBackdrop}"
                                                 >
                                                     <MenuItem.Icon>
                                                         <PathIcon Data="M4 11V13H16V11H4M4 6V8H20V6H4M4 18H12V16H4V18Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
@@ -867,7 +876,7 @@
                                                 <MenuItem
                                                     Header="Arrange Vertical"
                                                     Click="ArrangeVertical_Click"
-                                                    IsVisible="{Binding IsSelected}"
+                                                    IsVisible="{Binding !IsBackdrop}"
                                                 >
                                                     <MenuItem.Icon>
                                                         <PathIcon Data="M4 11V13H16V11H4M4 6V8H20V6H4M4 18H12V16H4V18Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
@@ -876,7 +885,7 @@
                                                 <MenuItem
                                                     Header="Arrange Grid"
                                                     Click="ArrangeSelected_Click"
-                                                    IsVisible="{Binding IsSelected}"
+                                                    IsVisible="{Binding !IsBackdrop}"
                                                 >
                                                     <MenuItem.Icon>
                                                         <PathIcon Data="M3 11H11V3H3M13 3V11H21V3M3 21H11V13H3M13 13V21H21V13Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />

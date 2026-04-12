@@ -457,7 +457,19 @@ public partial class MainWindow
         double x = Canvas.GetLeft(hoverHighlight);
         double y = Canvas.GetTop(hoverHighlight);
 
-        var newCell = new CellViewModel { CanvasX = x, CanvasY = y, ColSpan = 4, RowSpan = 2 };
+        string[] bgColors = { "#88222222", "#885A3A10", "#881A3A4A", "#881A4A2A", "#884A1A2A", "#88444444" };
+        string[] fgColors = { "#AAFFFFFF", "#FFFFA500", "#FF44AAFF", "#FF66FF66", "#FFFF6666", "#FFFFFF66" };
+        int colorIdx = Random.Shared.Next(bgColors.Length);
+
+        var newCell = new CellViewModel
+        {
+            CanvasX = x,
+            CanvasY = y,
+            ColSpan = 4,
+            RowSpan = 2,
+            BackgroundColor = bgColors[colorIdx],
+            ForegroundColor = fgColors[colorIdx]
+        };
         newCell.Type = CellType.Label;
         newCell.SetText("New Label");
 
@@ -508,6 +520,10 @@ public partial class MainWindow
                 return;
             }
 
+            string[] bgColors = { "#88222222", "#885A3A10", "#881A3A4A", "#881A4A2A", "#884A1A2A", "#88444444" };
+            string[] fgColors = { "#AAFFFFFF", "#FFFFA500", "#FF44AAFF", "#FF66FF66", "#FFFF6666", "#FFFFFF66" };
+            int colorIdx = Random.Shared.Next(bgColors.Length);
+
             var backdrop = new CellViewModel
             {
                 CanvasX = finalPosition.Value.X,
@@ -515,7 +531,9 @@ public partial class MainWindow
                 ColSpan = colSpan,
                 RowSpan = rowSpan,
                 Type = CellType.Backdrop,
-                TextContent = "Backdrop"
+                TextContent = "Backdrop",
+                BackgroundColor = bgColors[colorIdx],
+                ForegroundColor = fgColors[colorIdx]
             };
 
             GridCells.Add(backdrop);
@@ -545,18 +563,74 @@ public partial class MainWindow
             int gridX = (int)(Math.Floor(x / Constants.GridSize) * Constants.GridSize);
             int gridY = (int)(Math.Floor(y / Constants.GridSize) * Constants.GridSize);
 
+            string[] bgColors = { "#88222222", "#885A3A10", "#881A3A4A", "#881A4A2A", "#884A1A2A", "#88444444" };
+            string[] fgColors = { "#AAFFFFFF", "#FFFFA500", "#FF44AAFF", "#FF66FF66", "#FFFF6666", "#FFFFFF66" };
+            int colorIdx = Random.Shared.Next(bgColors.Length);
+
             // Create pending backdrop
             _pendingBackdrop = new CellViewModel
             {
                 ColSpan = 6,
                 RowSpan = 4,
                 Type = CellType.Backdrop,
-                TextContent = "New Backdrop"
+                TextContent = "New Backdrop",
+                BackgroundColor = bgColors[colorIdx],
+                ForegroundColor = fgColors[colorIdx]
             };
 
             // Show placement preview
             ShowPlacementPreview(gridX, gridY, _pendingBackdrop.ColSpan, _pendingBackdrop.RowSpan, collisionLayer: 0);
         }
+    }
+
+    private void SelectContent_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { DataContext: CellViewModel cell } || !cell.IsBackdrop)
+            return;
+
+        ClearSelection();
+
+        double left = cell.CanvasX;
+        double top = cell.CanvasY;
+        double right = left + cell.ColSpan * Constants.GridSize;
+        double bottom = top + cell.RowSpan * Constants.GridSize;
+
+        foreach (var c in GridCells)
+        {
+            if (!c.HasContent)
+                continue;
+
+            double cx = c.CanvasX;
+            double cy = c.CanvasY;
+            double cw = c.ColSpan * Constants.GridSize;
+            double ch = c.RowSpan * Constants.GridSize;
+
+            bool intersects = cx < right && cx + cw > left
+                           && cy < bottom && cy + ch > top;
+            if (intersects)
+            {
+                c.IsSelected = true;
+                _selectedCells.Add(c);
+            }
+        }
+
+        foreach (var ann in Annotations)
+        {
+            bool inRect = ann.Points.Any(p =>
+            {
+                double px = p.X + ann.CanvasX;
+                double py = p.Y + ann.CanvasY;
+                return px >= left && px <= right && py >= top && py <= bottom;
+            });
+
+            if (inRect)
+            {
+                ann.IsSelected = true;
+                _selectedAnnotations.Add(ann);
+            }
+        }
+
+        OnPropertyChanged(nameof(SelectionCountText));
     }
 
     private void ArrangeSelected_Click(object? sender, RoutedEventArgs e)
@@ -578,15 +652,17 @@ public partial class MainWindow
         double currentY = minY;
         double maxRowHeight = 0;
         int itemsInCurrentRow = 0;
+        var cellsToAvoid = GridCells.Except(sortedCells).ToList();
 
         foreach (var cell in sortedCells)
         {
-            var emptySpace = GridLayoutService.FindEmptySpace(GridCells, currentX, currentY, cell.ColSpan, cell.RowSpan, cell.CollisionLayer, excludeCell: cell);
+            var emptySpace = GridLayoutService.FindEmptySpace(cellsToAvoid, currentX, currentY, cell.ColSpan, cell.RowSpan, cell.CollisionLayer);
 
             if (emptySpace != null)
             {
                 cell.CanvasX = emptySpace.Value.X;
                 cell.CanvasY = emptySpace.Value.Y;
+                cellsToAvoid.Add(cell);
             }
 
             maxRowHeight = Math.Max(maxRowHeight, cell.PixelHeight);
@@ -622,15 +698,17 @@ public partial class MainWindow
             oldPositions[cell] = new Point(cell.CanvasX, cell.CanvasY);
 
         double currentX = minX;
+        var cellsToAvoid = GridCells.Except(sortedCells).ToList();
 
         foreach (var cell in sortedCells)
         {
-            var emptySpace = GridLayoutService.FindEmptySpace(GridCells, currentX, minY, cell.ColSpan, cell.RowSpan, cell.CollisionLayer, cell);
+            var emptySpace = GridLayoutService.FindEmptySpace(cellsToAvoid, currentX, minY, cell.ColSpan, cell.RowSpan, cell.CollisionLayer);
 
             if (emptySpace != null)
             {
                 cell.CanvasX = emptySpace.Value.X;
                 cell.CanvasY = emptySpace.Value.Y;
+                cellsToAvoid.Add(cell);
             }
 
             currentX += cell.PixelWidth;
@@ -656,15 +734,17 @@ public partial class MainWindow
             oldPositions[cell] = new Point(cell.CanvasX, cell.CanvasY);
 
         double currentY = minY;
+        var cellsToAvoid = GridCells.Except(sortedCells).ToList();
 
         foreach (var cell in sortedCells)
         {
-            var emptySpace = GridLayoutService.FindEmptySpace(GridCells, minX, currentY, cell.ColSpan, cell.RowSpan, cell.CollisionLayer, cell);
+            var emptySpace = GridLayoutService.FindEmptySpace(cellsToAvoid, minX, currentY, cell.ColSpan, cell.RowSpan, cell.CollisionLayer);
 
             if (emptySpace != null)
             {
                 cell.CanvasX = emptySpace.Value.X;
                 cell.CanvasY = emptySpace.Value.Y;
+                cellsToAvoid.Add(cell);
             }
 
             currentY += cell.PixelHeight;

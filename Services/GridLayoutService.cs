@@ -185,12 +185,18 @@ public static class GridLayoutService
 
         double aspectRatio = imageWidth / imageHeight;
 
-        if (aspectRatio >= 3.0) { colSpan = 4; rowSpan = 1; }
-        else if (aspectRatio >= 2.0) { colSpan = 3; rowSpan = 1; }
-        else if (aspectRatio >= 1.5) { colSpan = 3; rowSpan = 2; }
-        else if (aspectRatio <= 0.33) { colSpan = 1; rowSpan = 4; }
-        else if (aspectRatio <= 0.5) { colSpan = 1; rowSpan = 3; }
-        else if (aspectRatio <= 0.66) { colSpan = 2; rowSpan = 3; }
+        if (aspectRatio >= 3.0)
+        { colSpan = 4; rowSpan = 1; }
+        else if (aspectRatio >= 2.0)
+        { colSpan = 3; rowSpan = 1; }
+        else if (aspectRatio >= 1.5)
+        { colSpan = 3; rowSpan = 2; }
+        else if (aspectRatio <= 0.33)
+        { colSpan = 1; rowSpan = 4; }
+        else if (aspectRatio <= 0.5)
+        { colSpan = 1; rowSpan = 3; }
+        else if (aspectRatio <= 0.66)
+        { colSpan = 2; rowSpan = 3; }
 
         return (colSpan, rowSpan);
     }
@@ -233,7 +239,14 @@ public static class GridLayoutService
 
         foreach (var annotation in annotations)
         {
-            if (annotation.Points.Count > 0 && backdropRect.Contains(annotation.Points[0]))
+            bool inRect = annotation.Points.Any(p =>
+            {
+                double px = p.X + annotation.CanvasX;
+                double py = p.Y + annotation.CanvasY;
+                return backdropRect.Contains(new Point(px, py));
+            });
+
+            if (inRect)
                 result.Add(annotation);
         }
 
@@ -247,6 +260,8 @@ public static class GridLayoutService
         IEnumerable<AnnotationViewModel> annotations,
         Dictionary<CellViewModel, Point> oldPositions)
     {
+        var movedAnnotations = new HashSet<AnnotationViewModel>();
+
         foreach (var (cell, oldPos) in oldPositions)
         {
             double deltaX = cell.CanvasX - oldPos.X;
@@ -259,14 +274,21 @@ public static class GridLayoutService
 
             foreach (var annotation in annotations.ToList())
             {
-                if (annotation.Points.Count > 0)
+                if (movedAnnotations.Contains(annotation))
+                    continue;
+
+                bool inRect = annotation.Points.Any(p =>
                 {
-                    var pt = annotation.Points[0];
-                    if (cellRect.Contains(pt))
-                    {
-                        annotation.CanvasX += deltaX;
-                        annotation.CanvasY += deltaY;
-                    }
+                    double px = p.X + annotation.CanvasX;
+                    double py = p.Y + annotation.CanvasY;
+                    return cellRect.Contains(new Point(px, py));
+                });
+
+                if (inRect)
+                {
+                    annotation.CanvasX += deltaX;
+                    annotation.CanvasY += deltaY;
+                    movedAnnotations.Add(annotation);
                 }
             }
         }

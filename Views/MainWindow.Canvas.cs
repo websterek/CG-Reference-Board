@@ -241,6 +241,19 @@ public partial class MainWindow
 
                 if (Math.Abs(dx) > 0.1 || Math.Abs(dy) > 0.1)
                 {
+                    bool collision = false;
+                    if (_annotationDragCellOriginals != null && _annotationDragCellOriginals.Count > 0)
+                    {
+                        var cellsToMove = _annotationDragCellOriginals.Select(x => x.Cell).ToList();
+                        collision = GridLayoutService.HasGroupCollision(GridCells, cellsToMove, dx, dy);
+                        foreach (var (c, _, _) in _annotationDragCellOriginals)
+                        {
+                            c.IsDragInvalid = collision;
+                            c.CanvasX += dx;
+                            c.CanvasY += dy;
+                        }
+                    }
+
                     foreach (var ann in _selectedAnnotations)
                     {
                         ann.CanvasX += dx;
@@ -419,6 +432,47 @@ public partial class MainWindow
         if (_isDraggingAnnotations)
         {
             _isDraggingAnnotations = false;
+
+            if (!IsDrawMode && _annotationDragCellOriginals != null && _annotationDragCellOriginals.Count > 0)
+            {
+                bool hasCollision = false;
+
+                foreach (var (c, startX, startY) in _annotationDragCellOriginals)
+                {
+                    if (GridLayoutService.HasLayerCollision(GridCells, c.CollisionLayer, c, c.CanvasX, c.CanvasY, c.ColSpan, c.RowSpan))
+                    {
+                        hasCollision = true;
+                        break;
+                    }
+                }
+
+                if (hasCollision)
+                {
+                    double revertDx = _annotationDragCellOriginals[0].StartX - _annotationDragCellOriginals[0].Cell.CanvasX;
+                    double revertDy = _annotationDragCellOriginals[0].StartY - _annotationDragCellOriginals[0].Cell.CanvasY;
+
+                    foreach (var (c, startX, startY) in _annotationDragCellOriginals)
+                    {
+                        c.CanvasX = startX;
+                        c.CanvasY = startY;
+                    }
+
+                    foreach (var ann in _selectedAnnotations)
+                    {
+                        ann.CanvasX += revertDx;
+                        ann.CanvasY += revertDy;
+                    }
+                    ShakeScreen();
+                }
+
+                foreach (var (c, _, _) in _annotationDragCellOriginals)
+                {
+                    c.IsDragging = false;
+                    c.IsDragInvalid = false;
+                }
+                _annotationDragCellOriginals = null;
+            }
+
             e.Pointer.Capture(null);
             MarkUnsaved();
             SaveBoardData();

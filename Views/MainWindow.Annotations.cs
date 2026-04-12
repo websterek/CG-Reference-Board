@@ -57,6 +57,9 @@ public partial class MainWindow
                 }
 
                 _isDraggingAnnotations = true;
+                _annotationDragCellOriginals = _selectedCells.Select(c => (c, c.CanvasX, c.CanvasY)).ToList();
+                foreach (var (c, _, _) in _annotationDragCellOriginals)
+                    c.IsDragging = true;
                 var mainCanvas = this.FindControl<Canvas>("MainCanvas");
                 if (mainCanvas != null)
                 {
@@ -86,6 +89,7 @@ public partial class MainWindow
             }
 
             _isDraggingAnnotations = true;
+            _annotationDragCellOriginals = null;
             _annotationDragStart = e.GetPosition(this.FindControl<Canvas>("MainCanvas"));
             e.Handled = true;
             return;

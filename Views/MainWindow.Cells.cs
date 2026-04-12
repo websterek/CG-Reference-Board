@@ -222,6 +222,12 @@ public partial class MainWindow
                     }
                 }
 
+                foreach (var ann in _selectedAnnotations)
+                {
+                    if (!annotationsToMove.Contains(ann))
+                        annotationsToMove.Add(ann);
+                }
+
                 bool isGroupDrag = (cellsToMove.Count + annotationsToMove.Count) > 1
                                    && cellsToMove.Contains(cell);
                 if (isGroupDrag)
