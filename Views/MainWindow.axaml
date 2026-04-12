@@ -291,6 +291,29 @@
                             </TextBlock>
                         </Border>
 
+                        <!-- Placement Preview Rectangle -->
+                        <Border
+                            x:Name="PlacementPreviewBorder"
+                            Canvas.Left="-10000"
+                            Canvas.Top="-10000"
+                            IsHitTestVisible="False"
+                            IsVisible="False"
+                            ZIndex="9999"
+                            Background="#30FFFFFF"
+                            BorderBrush="#80FFFFFF"
+                            BorderThickness="2"
+                            CornerRadius="4"
+                        >
+                            <Border.Effect>
+                                <DropShadowEffect
+                                    BlurRadius="8"
+                                    OffsetX="0"
+                                    OffsetY="0"
+                                    Color="White"
+                                    Opacity="0.4" />
+                            </Border.Effect>
+                        </Border>
+
                         <!-- Grid Background Pattern + Context Menu -->
                         <Border
                             Width="1000000"
@@ -487,7 +510,7 @@
                         <ItemsControl
                             ItemsSource="{Binding Annotations}"
                             IsVisible="{Binding IsAnnotationsVisible}"
-                            ZIndex="100"
+                            ZIndex="200"
                             HorizontalAlignment="Stretch"
                             VerticalAlignment="Stretch"
                             ClipToBounds="False"
@@ -707,6 +730,26 @@
                                                 IsVisible="{Binding IsSelected}"
                                                 ZIndex="8"
                                             />
+
+                                            <!-- Invalid Drag Position Indicator -->
+                                            <Border
+                                                Background="#60FF4444"
+                                                BorderBrush="#AAFF4444"
+                                                BorderThickness="3"
+                                                CornerRadius="4"
+                                                IsVisible="{Binding IsDragInvalid}"
+                                                ZIndex="9"
+                                                IsHitTestVisible="False"
+                                            >
+                                                <Border.Effect>
+                                                    <DropShadowEffect
+                                                        BlurRadius="8"
+                                                        OffsetX="0"
+                                                        OffsetY="0"
+                                                        Color="Red"
+                                                        Opacity="0.6" />
+                                                </Border.Effect>
+                                            </Border>
 
                                             <!-- Image Content -->
                                             <Border

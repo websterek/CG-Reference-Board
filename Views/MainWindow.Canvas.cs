@@ -39,6 +39,31 @@ public partial class MainWindow
             Canvas.SetTop(cursorIcon, pt.Y + 15);
         }
 
+        // Handle placement preview click (backdrop positioning)
+        if (_isShowingPlacementPreview && props.IsLeftButtonPressed)
+        {
+            if (TryPlacePendingBackdrop())
+            {
+                e.Handled = true;
+                return;
+            }
+            else
+            {
+                // Invalid position - show shake feedback
+                ShakeScreen();
+                e.Handled = true;
+                return;
+            }
+        }
+
+        // Right-click or Escape cancels placement preview
+        if (_isShowingPlacementPreview && (props.IsRightButtonPressed || e.KeyModifiers.HasFlag(KeyModifiers.Control)))
+        {
+            HidePlacementPreview();
+            e.Handled = true;
+            return;
+        }
+
         // Annotation mode: Eraser
         if (IsDrawMode && IsEraserMode && !e.Handled && props.IsLeftButtonPressed && !props.IsMiddleButtonPressed)
         {
@@ -147,12 +172,22 @@ public partial class MainWindow
         var mainCanvas = this.FindControl<Canvas>("MainCanvas");
         var pt = e.GetPosition(mainCanvas);
 
+        // Store pointer position for edge scrolling
+        _lastPointerPosition = e.GetPosition(CanvasBorder);
+
         // Update custom cursor icon position
         var cursorIcon = this.FindControl<Border>("CursorIconContainer");
         if (cursorIcon != null)
         {
             Canvas.SetLeft(cursorIcon, pt.X + 15);
             Canvas.SetTop(cursorIcon, pt.Y + 15);
+        }
+
+        // Update placement preview for backdrop positioning
+        if (_isShowingPlacementPreview)
+        {
+            UpdatePlacementPreview(pt);
+            StartEdgeScrollIfNeeded(_lastPointerPosition);
         }
 
         // Eraser drag
@@ -183,6 +218,8 @@ public partial class MainWindow
         // Annotation drag
         if (_isDraggingAnnotations && _selectedAnnotations.Count > 0)
         {
+            StartEdgeScrollIfNeeded(_lastPointerPosition);
+
             if (IsDrawMode)
             {
                 double dx = pt.X - _annotationDragStart.X;
@@ -242,6 +279,8 @@ public partial class MainWindow
         // Cell marquee selection drag
         if (_isSelectingCells)
         {
+            StartEdgeScrollIfNeeded(_lastPointerPosition);
+
             var cellMarquee = this.FindControl<Border>("CellSelectionMarquee");
             if (cellMarquee != null)
             {
@@ -336,6 +375,9 @@ public partial class MainWindow
 
     private void Canvas_PointerReleased(object? sender, PointerReleasedEventArgs e)
     {
+        // Stop edge scrolling when mouse is released
+        StopEdgeScroll();
+
         if (IsEraserMode)
             e.Pointer.Capture(null);
 
@@ -502,10 +544,14 @@ public partial class MainWindow
 
         foreach (var cell in GridCells)
         {
-            if (cell.CanvasX < minX) minX = cell.CanvasX;
-            if (cell.CanvasY < minY) minY = cell.CanvasY;
-            if (cell.CanvasX + cell.PixelWidth > maxX) maxX = cell.CanvasX + cell.PixelWidth;
-            if (cell.CanvasY + cell.PixelHeight > maxY) maxY = cell.CanvasY + cell.PixelHeight;
+            if (cell.CanvasX < minX)
+                minX = cell.CanvasX;
+            if (cell.CanvasY < minY)
+                minY = cell.CanvasY;
+            if (cell.CanvasX + cell.PixelWidth > maxX)
+                maxX = cell.CanvasX + cell.PixelWidth;
+            if (cell.CanvasY + cell.PixelHeight > maxY)
+                maxY = cell.CanvasY + cell.PixelHeight;
         }
 
         double contentWidth = maxX - minX;
@@ -523,6 +569,18 @@ public partial class MainWindow
         _translate.X = (viewportWidth - contentWidth * scale) / 2 - minX * scale;
         _translate.Y = (viewportHeight - contentHeight * scale) / 2 - minY * scale;
         OnPropertyChanged(nameof(ZoomLevelText));
+    }
+
+    /// <summary>
+    /// Pans the view to center on a specific canvas position without changing zoom.
+    /// </summary>
+    private void PanToPosition(double canvasX, double canvasY)
+    {
+        double viewportWidth = MainCanvas.Bounds.Width > 0 ? MainCanvas.Bounds.Width : this.Bounds.Width;
+        double viewportHeight = MainCanvas.Bounds.Height > 0 ? MainCanvas.Bounds.Height : this.Bounds.Height;
+
+        _translate.X = viewportWidth / 2 / _scale.ScaleX - canvasX;
+        _translate.Y = viewportHeight / 2 / _scale.ScaleY - canvasY;
     }
 
     #endregion

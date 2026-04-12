@@ -160,6 +160,8 @@ public partial class MainWindow
         if (sender is not Control { DataContext: CellViewModel { HasContent: true } cell })
             return;
 
+        _lastPointerPosition = e.GetPosition(CanvasBorder);
+
         if (!_isDraggingCell)
         {
             var pt = e.GetPosition(this);
@@ -238,6 +240,17 @@ public partial class MainWindow
                 _dragStartX = cell.CanvasX;
                 _dragStartY = cell.CanvasY;
 
+                // Set dragging flag for Z-index boost
+                if (_groupDragStarts != null)
+                {
+                    foreach (var (c, _, _) in _groupDragStarts)
+                        c.IsDragging = true;
+                }
+                else
+                {
+                    cell.IsDragging = true;
+                }
+
                 var canvasPt = e.GetPosition(CanvasGrid);
                 _dragOffsetX = canvasPt.X - cell.CanvasX;
                 _dragOffsetY = canvasPt.Y - cell.CanvasY;
@@ -264,51 +277,102 @@ public partial class MainWindow
                 var cellsToMove = _groupDragStarts.Select(s => s.Cell).ToList();
                 bool collision = GridLayoutService.HasGroupCollision(GridCells, cellsToMove, dx, dy);
 
-                if (!collision)
+                // Update visual state and allow movement
+                foreach (var (c, _, _) in _groupDragStarts)
                 {
-                    foreach (var (c, _, _) in _groupDragStarts)
+                    c.IsDragInvalid = collision;
+                    c.CanvasX += dx;
+                    c.CanvasY += dy;
+                }
+                if (_groupAnnotationDragStarts != null)
+                {
+                    foreach (var (a, _, _) in _groupAnnotationDragStarts)
                     {
-                        c.CanvasX += dx;
-                        c.CanvasY += dy;
-                    }
-                    if (_groupAnnotationDragStarts != null)
-                    {
-                        foreach (var (a, _, _) in _groupAnnotationDragStarts)
-                        {
-                            a.CanvasX += dx;
-                            a.CanvasY += dy;
-                        }
+                        a.CanvasX += dx;
+                        a.CanvasY += dy;
                     }
                 }
             }
+
+            StartEdgeScrollIfNeeded(_lastPointerPosition);
         }
         else
         {
+            StartEdgeScrollIfNeeded(_lastPointerPosition);
+
             var canvasPt = e.GetPosition(CanvasGrid);
             double newX = Math.Round((canvasPt.X - _dragOffsetX) / Constants.GridSize) * Constants.GridSize;
             double newY = Math.Round((canvasPt.Y - _dragOffsetY) / Constants.GridSize) * Constants.GridSize;
 
-            if (!GridLayoutService.HasLayerCollision(GridCells, cell.CollisionLayer, cell, newX, newY, cell.ColSpan, cell.RowSpan))
-            {
-                cell.CanvasX = newX;
-                cell.CanvasY = newY;
-            }
+            bool collision = GridLayoutService.HasLayerCollision(GridCells, cell.CollisionLayer, cell, newX, newY, cell.ColSpan, cell.RowSpan);
+            cell.IsDragInvalid = collision;
+            cell.CanvasX = newX;
+            cell.CanvasY = newY;
         }
     }
 
     private void Cell_PointerReleased(object? sender, PointerReleasedEventArgs e)
     {
+        StopEdgeScroll();
+
         if (IsDrawMode)
             return;
 
         if (_isDraggingCell && sender is Control)
         {
-            if (_draggingCell != null && GridLayoutService.HasLayerCollision(GridCells, _draggingCell.CollisionLayer, _draggingCell,
-                    _draggingCell.CanvasX, _draggingCell.CanvasY,
-                    _draggingCell.ColSpan, _draggingCell.RowSpan))
+            // Handle group drag
+            if (_groupDragStarts != null)
             {
-                _draggingCell.CanvasX = _dragStartX;
-                _draggingCell.CanvasY = _dragStartY;
+                var cellsToMove = _groupDragStarts.Select(s => s.Cell).ToList();
+                bool hasCollision = false;
+
+                foreach (var (c, startX, startY) in _groupDragStarts)
+                {
+                    if (GridLayoutService.HasLayerCollision(GridCells, c.CollisionLayer, c, c.CanvasX, c.CanvasY, c.ColSpan, c.RowSpan))
+                    {
+                        hasCollision = true;
+                        break;
+                    }
+                }
+
+                if (hasCollision)
+                {
+                    // Revert all cells to start positions
+                    foreach (var (c, startX, startY) in _groupDragStarts)
+                    {
+                        c.CanvasX = startX;
+                        c.CanvasY = startY;
+                    }
+                    if (_groupAnnotationDragStarts != null)
+                    {
+                        foreach (var (a, startX, startY) in _groupAnnotationDragStarts)
+                        {
+                            a.CanvasX = startX;
+                            a.CanvasY = startY;
+                        }
+                    }
+                }
+
+                // Clear IsDragInvalid flag
+                // Clear invalid state and dragging flag for all cells
+                foreach (var (c, _, _) in _groupDragStarts)
+                {
+                    c.IsDragInvalid = false;
+                    c.IsDragging = false;
+                }
+            }
+            // Handle single cell drag
+            else if (_draggingCell != null)
+            {
+                if (GridLayoutService.HasLayerCollision(GridCells, _draggingCell.CollisionLayer, _draggingCell,
+                        _draggingCell.CanvasX, _draggingCell.CanvasY,
+                        _draggingCell.ColSpan, _draggingCell.RowSpan))
+                {
+                    _draggingCell.CanvasX = _dragStartX;
+                    _draggingCell.CanvasY = _dragStartY;
+                }
+                _draggingCell.IsDragInvalid = false;
+                _draggingCell.IsDragging = false;
             }
 
             e.Pointer.Capture(null);
@@ -334,6 +398,8 @@ public partial class MainWindow
             _isResizing = true;
             _resizeStartPos = e.GetPosition(CanvasGrid);
             _resizingCell = cell;
+            _resizeStartColSpan = cell.ColSpan;
+            _resizeStartRowSpan = cell.RowSpan;
             e.Pointer.Capture(c);
             e.Handled = true;
         }
@@ -352,17 +418,28 @@ public partial class MainWindow
         bool collision = GridLayoutService.HasLayerCollision(GridCells, _resizingCell.CollisionLayer, _resizingCell,
             _resizingCell.CanvasX, _resizingCell.CanvasY, newCols, newRows);
 
-        if (!collision)
-        {
-            _resizingCell.ColSpan = newCols;
-            _resizingCell.RowSpan = newRows;
-        }
+        _resizingCell.IsDragInvalid = collision;
+        _resizingCell.ColSpan = newCols;
+        _resizingCell.RowSpan = newRows;
     }
 
     private void ResizeThumb_PointerReleased(object? sender, PointerReleasedEventArgs e)
     {
-        if (_isResizing && sender is Control)
+        if (_isResizing && sender is Control && _resizingCell != null)
         {
+            // Check for collision and revert if needed
+            bool collision = GridLayoutService.HasLayerCollision(GridCells, _resizingCell.CollisionLayer, _resizingCell,
+                _resizingCell.CanvasX, _resizingCell.CanvasY, _resizingCell.ColSpan, _resizingCell.RowSpan);
+
+            if (collision)
+            {
+                _resizingCell.ColSpan = _resizeStartColSpan;
+                _resizingCell.RowSpan = _resizeStartRowSpan;
+            }
+
+            // Clear IsDragInvalid flag
+            _resizingCell.IsDragInvalid = false;
+
             e.Pointer.Capture(null);
             _isResizing = false;
             _resizingCell = null;

@@ -338,8 +338,27 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private bool _isResizing;
     private Point _resizeStartPos;
     private CellViewModel? _resizingCell;
+    private int _resizeStartColSpan;
+    private int _resizeStartRowSpan;
+
+    // Placement preview (for backdrop creation)
+    private bool _isShowingPlacementPreview;
+    private double _previewX;
+    private double _previewY;
+    private int _previewColSpan;
+    private int _previewRowSpan;
+    private bool _previewIsValid;
+    private CellViewModel? _pendingBackdrop;
+
+    // Auto-scroll when dragging near edges
+    private const double EdgeScrollThreshold = 50.0; // pixels from edge
+    private const double EdgeScrollSpeed = 25.0; // pixels per tick
+    private System.Timers.Timer? _edgeScrollTimer;
+    private Point _lastPointerPosition;
+    private bool _isEdgeScrolling;
 
     #endregion
+
 
     #region Constructor
 
@@ -668,6 +687,149 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             a.IsSelected = false;
         _selectedAnnotations.Clear();
         OnPropertyChanged(nameof(SelectionCountText));
+    }
+
+    #endregion
+
+    #region Placement Preview Helpers
+
+    /// <summary>Shows the placement preview rectangle at the specified grid-aligned position.</summary>
+    private void ShowPlacementPreview(double x, double y, int colSpan, int rowSpan, int collisionLayer)
+    {
+        var previewBorder = this.FindControl<Border>("PlacementPreviewBorder");
+        if (previewBorder == null)
+            return;
+
+        _isShowingPlacementPreview = true;
+        _previewX = x;
+        _previewY = y;
+        _previewColSpan = colSpan;
+        _previewRowSpan = rowSpan;
+
+        // Check if placement is valid (no collision)
+        _previewIsValid = GridLayoutService.IsSpaceEmpty(GridCells, x, y, colSpan, rowSpan, collisionLayer);
+
+        // Update visual appearance based on validity
+        previewBorder.BorderBrush = _previewIsValid
+            ? Brushes.LightGreen
+            : Brushes.Red;
+        previewBorder.Background = _previewIsValid
+            ? new SolidColorBrush(Color.FromArgb(48, 144, 238, 144))
+            : new SolidColorBrush(Color.FromArgb(48, 255, 68, 68));
+
+        Canvas.SetLeft(previewBorder, x);
+        Canvas.SetTop(previewBorder, y);
+        previewBorder.Width = colSpan * Constants.GridSize;
+        previewBorder.Height = rowSpan * Constants.GridSize;
+        previewBorder.IsVisible = true;
+    }
+
+    /// <summary>Hides the placement preview rectangle.</summary>
+    private void HidePlacementPreview()
+    {
+        var previewBorder = this.FindControl<Border>("PlacementPreviewBorder");
+        if (previewBorder == null)
+            return;
+
+        _isShowingPlacementPreview = false;
+        previewBorder.IsVisible = false;
+        _pendingBackdrop = null;
+    }
+
+    /// <summary>Updates the placement preview position based on pointer movement.</summary>
+    private void UpdatePlacementPreview(Point canvasPoint)
+    {
+        if (!_isShowingPlacementPreview || _pendingBackdrop == null)
+            return;
+
+        // Snap to grid
+        int gridX = (int)(Math.Floor(canvasPoint.X / Constants.GridSize) * Constants.GridSize);
+        int gridY = (int)(Math.Floor(canvasPoint.Y / Constants.GridSize) * Constants.GridSize);
+
+        ShowPlacementPreview(gridX, gridY, _previewColSpan, _previewRowSpan, _pendingBackdrop.CollisionLayer);
+    }
+
+    /// <summary>Attempts to place the pending backdrop at the preview location if valid.</summary>
+    private bool TryPlacePendingBackdrop()
+    {
+        if (!_isShowingPlacementPreview || _pendingBackdrop == null || !_previewIsValid)
+            return false;
+
+        _pendingBackdrop.CanvasX = _previewX;
+        _pendingBackdrop.CanvasY = _previewY;
+        GridCells.Add(_pendingBackdrop);
+        MarkUnsaved();
+        SaveBoardData();
+        HidePlacementPreview();
+        return true;
+    }
+
+    #endregion
+
+    #region Edge Scroll Helpers
+
+    /// <summary>Starts edge scrolling if the pointer is near the viewport edge.</summary>
+    private void StartEdgeScrollIfNeeded(Point screenPoint)
+    {
+        if (CanvasBorder == null)
+            return;
+
+        var bounds = CanvasBorder.Bounds;
+        bool nearEdge = screenPoint.X < EdgeScrollThreshold ||
+                        screenPoint.Y < EdgeScrollThreshold ||
+                        screenPoint.X > bounds.Width - EdgeScrollThreshold ||
+                        screenPoint.Y > bounds.Height - EdgeScrollThreshold;
+
+        if (nearEdge && !_isEdgeScrolling)
+        {
+            _isEdgeScrolling = true;
+            if (_edgeScrollTimer == null)
+            {
+                _edgeScrollTimer = new System.Timers.Timer(16); // ~60fps
+                _edgeScrollTimer.Elapsed += EdgeScrollTimer_Elapsed;
+            }
+            _edgeScrollTimer.Start();
+        }
+        else if (!nearEdge && _isEdgeScrolling)
+        {
+            StopEdgeScroll();
+        }
+    }
+
+    /// <summary>Stops the edge scroll timer.</summary>
+    private void StopEdgeScroll()
+    {
+        _isEdgeScrolling = false;
+        _edgeScrollTimer?.Stop();
+    }
+
+    /// <summary>Timer callback that performs the actual edge scrolling.</summary>
+    private void EdgeScrollTimer_Elapsed(object? sender, System.Timers.ElapsedEventArgs e)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (!_isEdgeScrolling || CanvasBorder == null)
+                return;
+
+            var bounds = CanvasBorder.Bounds;
+            double dx = 0, dy = 0;
+
+            if (_lastPointerPosition.X < EdgeScrollThreshold)
+                dx = EdgeScrollSpeed;
+            else if (_lastPointerPosition.X > bounds.Width - EdgeScrollThreshold)
+                dx = -EdgeScrollSpeed;
+
+            if (_lastPointerPosition.Y < EdgeScrollThreshold)
+                dy = EdgeScrollSpeed;
+            else if (_lastPointerPosition.Y > bounds.Height - EdgeScrollThreshold)
+                dy = -EdgeScrollSpeed;
+
+            if (Math.Abs(dx) > 0.1 || Math.Abs(dy) > 0.1)
+            {
+                _translate.X += dx;
+                _translate.Y += dy;
+            }
+        });
     }
 
     #endregion

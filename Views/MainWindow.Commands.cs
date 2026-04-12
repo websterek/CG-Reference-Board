@@ -387,9 +387,13 @@ public partial class MainWindow
             return;
 
         if (cell.FilePath != null && File.Exists(cell.FilePath))
-            try { File.Delete(cell.FilePath); } catch { }
+            try
+            { File.Delete(cell.FilePath); }
+            catch { }
         if (cell.VideoPath != null && File.Exists(cell.VideoPath))
-            try { File.Delete(cell.VideoPath); } catch { }
+            try
+            { File.Delete(cell.VideoPath); }
+            catch { }
 
         cell.Clear();
         GridCells.Remove(cell);
@@ -448,6 +452,7 @@ public partial class MainWindow
 
         if (_selectedCells.Count > 0)
         {
+            // Create backdrop around selected cells
             double minX = _selectedCells.Min(c => c.CanvasX);
             double minY = _selectedCells.Min(c => c.CanvasY);
             double maxX = _selectedCells.Max(c => c.CanvasX + c.PixelWidth);
@@ -462,10 +467,29 @@ public partial class MainWindow
             int colSpan = (int)Math.Ceiling(width / Constants.GridSize);
             int rowSpan = (int)Math.Ceiling(height / Constants.GridSize);
 
+            // Check for collision and find empty space if needed
+            Point? finalPosition = null;
+            if (GridLayoutService.IsSpaceEmpty(GridCells, gridX, gridY, colSpan, rowSpan, collisionLayer: 0))
+            {
+                finalPosition = new Point(gridX, gridY);
+            }
+            else
+            {
+                // Try to find nearby empty space
+                finalPosition = GridLayoutService.FindEmptySpace(GridCells, gridX, gridY, colSpan, rowSpan, collisionLayer: 0);
+            }
+
+            if (finalPosition == null)
+            {
+                // Show feedback that no space is available
+                ShakeScreen();
+                return;
+            }
+
             var backdrop = new CellViewModel
             {
-                CanvasX = gridX,
-                CanvasY = gridY,
+                CanvasX = finalPosition.Value.X,
+                CanvasY = finalPosition.Value.Y,
                 ColSpan = colSpan,
                 RowSpan = rowSpan,
                 Type = CellType.Backdrop,
@@ -475,9 +499,18 @@ public partial class MainWindow
             GridCells.Add(backdrop);
             MarkUnsaved();
             SaveBoardData();
+
+            // Pan view to backdrop if it was placed in a different location
+            if (Math.Abs(finalPosition.Value.X - gridX) > 1 || Math.Abs(finalPosition.Value.Y - gridY) > 1)
+            {
+                double centerX = finalPosition.Value.X + (colSpan * Constants.GridSize) / 2;
+                double centerY = finalPosition.Value.Y + (rowSpan * Constants.GridSize) / 2;
+                PanToPosition(centerX, centerY);
+            }
         }
         else
         {
+            // Manual placement mode - show preview and let user position it
             var hoverHighlight = this.FindControl<Border>("HoverHighlight");
             if (hoverHighlight == null)
                 return;
@@ -485,13 +518,21 @@ public partial class MainWindow
             double x = Canvas.GetLeft(hoverHighlight);
             double y = Canvas.GetTop(hoverHighlight);
 
-            var newCell = new CellViewModel { CanvasX = x, CanvasY = y, ColSpan = 6, RowSpan = 4 };
-            newCell.Type = CellType.Backdrop;
-            newCell.SetText("New Backdrop");
+            // Snap to grid
+            int gridX = (int)(Math.Floor(x / Constants.GridSize) * Constants.GridSize);
+            int gridY = (int)(Math.Floor(y / Constants.GridSize) * Constants.GridSize);
 
-            GridCells.Add(newCell);
-            MarkUnsaved();
-            SaveBoardData();
+            // Create pending backdrop
+            _pendingBackdrop = new CellViewModel
+            {
+                ColSpan = 6,
+                RowSpan = 4,
+                Type = CellType.Backdrop,
+                TextContent = "New Backdrop"
+            };
+
+            // Show placement preview
+            ShowPlacementPreview(gridX, gridY, _pendingBackdrop.ColSpan, _pendingBackdrop.RowSpan, collisionLayer: 0);
         }
     }
 
@@ -757,6 +798,14 @@ public partial class MainWindow
         bool isShift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         bool noModifiers = e.KeyModifiers == KeyModifiers.None;
 
+        // Cancel placement preview on Escape
+        if (e.Key == Key.Escape && _isShowingPlacementPreview)
+        {
+            HidePlacementPreview();
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key == Key.N && isCtrl)
         { NewBoard_Click(null, null!); return; }
 
@@ -1005,9 +1054,13 @@ public partial class MainWindow
                 foreach (var cell in _selectedCells.ToList())
                 {
                     if (cell.FilePath != null && File.Exists(cell.FilePath))
-                        try { File.Delete(cell.FilePath); } catch { }
+                        try
+                        { File.Delete(cell.FilePath); }
+                        catch { }
                     if (cell.VideoPath != null && File.Exists(cell.VideoPath))
-                        try { File.Delete(cell.VideoPath); } catch { }
+                        try
+                        { File.Delete(cell.VideoPath); }
+                        catch { }
                     cell.Clear();
                     GridCells.Remove(cell);
                 }
@@ -1032,9 +1085,13 @@ public partial class MainWindow
             else if (_hoveredCell != null)
             {
                 if (_hoveredCell.FilePath != null && File.Exists(_hoveredCell.FilePath))
-                    try { File.Delete(_hoveredCell.FilePath); } catch { }
+                    try
+                    { File.Delete(_hoveredCell.FilePath); }
+                    catch { }
                 if (_hoveredCell.VideoPath != null && File.Exists(_hoveredCell.VideoPath))
-                    try { File.Delete(_hoveredCell.VideoPath); } catch { }
+                    try
+                    { File.Delete(_hoveredCell.VideoPath); }
+                    catch { }
 
                 _hoveredCell.Clear();
                 GridCells.Remove(_hoveredCell);

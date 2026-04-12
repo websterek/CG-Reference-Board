@@ -127,6 +127,26 @@ public class CellViewModel : ViewModelBase
         set => SetProperty(ref _isSelected, value);
     }
 
+    private bool _isDragInvalid;
+    /// <summary>Whether this cell is being dragged to an invalid position (collision detected).</summary>
+    public bool IsDragInvalid
+    {
+        get => _isDragInvalid;
+        set => SetProperty(ref _isDragInvalid, value);
+    }
+
+    private bool _isDragging;
+    /// <summary>Whether this cell is currently being dragged.</summary>
+    public bool IsDragging
+    {
+        get => _isDragging;
+        set
+        {
+            if (SetProperty(ref _isDragging, value))
+                OnPropertyChanged(nameof(ZIndex));
+        }
+    }
+
     #endregion
 
     #region Derived Type Flags
@@ -163,13 +183,46 @@ public class CellViewModel : ViewModelBase
         _ => 1   // Image, Video, Text
     };
 
-    /// <summary>Z-index for rendering order: backdrops behind, labels in front.</summary>
-    public int ZIndex => Type switch
+    /// <summary>
+    /// Z-index for rendering order with proper layering:
+    /// Layering hierarchy (lowest to highest):
+    /// - Backdrops (static): -10
+    /// - Content/Items (static): 0
+    /// - Labels (static): 10
+    /// - Backdrops (dragging): 90
+    /// - Content/Items (dragging): 120
+    /// - Labels (dragging): 150
+    /// - Annotations (always): 200 (set in XAML)
+    ///
+    /// This ensures:
+    /// - Items are always above backdrops
+    /// - Labels are always above items and backdrops
+    /// - Dragging items maintain proper order relative to each other
+    /// - Annotations are always on top
+    /// </summary>
+    public int ZIndex
     {
-        CellType.Backdrop => -10,
-        CellType.Label => 5,
-        _ => 0
-    };
+        get
+        {
+            // Apply type-specific boost when dragging to maintain proper layering
+            if (IsDragging)
+            {
+                return Type switch
+                {
+                    CellType.Backdrop => 90,    // Above all static items, below dragging content
+                    CellType.Label => 150,       // Above all dragging items, below annotations
+                    _ => 120                     // Content items - above dragging backdrops
+                };
+            }
+
+            return Type switch
+            {
+                CellType.Backdrop => -10,
+                CellType.Label => 10,
+                _ => 0
+            };
+        }
+    }
 
     #endregion
 
