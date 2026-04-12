@@ -104,7 +104,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         foreach (var cell in cells)
             GridCells.Add(cell);
         foreach (var ann in annotations)
+        {
+            ann.IsInDrawMode = IsDrawMode;
             Annotations.Add(ann);
+        }
     }
 
     #endregion
@@ -129,6 +132,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (_isDrawMode == value)
                 return;
             _isDrawMode = value;
+
+            // Update hit-test state on all annotations
+            foreach (var ann in Annotations)
+                ann.IsInDrawMode = value;
+
             ClearSelection();
             OnPropertyChanged(nameof(IsDrawMode));
             OnPropertyChanged(nameof(WindowTitle));
@@ -543,7 +551,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             foreach (var cell in cells)
                 GridCells.Add(cell);
             foreach (var ann in annotations)
+            {
+                ann.IsInDrawMode = IsDrawMode;
                 Annotations.Add(ann);
+            }
 
             _hasUnsavedChanges = false;
             Title = $"{Constants.AppName} - {Path.GetFileName(_currentBoardFile)}" + (_isViewMode ? " [VIEW MODE]" : "");

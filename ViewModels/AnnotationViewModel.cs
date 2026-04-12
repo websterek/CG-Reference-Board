@@ -64,6 +64,28 @@ public class AnnotationViewModel : ViewModelBase
     public bool IsSelected
     {
         get => _isSelected;
-        set => SetProperty(ref _isSelected, value);
+        set
+        {
+            if (SetProperty(ref _isSelected, value))
+                OnPropertyChanged(nameof(IsHitTestable));
+        }
     }
+
+    private bool _isInDrawMode;
+    /// <summary>Whether the application is currently in draw/annotation mode.</summary>
+    public bool IsInDrawMode
+    {
+        get => _isInDrawMode;
+        set
+        {
+            if (SetProperty(ref _isInDrawMode, value))
+                OnPropertyChanged(nameof(IsHitTestable));
+        }
+    }
+
+    /// <summary>
+    /// Whether this annotation should receive pointer events.
+    /// True when in draw mode OR when the annotation is selected.
+    /// </summary>
+    public bool IsHitTestable => IsInDrawMode || IsSelected;
 }

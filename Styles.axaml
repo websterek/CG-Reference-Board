@@ -14,14 +14,13 @@
     <!-- Cell Root – idle state                                     -->
     <!-- ═══════════════════════════════════════════════════════════ -->
     <Style Selector="Border.CellRoot">
-        <Setter Property="BorderBrush" Value="#1AFFFFFF" />
+        <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="CornerRadius" Value="6" />
         <Setter Property="ClipToBounds" Value="True" />
         <Setter Property="Transitions">
             <Transitions>
                 <BrushTransition Property="BorderBrush" Duration="0:0:0.15" />
-                <BrushTransition Property="Background" Duration="0:0:0.15" />
                 <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.2" />
             </Transitions>
         </Setter>
@@ -30,9 +29,8 @@
 
     <!-- Cell Root – hover state -->
     <Style Selector="Border.CellRoot:pointerover">
-        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-        <Setter Property="Background" Value="{StaticResource AccentBrushDim}" />
-        <Setter Property="BoxShadow" Value="0 4 16 0 #3044AAFF" />
+        <Setter Property="BorderBrush" Value="#5088CCFF" />
+        <Setter Property="BoxShadow" Value="0 2 8 0 #18000000" />
     </Style>
 
     <!-- ═══════════════════════════════════════════════════════════ -->
@@ -48,6 +46,21 @@
     </Style>
     <Style Selector="Border.CellRoot:pointerover Border#ResizeThumb">
         <Setter Property="Opacity" Value="0.7" />
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Video Play Overlay – show on cell hover                    -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <Style Selector="Border.VideoPlayOverlay">
+        <Setter Property="Opacity" Value="0" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.15" />
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Border.CellRoot:pointerover Border.VideoPlayOverlay">
+        <Setter Property="Opacity" Value="1" />
     </Style>
 
     <!-- ═══════════════════════════════════════════════════════════ -->
@@ -147,9 +160,9 @@
     <!-- Selection Highlights                                       -->
     <!-- ═══════════════════════════════════════════════════════════ -->
     <Style Selector="Border.SelectionHighlight">
-        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-        <Setter Property="BorderThickness" Value="2.5" />
-        <Setter Property="Background" Value="{StaticResource SelectionBrush}" />
+        <Setter Property="BorderBrush" Value="#AA44AAFF" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Background" Value="Transparent" />
         <Setter Property="CornerRadius" Value="6" />
         <Setter Property="IsHitTestVisible" Value="False" />
     </Style>

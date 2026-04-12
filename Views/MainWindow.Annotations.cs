@@ -78,42 +78,20 @@ public partial class MainWindow
         if (_isViewMode || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             return;
 
-        // Grid mode: click annotation to select it and enable grid-snapped dragging
-        if (!IsDrawMode && sender is Control { DataContext: AnnotationViewModel annGrid })
+        // Grid mode: drag already-selected annotations (unselected ones are not hit-testable)
+        if (!IsDrawMode && sender is Control { DataContext: AnnotationViewModel annGrid } && annGrid.IsSelected)
         {
-            bool isCtrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
-
-            if (isCtrl)
+            _isDraggingAnnotations = true;
+            _annotationDragCellOriginals = _selectedCells.Select(c => (c, c.CanvasX, c.CanvasY)).ToList();
+            foreach (var (c, _, _) in _annotationDragCellOriginals)
+                c.IsDragging = true;
+            var mainCanvas = this.FindControl<Canvas>("MainCanvas");
+            if (mainCanvas != null)
             {
-                annGrid.IsSelected = !annGrid.IsSelected;
-                if (annGrid.IsSelected)
-                    _selectedAnnotations.Add(annGrid);
-                else
-                    _selectedAnnotations.Remove(annGrid);
+                _annotationDragStart = e.GetPosition(mainCanvas);
             }
-            else
-            {
-                if (!annGrid.IsSelected)
-                {
-                    ClearSelection();
-                    annGrid.IsSelected = true;
-                    _selectedAnnotations.Add(annGrid);
-                }
-
-                _isDraggingAnnotations = true;
-                _annotationDragCellOriginals = _selectedCells.Select(c => (c, c.CanvasX, c.CanvasY)).ToList();
-                foreach (var (c, _, _) in _annotationDragCellOriginals)
-                    c.IsDragging = true;
-                var mainCanvas = this.FindControl<Canvas>("MainCanvas");
-                if (mainCanvas != null)
-                {
-                    _annotationDragStart = e.GetPosition(mainCanvas);
-                }
-                e.Pointer.Capture(sender as Control);
-            }
-
+            e.Pointer.Capture(sender as Control);
             e.Handled = true;
-            UpdateSelectionState();
             return;
         }
 

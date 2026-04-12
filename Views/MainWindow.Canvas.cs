@@ -102,7 +102,8 @@ public partial class MainWindow
             {
                 Type = CurrentTool,
                 Color = CurrentBrushColor,
-                Thickness = CurrentBrushThickness
+                Thickness = CurrentBrushThickness,
+                IsInDrawMode = true
             };
 
             var pt = e.GetPosition(mainCanvas);
@@ -715,6 +716,34 @@ public partial class MainWindow
         _scale.ScaleY = scale;
         _translate.X = viewportWidth / 2 / scale - (minX + maxX) / 2;
         _translate.Y = viewportHeight / 2 / scale - (minY + maxY) / 2;
+        OnPropertyChanged(nameof(ZoomLevelText));
+    }
+
+    /// <summary>
+    /// Zooms to a specific cell, filling the screen completely (fit to longest edge, no padding).
+    /// Centers the cell in the viewport.
+    /// </summary>
+    private void ZoomToCell(CellViewModel cell)
+    {
+        double contentWidth = cell.PixelWidth;
+        double contentHeight = cell.PixelHeight;
+        double viewportWidth = MainCanvas.Bounds.Width > 0 ? MainCanvas.Bounds.Width : this.Bounds.Width;
+        double viewportHeight = MainCanvas.Bounds.Height > 0 ? MainCanvas.Bounds.Height : this.Bounds.Height;
+
+        // No padding - fill screen completely
+        double scaleX = contentWidth > 0 ? viewportWidth / contentWidth : 2.0;
+        double scaleY = contentHeight > 0 ? viewportHeight / contentHeight : 2.0;
+        double scale = Math.Clamp(Math.Min(scaleX, scaleY), Constants.MinZoom, 2.0);
+
+        _scale.ScaleX = scale;
+        _scale.ScaleY = scale;
+
+        // Center the cell in the viewport (use VisualX/VisualY for correct backdrop positioning)
+        double cellCenterX = cell.VisualX + contentWidth / 2;
+        double cellCenterY = cell.VisualY + contentHeight / 2;
+        _translate.X = viewportWidth / 2 / scale - cellCenterX;
+        _translate.Y = viewportHeight / 2 / scale - cellCenterY;
+
         OnPropertyChanged(nameof(ZoomLevelText));
     }
 

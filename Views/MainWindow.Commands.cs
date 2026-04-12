@@ -315,6 +315,33 @@ public partial class MainWindow
             PlatformHelper.ShowInFileExplorer(cell.VideoPath ?? cell.FilePath ?? "");
     }
 
+    private void OpenNative_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { DataContext: CellViewModel cell })
+            return;
+
+        string? pathToOpen = cell.IsImage ? cell.FilePath
+                           : cell.IsVideo ? cell.VideoPath
+                           : null;
+
+        if (!string.IsNullOrEmpty(pathToOpen) && File.Exists(pathToOpen))
+            PlatformHelper.OpenWithDefaultApp(pathToOpen);
+    }
+
+    private void EditText_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { DataContext: CellViewModel cell })
+            return;
+        if (!cell.IsText && !cell.IsBoardElement)
+            return;
+
+        FullImage.IsVisible = false;
+        FullText.IsVisible = true;
+        FullText.Text = cell.TextContent;
+        _editingTextCell = cell;
+        FullMediaOverlay.IsVisible = true;
+    }
+
     private void ChangeColor_Click(object? sender, RoutedEventArgs e)
     {
         if (sender is not MenuItem { DataContext: CellViewModel cell })
@@ -1333,12 +1360,44 @@ public partial class MainWindow
         if (sender is not Control { DataContext: CellViewModel cell })
             return;
 
-        string? pathToOpen = cell.IsImage ? cell.FilePath
-                           : cell.IsVideo ? cell.VideoPath
-                           : null;
+        bool isShift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
 
-        if (!string.IsNullOrEmpty(pathToOpen) && File.Exists(pathToOpen))
-            PlatformHelper.OpenWithDefaultApp(pathToOpen);
+        if (cell.IsVideo)
+        {
+            // Video: Always open in native player
+            string? videoPath = cell.VideoPath;
+            if (!string.IsNullOrEmpty(videoPath) && File.Exists(videoPath))
+                PlatformHelper.OpenWithDefaultApp(videoPath);
+
+            // Normal double-click also zooms to the video
+            if (!isShift)
+            {
+                ClearSelection();
+                cell.IsSelected = true;
+                _selectedCells.Add(cell);
+                UpdateSelectionState();
+                ZoomToCell(cell);
+            }
+        }
+        else if (cell.IsImage)
+        {
+            if (isShift)
+            {
+                // Shift+double-click: Open in system image viewer
+                string? imagePath = cell.FilePath;
+                if (!string.IsNullOrEmpty(imagePath) && File.Exists(imagePath))
+                    PlatformHelper.OpenWithDefaultApp(imagePath);
+            }
+            else
+            {
+                // Normal double-click: Zoom to fill screen completely
+                ClearSelection();
+                cell.IsSelected = true;
+                _selectedCells.Add(cell);
+                UpdateSelectionState();
+                ZoomToCell(cell);
+            }
+        }
     }
 
     private void CanvasText_DoubleTapped(object? sender, TappedEventArgs e)
@@ -1348,11 +1407,26 @@ public partial class MainWindow
         if (!cell.IsText && !cell.IsBoardElement)
             return;
 
-        FullImage.IsVisible = false;
-        FullText.IsVisible = true;
-        FullText.Text = cell.TextContent;
-        _editingTextCell = cell;
-        FullMediaOverlay.IsVisible = true;
+        bool isShift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+
+        if (isShift)
+        {
+            // Shift+double-click: Open text editor
+            FullImage.IsVisible = false;
+            FullText.IsVisible = true;
+            FullText.Text = cell.TextContent;
+            _editingTextCell = cell;
+            FullMediaOverlay.IsVisible = true;
+        }
+        else
+        {
+            // Normal double-click: Zoom to fill screen completely
+            ClearSelection();
+            cell.IsSelected = true;
+            _selectedCells.Add(cell);
+            UpdateSelectionState();
+            ZoomToCell(cell);
+        }
     }
 
     private void FullText_TextChanged(object? sender, TextChangedEventArgs e)
