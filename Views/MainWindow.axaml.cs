@@ -82,6 +82,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     /// </summary>
     private void RestoreBoardState(string json)
     {
+        // Dispose existing cell bitmaps before discarding the view-models
+        foreach (var c in GridCells)
+            c.UnloadImage();
+
         GridCells.Clear();
         Annotations.Clear();
         _selectedAnnotations.Clear();
@@ -247,6 +251,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     /// <summary>Application version string for the status bar.</summary>
     public string VersionText => $"v{Constants.AppVersion}";
 
+    /// <summary>Memory usage summary for the status bar (loaded image count + working set).</summary>
+    public string MemoryUsageText
+    {
+        get
+        {
+            int loaded = GridCells.Count(c => c.NeedsImage && c.Image != null);
+            int total = GridCells.Count(c => c.NeedsImage);
+            long mb = System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
+            return total > 0 ? $"IMG {loaded}/{total} | {mb} MB" : $"{mb} MB";
+        }
+    }
+
     /// <summary>Number of currently selected items for the status bar.</summary>
     public string SelectionCountText
     {
@@ -370,6 +386,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     // Toast notification
     private System.Threading.CancellationTokenSource? _toastCts;
 
+    // Viewport-aware LOD management (polls transform state to detect pan/zoom changes)
+    private Avalonia.Threading.DispatcherTimer? _viewportLodTimer;
+    private double _lastViewportTx = double.NaN;
+    private double _lastViewportTy = double.NaN;
+    private double _lastViewportScale = double.NaN;
+    private double _lastViewportW = double.NaN;
+    private double _lastViewportH = double.NaN;
+    private int _lastViewportCellCount = -1;
+    private bool _lodUpdateInProgress;
+
     #endregion
 
 
@@ -419,6 +445,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         AddHandler(DragDrop.DropEvent, OnDrop);
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
 
+        // Start the viewport LOD polling timer (recalculates image detail levels)
+        InitViewportLodTimer();
+
         // Auto-load a board passed via command line
         if (!string.IsNullOrEmpty(startFile) && File.Exists(startFile))
         {
@@ -451,6 +480,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
             string json = File.ReadAllText(_currentBoardFile);
 
+            // Dispose existing cell bitmaps and clear colour caches
+            foreach (var c in GridCells)
+                c.UnloadImage();
+            ImageManager.ClearCaches();
+
             GridCells.Clear();
             Annotations.Clear();
             _selectedAnnotations.Clear();
@@ -471,7 +505,20 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _redoStack.Clear();
             SaveBoardData();
 
-            Avalonia.Threading.Dispatcher.UIThread.Post(() => ShowAll_Click(null, null!));
+            // For cells loaded from older .cgrb files without a saved PlaceholderColor,
+            // kick off background average-colour computation so the placeholder rects
+            // show a meaningful colour instead of default dark grey.
+            foreach (var cell in GridCells)
+            {
+                if (cell.NeedsImage && cell.PlaceholderColor == "#FF2A2A2A")
+                    _ = cell.EnsurePlaceholderColorAsync();
+            }
+
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                ShowAll_Click(null, null!);
+                ScheduleViewportUpdate();
+            });
         }
         catch (Exception ex)
         {
@@ -910,6 +957,135 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         catch (TaskCanceledException)
         {
             // New toast replaced this one — that's fine
+        }
+    }
+
+    #endregion
+
+    #region Viewport LOD Management
+
+    /// <summary>
+    /// Initialises a <see cref="Avalonia.Threading.DispatcherTimer"/> that polls the
+    /// current pan/zoom transform every 200 ms and triggers an LOD recalculation
+    /// whenever the viewport changes. Polling avoids having to modify every
+    /// zoom/pan code-path in Canvas.cs.
+    /// </summary>
+    private void InitViewportLodTimer()
+    {
+        _viewportLodTimer = new Avalonia.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(200)
+        };
+        _viewportLodTimer.Tick += ViewportLodTimer_Tick;
+        _viewportLodTimer.Start();
+    }
+
+    /// <summary>Timer callback — fires on the UI thread.</summary>
+    private void ViewportLodTimer_Tick(object? sender, EventArgs e)
+    {
+        double tx = _translate.X;
+        double ty = _translate.Y;
+        double sc = _scale.ScaleX;
+        int count = GridCells.Count;
+        double vw = MainCanvas.Bounds.Width > 0 ? MainCanvas.Bounds.Width : this.Bounds.Width;
+        double vh = MainCanvas.Bounds.Height > 0 ? MainCanvas.Bounds.Height : this.Bounds.Height;
+
+        // Skip if nothing relevant changed since last tick.
+        if (tx == _lastViewportTx && ty == _lastViewportTy
+            && sc == _lastViewportScale && count == _lastViewportCellCount
+            && vw == _lastViewportW && vh == _lastViewportH)
+            return;
+
+        _lastViewportTx = tx;
+        _lastViewportTy = ty;
+        _lastViewportScale = sc;
+        _lastViewportCellCount = count;
+        _lastViewportW = vw;
+        _lastViewportH = vh;
+
+        if (_lodUpdateInProgress)
+            return;
+        _ = UpdateViewportLodAsync();
+
+        // Refresh the memory indicator in the status bar.
+        OnPropertyChanged(nameof(MemoryUsageText));
+    }
+
+    /// <summary>
+    /// Forces the next timer tick to recalculate LODs regardless of whether
+    /// the cached transform values have changed.
+    /// </summary>
+    public void ScheduleViewportUpdate()
+    {
+        _lastViewportScale = double.NaN;
+    }
+
+    /// <summary>
+    /// Iterates every image/video cell and transitions it to the LOD tier
+    /// appropriate for its current on-screen size and visibility.
+    /// Heavy I/O (bitmap decode) is performed on the thread-pool; only the
+    /// final <c>Image</c> property assignment happens on the UI thread.
+    /// </summary>
+    private async Task UpdateViewportLodAsync()
+    {
+        _lodUpdateInProgress = true;
+        try
+        {
+            double scale = _scale.ScaleX;
+            double tx = _translate.X;
+            double ty = _translate.Y;
+
+            // Determine viewport size in screen pixels (same pattern as ShowAll_Click).
+            double viewW = MainCanvas.Bounds.Width > 0 ? MainCanvas.Bounds.Width : this.Bounds.Width;
+            double viewH = MainCanvas.Bounds.Height > 0 ? MainCanvas.Bounds.Height : this.Bounds.Height;
+            if (viewW <= 0 || viewH <= 0)
+                return;
+
+            // Convert viewport rect to canvas coordinates.
+            //   screen = (canvas + translate) × scale
+            //   canvas = screen / scale − translate
+            double vpLeft = -tx;
+            double vpTop = -ty;
+            double vpRight = viewW / scale - tx;
+            double vpBottom = viewH / scale - ty;
+
+            // Generous margin (2 grid cells) to pre-load cells about to scroll into view.
+            double margin = Constants.GridSize * 2;
+            vpLeft -= margin;
+            vpTop -= margin;
+            vpRight += margin;
+            vpBottom += margin;
+
+            var tasks = new System.Collections.Generic.List<Task>();
+
+            foreach (var cell in GridCells)
+            {
+                if (!cell.NeedsImage)
+                    continue;
+
+                // Cell bounding rectangle in canvas coordinates.
+                double cellLeft = cell.CanvasX;
+                double cellTop = cell.CanvasY;
+                double cellRight = cellLeft + cell.PixelWidth;
+                double cellBottom = cellTop + cell.PixelHeight;
+
+                bool isVisible = cellRight > vpLeft && cellLeft < vpRight
+                              && cellBottom > vpTop && cellTop < vpBottom;
+
+                double cellScreenWidth = cell.PixelWidth * scale;
+
+                var targetLod = ImageManager.DetermineLod(cellScreenWidth, isVisible);
+
+                if (targetLod != cell.CurrentLod)
+                    tasks.Add(cell.ApplyLodAsync(targetLod));
+            }
+
+            if (tasks.Count > 0)
+                await Task.WhenAll(tasks);
+        }
+        finally
+        {
+            _lodUpdateInProgress = false;
         }
     }
 

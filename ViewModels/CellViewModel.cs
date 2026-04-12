@@ -1,6 +1,10 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using CGReferenceBoard.Helpers;
 using CGReferenceBoard.Models;
+using CGReferenceBoard.Services;
 
 namespace CGReferenceBoard.ViewModels;
 
@@ -108,6 +112,8 @@ public class CellViewModel : ViewModelBase
             OnPropertyChanged(nameof(ShowIcon));
             OnPropertyChanged(nameof(TypeIcon));
             OnPropertyChanged(nameof(ZIndex));
+            OnPropertyChanged(nameof(NeedsImage));
+            OnPropertyChanged(nameof(ShowPlaceholder));
         }
     }
 
@@ -199,6 +205,12 @@ public class CellViewModel : ViewModelBase
 
     /// <summary>Whether to show the type icon overlay (shown for content cells, hidden for board elements).</summary>
     public bool ShowIcon => HasContent && !IsBoardElement;
+
+    /// <summary>True when this cell type uses a bitmap (Image or Video).</summary>
+    public bool NeedsImage => Type == CellType.Image || Type == CellType.Video;
+
+    /// <summary>True when the placeholder color rect should be shown instead of an image.</summary>
+    public bool ShowPlaceholder => NeedsImage && _image == null;
 
     /// <summary>
     /// Collision layer for overlap prevention. Cells only block each other within the same layer.
@@ -336,7 +348,174 @@ public class CellViewModel : ViewModelBase
     public Bitmap? Image
     {
         get => _image;
-        set => SetProperty(ref _image, value);
+        set
+        {
+            if (SetProperty(ref _image, value))
+                OnPropertyChanged(nameof(ShowPlaceholder));
+        }
+    }
+
+    #endregion
+
+    #region LOD (Level-of-Detail) Image Lifecycle
+
+    private string _placeholderColor = "#FF2A2A2A";
+    /// <summary>
+    /// Average colour of the source image, shown as a placeholder rectangle
+    /// when the full bitmap is not loaded (off-screen or zoomed far out).
+    /// Persisted in the .cgrb file so we never need to decode just for the colour.
+    /// </summary>
+    public string PlaceholderColor
+    {
+        get => _placeholderColor;
+        set => SetProperty(ref _placeholderColor, value);
+    }
+
+    private string? _thumbnailPath;
+    /// <summary>
+    /// Path to a small (~200 px wide) JPEG thumbnail generated on first load.
+    /// Stored in a .thumbs subdirectory next to the source image.
+    /// Not persisted — regenerated on demand.
+    /// </summary>
+    public string? ThumbnailPath
+    {
+        get => _thumbnailPath;
+        set => SetProperty(ref _thumbnailPath, value);
+    }
+
+    private ImageLod _currentLod = ImageLod.Full;
+    /// <summary>The LOD tier currently loaded for this cell's image.</summary>
+    public ImageLod CurrentLod
+    {
+        get => _currentLod;
+        private set => SetProperty(ref _currentLod, value);
+    }
+
+    /// <summary>
+    /// Serial token incremented on every LOD transition.
+    /// Used to discard stale async loads that complete after a newer request.
+    /// </summary>
+    private int _lodToken;
+
+    /// <summary>
+    /// Transitions this cell to the requested LOD, loading or unloading the bitmap
+    /// as needed. Safe to call repeatedly — no-ops if already at the target LOD.
+    /// Must be called on the UI thread; the heavy I/O runs on the thread-pool.
+    /// </summary>
+    public async Task ApplyLodAsync(ImageLod target)
+    {
+        // Only image / video cells have bitmaps to manage.
+        if (!NeedsImage)
+            return;
+
+        // Already at the target level — nothing to do.
+        if (target == _currentLod && (_currentLod == ImageLod.Placeholder || _image != null))
+            return;
+
+        int token = Interlocked.Increment(ref _lodToken);
+
+        if (target == ImageLod.Placeholder)
+        {
+            var old = _image;
+            Image = null;
+            CurrentLod = ImageLod.Placeholder;
+            old?.Dispose();
+            return;
+        }
+
+        // Capture paths for the background closure.
+        var filePath = _filePath;
+        var thumbPath = _thumbnailPath;
+
+        // All I/O (File.Exists, thumbnail generation, bitmap decode) on thread-pool.
+        Bitmap? newBitmap = null;
+        try
+        {
+            newBitmap = await Task.Run(async () =>
+            {
+                string? pathToLoad = null;
+
+                if (target == ImageLod.Thumbnail)
+                {
+                    if (thumbPath == null || !System.IO.File.Exists(thumbPath))
+                    {
+                        thumbPath = await ImageManager.EnsureThumbnailAsync(filePath);
+                    }
+                    pathToLoad = thumbPath ?? filePath;
+                }
+                else
+                {
+                    pathToLoad = filePath;
+                }
+
+                if (string.IsNullOrEmpty(pathToLoad) || !System.IO.File.Exists(pathToLoad))
+                    return null;
+
+                try
+                { return new Bitmap(pathToLoad); }
+                catch { return null; }
+            });
+        }
+        catch
+        {
+            return;
+        }
+
+        if (token != _lodToken)
+        {
+            newBitmap?.Dispose();
+            return;
+        }
+
+        // If decode failed, fall back to placeholder to avoid infinite retry.
+        if (newBitmap == null)
+        {
+            CurrentLod = ImageLod.Placeholder;
+            return;
+        }
+
+        // Update thumbnail path if it was generated during this load.
+        if (target == ImageLod.Thumbnail && thumbPath != _thumbnailPath)
+            _thumbnailPath = thumbPath;
+
+        var oldBitmap = _image;
+        Image = newBitmap;
+        CurrentLod = target;
+        oldBitmap?.Dispose();
+    }
+
+    /// <summary>
+    /// Unloads the bitmap (sets Image to null) and drops to the Placeholder LOD.
+    /// Equivalent to <c>ApplyLodAsync(ImageLod.Placeholder)</c> but synchronous.
+    /// </summary>
+    public void UnloadImage()
+    {
+        if (_image == null && _currentLod == ImageLod.Placeholder)
+            return;
+
+        Interlocked.Increment(ref _lodToken); // cancel any in-flight loads
+
+        var old = _image;
+        Image = null;
+        CurrentLod = ImageLod.Placeholder;
+        old?.Dispose();
+    }
+
+    /// <summary>
+    /// Ensures <see cref="PlaceholderColor"/> is populated by computing the average
+    /// colour from the source image. Runs the heavy work on the thread-pool.
+    /// </summary>
+    public async Task EnsurePlaceholderColorAsync()
+    {
+        if (!NeedsImage || string.IsNullOrEmpty(_filePath))
+            return;
+
+        // Skip if we already have a meaningful (non-default) colour.
+        if (_placeholderColor != "#FF2A2A2A")
+            return;
+
+        var color = await ImageManager.ComputeAverageColorAsync(_filePath);
+        PlaceholderColor = color;
     }
 
     #endregion
@@ -344,15 +523,62 @@ public class CellViewModel : ViewModelBase
     #region Content Setters
 
     /// <summary>
+    /// Configures this cell as an Image without loading any bitmap.
+    /// Used during board deserialization so the viewport LOD system
+    /// can decide the appropriate detail level later.
+    /// </summary>
+    public void SetImageDeferred(string path)
+    {
+        FilePath = path;
+        Type = CellType.Image;
+        CurrentLod = ImageLod.Placeholder;
+        // Image stays null — the viewport timer will call ApplyLodAsync when visible.
+    }
+
+    /// <summary>
+    /// Configures this cell as a Video without loading any bitmap.
+    /// Used during board deserialization so the viewport LOD system
+    /// can decide the appropriate detail level later.
+    /// </summary>
+    public void SetVideoDeferred(string videoPath, string thumbPath)
+    {
+        FilePath = thumbPath;
+        VideoPath = videoPath;
+        Type = CellType.Video;
+        CurrentLod = ImageLod.Placeholder;
+        // Image stays null — the viewport timer will call ApplyLodAsync when visible.
+    }
+
+    /// <summary>
     /// Loads an image from disk and sets this cell to Image type.
+    /// The image is loaded at full LOD immediately (for newly-placed cells that are on-screen).
     /// </summary>
     public void SetImage(string path)
     {
         try
         {
+            var old = _image;
             Image = new Bitmap(path);
+            old?.Dispose();
             FilePath = path;
             Type = CellType.Image;
+            CurrentLod = ImageLod.Full;
+
+            // Kick off background work: thumbnail + average colour.
+            var bgToken = Interlocked.Increment(ref _lodToken);
+            _ = Task.Run(async () =>
+            {
+                var thumb = await ImageManager.EnsureThumbnailAsync(path);
+                var color = await ImageManager.ComputeAverageColorAsync(path);
+
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    if (bgToken != _lodToken)
+                        return; // cell was cleared/reassigned
+                    ThumbnailPath = thumb;
+                    PlaceholderColor = color;
+                });
+            });
         }
         catch
         {
@@ -367,10 +593,29 @@ public class CellViewModel : ViewModelBase
     {
         try
         {
+            var old = _image;
             Image = new Bitmap(thumbPath);
+            old?.Dispose();
             FilePath = thumbPath;
             VideoPath = videoPath;
             Type = CellType.Video;
+            CurrentLod = ImageLod.Full;
+
+            // Kick off background work: thumbnail + average colour.
+            var bgToken = Interlocked.Increment(ref _lodToken);
+            _ = Task.Run(async () =>
+            {
+                var thumb = await ImageManager.EnsureThumbnailAsync(thumbPath);
+                var color = await ImageManager.ComputeAverageColorAsync(thumbPath);
+
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    if (bgToken != _lodToken)
+                        return; // cell was cleared/reassigned
+                    ThumbnailPath = thumb;
+                    PlaceholderColor = color;
+                });
+            });
         }
         catch
         {
@@ -386,7 +631,9 @@ public class CellViewModel : ViewModelBase
         TextContent = text;
         if (!IsBoardElement)
             Type = CellType.Text;
+        var old = _image;
         Image = null;
+        old?.Dispose();
         FilePath = null;
     }
 
@@ -395,11 +642,17 @@ public class CellViewModel : ViewModelBase
     /// </summary>
     public void Clear()
     {
+        Interlocked.Increment(ref _lodToken);
+        var old = _image;
         Type = CellType.None;
         Image = null;
         TextContent = null;
         FilePath = null;
         VideoPath = null;
+        ThumbnailPath = null;
+        PlaceholderColor = "#FF2A2A2A";
+        CurrentLod = ImageLod.Placeholder;
+        old?.Dispose();
     }
 
     #endregion

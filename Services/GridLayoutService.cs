@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Avalonia;
-using Avalonia.Media.Imaging;
 using CGReferenceBoard.Helpers;
 using CGReferenceBoard.Models;
 using CGReferenceBoard.ViewModels;
+using SkiaSharp;
 
 namespace CGReferenceBoard.Services;
 
@@ -161,9 +161,12 @@ public static class GridLayoutService
     {
         try
         {
-            using var stream = File.OpenRead(imagePath);
-            using var bitmap = new Bitmap(stream);
-            return new Size(bitmap.PixelSize.Width, bitmap.PixelSize.Height);
+            // Use SKCodec to read only the file header — avoids decoding the full bitmap.
+            using var codec = SKCodec.Create(imagePath);
+            if (codec == null)
+                return null;
+            var info = codec.Info;
+            return new Size(info.Width, info.Height);
         }
         catch
         {

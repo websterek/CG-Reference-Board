@@ -937,6 +937,14 @@
                                                 </Border.Effect>
                                             </Border>
 
+                                            <!-- Placeholder color rect (shown when image bitmap is not loaded) -->
+                                            <Border
+                                                IsVisible="{Binding ShowPlaceholder}"
+                                                Background="{Binding PlaceholderColor}"
+                                                CornerRadius="2"
+                                                IsHitTestVisible="False"
+                                            />
+
                                             <!-- Image Content -->
                                             <Border
                                                 IsVisible="{Binding IsImage}"
@@ -1308,7 +1316,7 @@
                 Padding="12,3"
                 Height="26"
             >
-                <Grid ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto, Auto, Auto, Auto">
+                <Grid ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto, Auto, Auto, Auto, Auto, Auto">
                     <!-- Mode indicator -->
                     <StackPanel
                         Grid.Column="0"
@@ -1368,9 +1376,19 @@
 
                     <Border Grid.Column="7" Classes="statusDivider" />
 
-                    <!-- App version -->
+                    <!-- Memory / LOD indicator -->
                     <TextBlock
                         Grid.Column="8"
+                        Text="{Binding MemoryUsageText}"
+                        Classes="statusText"
+                        Opacity="0.6"
+                    />
+
+                    <Border Grid.Column="9" Classes="statusDivider" />
+
+                    <!-- App version -->
+                    <TextBlock
+                        Grid.Column="10"
                         Text="{Binding VersionText}"
                         Classes="statusText"
                         Opacity="0.5"
