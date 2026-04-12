@@ -14,6 +14,9 @@ public static class Constants
     /// <summary>Maximum number of recently opened boards to remember.</summary>
     public const int MaxRecentBoards = 5;
 
+    /// <summary>Maximum number of undo snapshots to keep in memory.</summary>
+    public const int MaxUndoDepth = 5;
+
     /// <summary>Application display name.</summary>
     public const string AppName = "CG Reference Board";
 

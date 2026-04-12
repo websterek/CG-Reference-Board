@@ -452,7 +452,7 @@ public class CellViewModel : ViewModelBase
                     return null;
 
                 try
-                { return new Bitmap(pathToLoad); }
+                { return ImageManager.LoadBitmapFromPath(pathToLoad, target == ImageLod.Full); }
                 catch { return null; }
             });
         }
@@ -558,7 +558,7 @@ public class CellViewModel : ViewModelBase
         try
         {
             var old = _image;
-            Image = new Bitmap(path);
+            Image = ImageManager.LoadBitmapFromPath(path, capSize: true) ?? new Bitmap(path);
             old?.Dispose();
             FilePath = path;
             Type = CellType.Image;
@@ -594,7 +594,7 @@ public class CellViewModel : ViewModelBase
         try
         {
             var old = _image;
-            Image = new Bitmap(thumbPath);
+            Image = ImageManager.LoadBitmapFromPath(thumbPath, capSize: true) ?? new Bitmap(thumbPath);
             old?.Dispose();
             FilePath = thumbPath;
             VideoPath = videoPath;

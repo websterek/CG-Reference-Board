@@ -35,6 +35,13 @@ public static class ImageManager
     private const int ThumbnailMaxWidth = 200;
     private const int ColorSampleGrid = 8; // sample an 8×8 grid for average color
 
+    /// <summary>
+    /// Maximum decoded pixel width for Full-LOD bitmaps.
+    /// Images wider than this are downscaled during decode to limit memory.
+    /// 2048 px provides ample quality for cells up to 5× zoom.
+    /// </summary>
+    private const int MaxFullDecodeWidth = 2048;
+
     // ───────── caches ─────────
     // Average color cache: filePath → hex string  e.g. "#FF3A2B1C"
     private static readonly ConcurrentDictionary<string, string> _colorCache = new();
@@ -191,6 +198,89 @@ public static class ImageManager
     public static Task<string> ComputeAverageColorAsync(string? imagePath)
         => Task.Run(() => ComputeAverageColor(imagePath));
 
+    // ───────── capped bitmap loading ─────────
+
+    /// <summary>
+    /// Loads an Avalonia Bitmap from disk, downscaling images wider than
+    /// <paramref name="maxWidth"/> during decode to limit memory consumption.
+    /// Returns null on failure.
+    /// </summary>
+    private static Bitmap? LoadBitmapCapped(string path, int maxWidth)
+    {
+        try
+        {
+            using var codec = SKCodec.Create(path);
+            if (codec == null)
+                return new Bitmap(path); // fallback if SkiaSharp can't read it
+
+            var info = codec.Info;
+            if (info.Width <= maxWidth)
+                return new Bitmap(path); // already small enough
+
+            // Decode at reduced resolution via sample-size trick
+            int sampleSize = Math.Max(1, info.Width / maxWidth);
+            var scaledInfo = new SKImageInfo(
+                Math.Max(1, info.Width / sampleSize),
+                Math.Max(1, info.Height / sampleSize),
+                SKColorType.Rgba8888,
+                SKAlphaType.Premul);
+
+            using var skBitmap = new SKBitmap(scaledInfo);
+            var result = codec.GetPixels(scaledInfo, skBitmap.GetPixels());
+            if (result != SKCodecResult.Success && result != SKCodecResult.IncompleteInput)
+                return new Bitmap(path);
+
+            // Resize to exact target width for consistent quality
+            double scale = (double)maxWidth / skBitmap.Width;
+            int targetW = maxWidth;
+            int targetH = Math.Max(1, (int)(skBitmap.Height * scale));
+
+            using var resized = skBitmap.Resize(
+                new SKImageInfo(targetW, targetH, SKColorType.Rgba8888, SKAlphaType.Premul),
+                SKSamplingOptions.Default);
+            var source = resized ?? skBitmap;
+
+            // Encode to a compact in-memory format, then create the Avalonia Bitmap.
+            // Use JPEG for opaque images (fast, small), PNG when alpha is present.
+            using var image = SKImage.FromBitmap(source);
+            bool hasAlpha = info.AlphaType != SKAlphaType.Opaque;
+            using var encoded = hasAlpha
+                ? image.Encode(SKEncodedImageFormat.Png, 100)
+                : image.Encode(SKEncodedImageFormat.Jpeg, 92);
+            if (encoded == null)
+                return new Bitmap(path);
+
+            var ms = new MemoryStream();
+            encoded.SaveTo(ms);
+            ms.Position = 0;
+            return new Bitmap(ms);
+        }
+        catch
+        {
+            try
+            { return new Bitmap(path); }
+            catch { return null; }
+        }
+    }
+
+    /// <summary>
+    /// Loads a bitmap from disk. When <paramref name="capSize"/> is true,
+    /// images wider than 2048 px are downscaled during decode to save memory.
+    /// </summary>
+    public static Bitmap? LoadBitmapFromPath(string? path, bool capSize)
+    {
+        if (string.IsNullOrEmpty(path) || !File.Exists(path))
+            return null;
+        try
+        {
+            return capSize ? LoadBitmapCapped(path, MaxFullDecodeWidth) : new Bitmap(path);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     // ───────── LOD-aware bitmap loading ─────────
 
     /// <summary>
@@ -219,8 +309,8 @@ public static class ImageManager
                     return new Bitmap(thumbPath);
             }
 
-            // Full or thumbnail-fallback
-            return new Bitmap(imagePath);
+            // Full or thumbnail-fallback — cap decode width to save memory
+            return LoadBitmapCapped(imagePath, MaxFullDecodeWidth);
         }
         catch
         {

@@ -406,6 +406,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     public MainWindow(bool isViewMode, string? startFile)
     {
+        // Compact the Large Object Heap on next GC to reduce memory fragmentation
+        // from repeatedly allocated/disposed bitmap pixel buffers.
+        System.Runtime.GCSettings.LargeObjectHeapCompactionMode =
+            System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
+
         DataContext = this;
         _isViewMode = isViewMode;
         InitializeComponent();
@@ -541,6 +546,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (_undoStack.Count == 0 || _undoStack.Peek() != json)
             {
                 _undoStack.Push(json);
+
+                // Trim undo stack to prevent unbounded memory growth
+                if (_undoStack.Count > Constants.MaxUndoDepth)
+                {
+                    var items = _undoStack.ToArray(); // [newest, ..., oldest]
+                    _undoStack.Clear();
+                    for (int i = Constants.MaxUndoDepth - 1; i >= 0; i--)
+                        _undoStack.Push(items[i]);
+                }
+
                 _redoStack.Clear();
             }
         }
@@ -1081,7 +1096,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             }
 
             if (tasks.Count > 0)
+            {
                 await Task.WhenAll(tasks);
+                // Nudge the GC to reclaim large bitmap buffers from disposed images.
+                // Optimized mode lets the GC decide whether collection is worthwhile.
+                GC.Collect(2, GCCollectionMode.Optimized, false);
+            }
         }
         finally
         {
