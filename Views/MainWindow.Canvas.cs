@@ -599,7 +599,7 @@ public partial class MainWindow
 
     private void ShowAll_Click(object? sender, RoutedEventArgs e)
     {
-        if (GridCells.Count == 0)
+        if (GridCells.Count == 0 && Annotations.Count == 0)
         {
             _translate.X = 0;
             _translate.Y = 0;
@@ -622,6 +622,26 @@ public partial class MainWindow
                 maxX = cell.CanvasX + cell.PixelWidth;
             if (cell.CanvasY + cell.PixelHeight > maxY)
                 maxY = cell.CanvasY + cell.PixelHeight;
+        }
+
+        foreach (var ann in Annotations)
+        {
+            if (ann != null)
+            {
+                foreach (var pt in ann.Points)
+                {
+                    double px = pt.X + ann.CanvasX;
+                    double py = pt.Y + ann.CanvasY;
+                    if (px < minX)
+                        minX = px;
+                    if (py < minY)
+                        minY = py;
+                    if (px > maxX)
+                        maxX = px;
+                    if (py > maxY)
+                        maxY = py;
+                }
+            }
         }
 
         double contentWidth = maxX - minX;
@@ -667,14 +687,16 @@ public partial class MainWindow
             {
                 foreach (var pt in ann.Points)
                 {
-                    if (pt.X < minX)
-                        minX = pt.X;
-                    if (pt.Y < minY)
-                        minY = pt.Y;
-                    if (pt.X > maxX)
-                        maxX = pt.X;
-                    if (pt.Y > maxY)
-                        maxY = pt.Y;
+                    double px = pt.X + ann.CanvasX;
+                    double py = pt.Y + ann.CanvasY;
+                    if (px < minX)
+                        minX = px;
+                    if (py < minY)
+                        minY = py;
+                    if (px > maxX)
+                        maxX = px;
+                    if (py > maxY)
+                        maxY = py;
                 }
             }
         }
