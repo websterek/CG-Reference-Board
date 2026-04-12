@@ -83,7 +83,22 @@ public partial class MainWindow
             return;
         }
 
-        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed
+        var isLeftButton = e.GetCurrentPoint(this).Properties.IsLeftButtonPressed;
+        var isRightButton = e.GetCurrentPoint(this).Properties.IsRightButtonPressed;
+
+        if (isRightButton && sender is Control { DataContext: CellViewModel { HasContent: true } })
+        {
+            if (!cell.IsSelected)
+            {
+                ClearSelection();
+                cell.IsSelected = true;
+                _selectedCells.Add(cell);
+                UpdateSelectionState();
+            }
+            return;
+        }
+
+        if (isLeftButton
             && sender is Control { DataContext: CellViewModel { HasContent: true } })
         {
             if (cell.IsBackdrop)
@@ -97,14 +112,14 @@ public partial class MainWindow
                         _selectedCells.Add(cell);
                     else
                         _selectedCells.Remove(cell);
-                    OnPropertyChanged(nameof(SelectionCountText));
+                    UpdateSelectionState();
                 }
                 else if (!cell.IsSelected)
                 {
                     ClearSelection();
                     cell.IsSelected = true;
                     _selectedCells.Add(cell);
-                    OnPropertyChanged(nameof(SelectionCountText));
+                    UpdateSelectionState();
                 }
 
                 _isPointerDown = true;
@@ -119,7 +134,7 @@ public partial class MainWindow
                 ClearSelection();
                 cell.IsSelected = true;
                 _selectedCells.Add(cell);
-                OnPropertyChanged(nameof(SelectionCountText));
+                UpdateSelectionState();
             }
 
             bool isCtrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
@@ -131,7 +146,7 @@ public partial class MainWindow
                     _selectedCells.Add(cell);
                 else
                     _selectedCells.Remove(cell);
-                OnPropertyChanged(nameof(SelectionCountText));
+                UpdateSelectionState();
             }
             else
             {
@@ -390,7 +405,7 @@ public partial class MainWindow
             SaveBoardData();
         }
         _isPointerDown = false;
-        OnPropertyChanged(nameof(SelectionCountText));
+        UpdateSelectionState();
     }
 
     private void ResizeThumb_PointerPressed(object? sender, PointerPressedEventArgs e)

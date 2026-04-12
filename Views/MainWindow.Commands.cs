@@ -630,7 +630,7 @@ public partial class MainWindow
             }
         }
 
-        OnPropertyChanged(nameof(SelectionCountText));
+        UpdateSelectionState();
     }
 
     private void ArrangeSelected_Click(object? sender, RoutedEventArgs e)

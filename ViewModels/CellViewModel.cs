@@ -127,6 +127,20 @@ public class CellViewModel : ViewModelBase
         set => SetProperty(ref _isSelected, value);
     }
 
+    private bool _hasMultipleSelection;
+    public bool HasMultipleSelection
+    {
+        get => _hasMultipleSelection;
+        set => SetProperty(ref _hasMultipleSelection, value);
+    }
+
+    private bool _hasSingleSelection;
+    public bool HasSingleSelection
+    {
+        get => _hasSingleSelection;
+        set => SetProperty(ref _hasSingleSelection, value);
+    }
+
     private bool _isDragInvalid;
     /// <summary>Whether this cell is being dragged to an invalid position (collision detected).</summary>
     public bool IsDragInvalid
@@ -154,6 +168,12 @@ public class CellViewModel : ViewModelBase
         get => _isHighlighted;
         set => SetProperty(ref _isHighlighted, value);
     }
+
+    public bool HasAppearanceOptions => IsBoardElement || IsFile || IsImage;
+    public bool HasArrangeOptions => !IsBackdrop;
+    public bool HasFileOptions => IsFile;
+    public bool HasTextOptions => HasTextContent;
+    public bool HasClipboardOptions => IsImage || IsFile || HasTextContent;
 
     #endregion
 

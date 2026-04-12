@@ -257,6 +257,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
 
+    public bool HasMultipleSelection => (_selectedCells.Count + _selectedAnnotations.Count) > 1;
+    public bool HasSingleSelection => (_selectedCells.Count + _selectedAnnotations.Count) == 1;
+
     /// <summary>Current mode display text for the status bar.</summary>
     public string CurrentModeText => IsDrawMode ? "Annotation" : "Grid";
 
@@ -389,6 +392,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             Constants.ConfigDirName, "Assets");
         if (!Directory.Exists(_workspaceDir))
             Directory.CreateDirectory(_workspaceDir);
+
+        GridCells.CollectionChanged += (s, e) => UpdateSelectionState();
 
         OnPropertyChanged(nameof(WindowTitle));
         CanvasGrid.ItemsSource = GridCells;
@@ -701,7 +706,22 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         foreach (var a in _selectedAnnotations)
             a.IsSelected = false;
         _selectedAnnotations.Clear();
+        UpdateSelectionState();
+    }
+
+    public void UpdateSelectionState()
+    {
         OnPropertyChanged(nameof(SelectionCountText));
+        OnPropertyChanged(nameof(HasMultipleSelection));
+        OnPropertyChanged(nameof(HasSingleSelection));
+
+        bool multi = HasMultipleSelection;
+        bool single = HasSingleSelection;
+        foreach (var cell in GridCells)
+        {
+            cell.HasMultipleSelection = multi;
+            cell.HasSingleSelection = single;
+        }
     }
 
     #endregion

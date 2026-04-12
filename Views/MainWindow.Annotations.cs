@@ -69,7 +69,7 @@ public partial class MainWindow
             }
 
             e.Handled = true;
-            OnPropertyChanged(nameof(SelectionCountText));
+            UpdateSelectionState();
             return;
         }
 

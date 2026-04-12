@@ -547,14 +547,14 @@ public partial class MainWindow
                     }
                 }
             }
-            OnPropertyChanged(nameof(SelectionCountText));
+            UpdateSelectionState();
             return;
         }
 
         _isPanning = false;
         _middleZoomAnchorSet = false;
         _middleZoomActive = false;
-        OnPropertyChanged(nameof(SelectionCountText));
+        UpdateSelectionState();
     }
 
     private void CanvasBorder_PointerExited(object? sender, PointerEventArgs e)

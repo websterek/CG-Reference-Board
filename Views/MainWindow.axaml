@@ -769,19 +769,7 @@
                                         <!-- Cell Context Menu -->
                                         <Border.ContextMenu>
                                             <ContextMenu>
-                                                <MenuItem
-                                                    Header="Toggle Image Fit"
-                                                    Click="ToggleImageFit_Click"
-                                                    IsVisible="{Binding IsImage}"
-                                                >
-                                                    <MenuItem.Icon>
-                                                        <PathIcon Data="M21 3H3C2 3 1 4 1 5V19C1 20 2 21 3 21H21C22 21 23 20 23 19V5C23 4 22 3 21 3M5 17L8.5 12.5L11 15.5L14.5 11L19 17H5Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
-                                                    </MenuItem.Icon>
-                                                </MenuItem>
-                                                <Separator
-                                                    IsVisible="{Binding IsImage}"
-                                                    Background="{StaticResource BorderBrushSubtle}"
-                                                />
+                                                <!-- Category 1: Clipboard & File -->
                                                 <MenuItem
                                                     Header="Copy Image"
                                                     Click="CopyImage_Click"
@@ -818,6 +806,33 @@
                                                         <PathIcon Data="M10 4H4C2.89 4 2 4.89 2 6V18C2 19.1 2.89 20 4 20H20C21.1 20 22 19.1 22 18V8C22 6.89 21.1 6 20 6H12L10 4Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
                                                     </MenuItem.Icon>
                                                 </MenuItem>
+
+                                                <Separator
+                                                    IsVisible="{Binding HasClipboardOptions}"
+                                                    Background="{StaticResource BorderBrushSubtle}"
+                                                />
+
+                                                <!-- Category 2: Appearance & Resizing -->
+                                                <MenuItem
+                                                    Header="Fit to Content"
+                                                    Click="FitToContent_Click"
+                                                    HotKey="Ctrl+Shift+F"
+                                                    IsVisible="{Binding IsFile}"
+                                                    IsEnabled="{Binding !HasMultipleSelection}"
+                                                >
+                                                    <MenuItem.Icon>
+                                                        <PathIcon Data="M19 12H22L18 16L14 12H17V8H19M2 14V16H12V14M2 8V10H9V8M2 2V4H12V2M10 18V20H2V18" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                                                    </MenuItem.Icon>
+                                                </MenuItem>
+                                                <MenuItem
+                                                    Header="Toggle Image Fit"
+                                                    Click="ToggleImageFit_Click"
+                                                    IsVisible="{Binding IsImage}"
+                                                >
+                                                    <MenuItem.Icon>
+                                                        <PathIcon Data="M21 3H3C2 3 1 4 1 5V19C1 20 2 21 3 21H21C22 21 23 20 23 19V5C23 4 22 3 21 3M5 17L8.5 12.5L11 15.5L14.5 11L19 17H5Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                                                    </MenuItem.Icon>
+                                                </MenuItem>
                                                 <MenuItem
                                                     Header="Change Color"
                                                     Click="ChangeColor_Click"
@@ -845,16 +860,13 @@
                                                         <PathIcon Data="M5 4V8H10V20H14V8H19V4H5Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
                                                     </MenuItem.Icon>
                                                 </MenuItem>
-                                                <MenuItem
-                                                    Header="Fit to Content"
-                                                    Click="FitToContent_Click"
-                                                    HotKey="Ctrl+Shift+F"
-                                                    IsVisible="{Binding IsFile}"
-                                                >
-                                                    <MenuItem.Icon>
-                                                        <PathIcon Data="M19 12H22L18 16L14 12H17V8H19M2 14V16H12V14M2 8V10H9V8M2 2V4H12V2M10 18V20H2V18" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
-                                                    </MenuItem.Icon>
-                                                </MenuItem>
+
+                                                <Separator
+                                                    IsVisible="{Binding HasAppearanceOptions}"
+                                                    Background="{StaticResource BorderBrushSubtle}"
+                                                />
+
+                                                <!-- Category 3: Arrangements & Grouping -->
                                                 <MenuItem
                                                     Header="Select Content"
                                                     Click="SelectContent_Click"
@@ -868,6 +880,7 @@
                                                     Header="Arrange Horizontal"
                                                     Click="ArrangeHorizontal_Click"
                                                     IsVisible="{Binding !IsBackdrop}"
+                                                    IsEnabled="{Binding HasMultipleSelection}"
                                                 >
                                                     <MenuItem.Icon>
                                                         <PathIcon Data="M4 11V13H16V11H4M4 6V8H20V6H4M4 18H12V16H4V18Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
@@ -877,6 +890,7 @@
                                                     Header="Arrange Vertical"
                                                     Click="ArrangeVertical_Click"
                                                     IsVisible="{Binding !IsBackdrop}"
+                                                    IsEnabled="{Binding HasMultipleSelection}"
                                                 >
                                                     <MenuItem.Icon>
                                                         <PathIcon Data="M4 11V13H16V11H4M4 6V8H20V6H4M4 18H12V16H4V18Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
@@ -886,12 +900,16 @@
                                                     Header="Arrange Grid"
                                                     Click="ArrangeSelected_Click"
                                                     IsVisible="{Binding !IsBackdrop}"
+                                                    IsEnabled="{Binding HasMultipleSelection}"
                                                 >
                                                     <MenuItem.Icon>
                                                         <PathIcon Data="M3 11H11V3H3M13 3V11H21V3M3 21H11V13H3M13 13V21H21V13Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
                                                     </MenuItem.Icon>
                                                 </MenuItem>
+
                                                 <Separator Background="{StaticResource BorderBrushSubtle}" />
+
+                                                <!-- Category 4: Destructive Actions -->
                                                 <MenuItem
                                                     Header="Delete"
                                                     Click="DeleteCell_Click"
