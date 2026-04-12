@@ -25,4 +25,10 @@
   <ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' Or '$(RuntimeIdentifier)' == '' ">
     <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Include\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 </Project>
