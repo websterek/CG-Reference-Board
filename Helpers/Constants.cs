@@ -100,13 +100,13 @@ public static class Constants
     public const string GridDotColor = "#2D2D2D";
 
     /// <summary>Size in pixels of each quarter-dot at tile corners (4 combine into one dot).</summary>
-    public const double GridDotSize = 1.5;
+    public const double GridDotSize = 1.0;
 
     /// <summary>Color of the grid lines drawn between intersection points.</summary>
     public const string GridLineColor = "#1E1E1E";
 
     /// <summary>Thickness in pixels of the grid lines.</summary>
-    public const double GridLineThickness = 0.5;
+    public const double GridLineThickness = 1.0;
 
     // ───────── Backdrop / Label color palettes ─────────
 

@@ -84,8 +84,8 @@
         />
 
         <!-- ═══ Cell UI Constants ═══ -->
-        <CornerRadius x:Key="CellCornerRadius">4</CornerRadius>
-        <x:Double x:Key="CellBorderThickness">1.5</x:Double>
+        <CornerRadius x:Key="CellCornerRadius">0</CornerRadius>
+        <x:Double x:Key="CellBorderThickness">2.0</x:Double>
 
         <!-- Cell hover: visible but subtle -->
         <Color x:Key="CellHoverBorderColor">#6088AAFF</Color>

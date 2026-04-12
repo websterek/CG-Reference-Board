@@ -168,49 +168,37 @@
                         <!-- Mode Menu -->
                         <MenuItem Header="_Mode" IsEnabled="{Binding !#StartupOverlay.IsVisible}">
                             <MenuItem
+                                Header="Grid"
                                 Click="GridMode_Click"
                                 ToggleType="Radio"
                                 IsChecked="{Binding !IsDrawMode}"
+                                InputGesture="Ctrl+1"
                             >
                                 <MenuItem.Icon>
                                     <PathIcon Data="M3 11H11V3H3M5 5H9V9H5M13 3V11H21V3M15 5H19V9H15M3 21H11V13H3M5 15H9V19H5M13 13V21H21V13M15 15H19V19H15Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
                                 </MenuItem.Icon>
-                                <MenuItem.Header>
-                                    <Grid ColumnDefinitions="*, Auto">
-                                        <TextBlock Grid.Column="0" Text="Grid" />
-                                        <TextBlock Grid.Column="1" Text="Ctrl+1" Foreground="{StaticResource TextMuted}" Margin="24,0,0,0" />
-                                    </Grid>
-                                </MenuItem.Header>
                             </MenuItem>
                             <MenuItem
+                                Header="Annotation"
                                 Click="AnnotationMode_Click"
                                 ToggleType="Radio"
                                 IsChecked="{Binding IsDrawMode}"
+                                InputGesture="Ctrl+2"
                             >
                                 <MenuItem.Icon>
                                     <PathIcon Data="M20.71 7.04C21.1 6.65 21.1 6 20.71 5.63L18.37 3.29C18 2.9 17.35 2.9 16.96 3.29L15.12 5.12L18.87 8.87M3 17.25V21H6.75L17.81 9.93L14.06 6.18L3 17.25Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
                                 </MenuItem.Icon>
-                                <MenuItem.Header>
-                                    <Grid ColumnDefinitions="*, Auto">
-                                        <TextBlock Grid.Column="0" Text="Annotation" />
-                                        <TextBlock Grid.Column="1" Text="Ctrl+2" Foreground="{StaticResource TextMuted}" Margin="24,0,0,0" />
-                                    </Grid>
-                                </MenuItem.Header>
                             </MenuItem>
                         </MenuItem>
 
                         <!-- View Menu -->
                         <MenuItem Header="_View" IsEnabled="{Binding !#StartupOverlay.IsVisible}">
                             <MenuItem
+                                Header="Annotation Show"
                                 ToggleType="CheckBox"
                                 IsChecked="{Binding IsAnnotationsVisible, Mode=TwoWay}"
+                                InputGesture="Shift+A"
                             >
-                                <MenuItem.Header>
-                                    <Grid ColumnDefinitions="*, Auto">
-                                        <TextBlock Grid.Column="0" Text="Annotation Show" />
-                                        <TextBlock Grid.Column="1" Text="Shift+A" Foreground="{StaticResource TextMuted}" Margin="24,0,0,0" />
-                                    </Grid>
-                                </MenuItem.Header>
                                 <MenuItem.Icon>
                                     <PathIcon Data="M20.71 7.04C21.1 6.65 21.1 6 20.71 5.63L18.37 3.29C18 2.9 17.35 2.9 16.96 3.29L15.12 5.12L18.87 8.87M3 17.25V21H6.75L17.81 9.93L14.06 6.18L3 17.25Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
                                 </MenuItem.Icon>
@@ -378,7 +366,7 @@
                             Background="#30FFFFFF"
                             BorderBrush="#80FFFFFF"
                             BorderThickness="2"
-                            CornerRadius="4"
+                            CornerRadius="0"
                         >
                             <Border.Effect>
                                 <DropShadowEffect
@@ -439,7 +427,7 @@
                                         <MenuItem
                                             Header="Brush"
                                             Click="BrushMode_Click"
-                                            ToggleType="CheckBox"
+                                            ToggleType="Radio"
                                             IsChecked="{Binding IsBrushSelected}"
                                         >
                                             <MenuItem.Icon>
@@ -449,7 +437,7 @@
                                         <MenuItem
                                             Header="Text"
                                             Click="TextMode_Click"
-                                            ToggleType="CheckBox"
+                                            ToggleType="Radio"
                                             IsChecked="{Binding IsTextSelected}"
                                         >
                                             <MenuItem.Icon>
@@ -459,7 +447,7 @@
                                         <MenuItem
                                             Header="Arrow"
                                             Click="ArrowMode_Click"
-                                            ToggleType="CheckBox"
+                                            ToggleType="Radio"
                                             IsChecked="{Binding IsArrowSelected}"
                                         >
                                             <MenuItem.Icon>
@@ -469,7 +457,7 @@
                                         <MenuItem
                                             Header="Square"
                                             Click="SquareMode_Click"
-                                            ToggleType="CheckBox"
+                                            ToggleType="Radio"
                                             IsChecked="{Binding IsRectangleSelected}"
                                         >
                                             <MenuItem.Icon>
@@ -479,7 +467,7 @@
                                         <MenuItem
                                             Header="Circle"
                                             Click="CircleMode_Click"
-                                            ToggleType="CheckBox"
+                                            ToggleType="Radio"
                                             IsChecked="{Binding IsEllipseSelected}"
                                         >
                                             <MenuItem.Icon>
@@ -489,7 +477,7 @@
                                         <MenuItem
                                             Header="Eraser"
                                             Click="EraserMode_Click"
-                                            ToggleType="CheckBox"
+                                            ToggleType="Radio"
                                             IsChecked="{Binding IsEraserSelected}"
                                         >
                                             <MenuItem.Icon>
@@ -499,7 +487,7 @@
                                         <MenuItem
                                             Header="Select/Move"
                                             Click="MoveMode_Click"
-                                            ToggleType="CheckBox"
+                                            ToggleType="Radio"
                                             IsChecked="{Binding IsMoveSelected}"
                                         >
                                             <MenuItem.Icon>
@@ -592,25 +580,22 @@
                                 <VisualBrush
                                     TileMode="Tile"
                                     SourceRect="0,0,160,160"
-                                    DestinationRect="0,0,160,160"
+                                    DestinationRect="-1.5,-1.5,160,160"
                                 >
                                     <VisualBrush.Visual>
                                         <Canvas Width="160" Height="160">
-                                            <!-- Grid lines (thin rectangles at tile edges) -->
-                                            <Rectangle Width="160" Height="0.5" Fill="#1E1E1E"
+                                            <!-- Grid lines – positioned at canvas offset 1.5
+                                                 so with DestinationRect="-1.5,-1.5,160,160" they
+                                                 land exactly on the 160-px grid boundaries -->
+                                            <Rectangle Width="160" Height="1" Fill="#1A1A1A"
+                                                Canvas.Left="0" Canvas.Top="1.5" />
+                                            <Rectangle Width="1" Height="160" Fill="#1A1A1A"
+                                                Canvas.Left="1.5" Canvas.Top="0" />
+                                            <!-- Single intersection dot (3 px circle).
+                                                 With the -1.5 tile offset, its centre lands
+                                                 exactly on each grid intersection. -->
+                                            <Ellipse Width="3" Height="3" Fill="#3D3D3D"
                                                 Canvas.Left="0" Canvas.Top="0" />
-                                            <Rectangle Width="0.5" Height="160" Fill="#1E1E1E"
-                                                Canvas.Left="0" Canvas.Top="0" />
-                                            <!-- Grid intersection dots (quarter-dots at corners;
-                                                 tiling combines them into ~3px dots at intersections) -->
-                                            <Ellipse Width="1.5" Height="1.5" Fill="#2D2D2D"
-                                                Canvas.Left="0" Canvas.Top="0" />
-                                            <Ellipse Width="1.5" Height="1.5" Fill="#2D2D2D"
-                                                Canvas.Left="158.5" Canvas.Top="0" />
-                                            <Ellipse Width="1.5" Height="1.5" Fill="#2D2D2D"
-                                                Canvas.Left="0" Canvas.Top="158.5" />
-                                            <Ellipse Width="1.5" Height="1.5" Fill="#2D2D2D"
-                                                Canvas.Left="158.5" Canvas.Top="158.5" />
                                         </Canvas>
                                     </VisualBrush.Visual>
                                 </VisualBrush>
@@ -963,7 +948,7 @@
                                                 Background="#40FFFFFF"
                                                 BorderBrush="#80FFFFFF"
                                                 BorderThickness="2"
-                                                CornerRadius="4"
+                                                CornerRadius="0"
                                                 IsVisible="{Binding IsHighlighted}"
                                                 ZIndex="7"
                                                 IsHitTestVisible="False"
@@ -980,7 +965,7 @@
                                                 Background="#60FF4444"
                                                 BorderBrush="#AAFF4444"
                                                 BorderThickness="3"
-                                                CornerRadius="4"
+                                                CornerRadius="0"
                                                 IsVisible="{Binding IsDragInvalid}"
                                                 ZIndex="9"
                                                 IsHitTestVisible="False"
@@ -1090,7 +1075,7 @@
                                                 IsVisible="{Binding IsBackdrop}"
                                                 Padding="20"
                                                 DoubleTapped="CanvasText_DoubleTapped"
-                                                CornerRadius="6"
+                                                CornerRadius="0"
                                             >
                                                 <TextBlock
                                                     local:TextBlockLinkify.Text="{Binding TextContent}"
@@ -1213,7 +1198,7 @@
                                 Text="{Binding CanvasCursor}"
                                 FontSize="16"
                                 FontWeight="Bold"
-                                Foreground="White"
+                                Foreground="{Binding CurrentBrushColorBrush}"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                             >

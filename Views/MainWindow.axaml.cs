@@ -208,8 +208,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string CurrentBrushColor
     {
         get => _currentBrushColor;
-        set { _currentBrushColor = value; OnPropertyChanged(nameof(CurrentBrushColor)); }
+        set { _currentBrushColor = value; OnPropertyChanged(nameof(CurrentBrushColor)); OnPropertyChanged(nameof(CurrentBrushColorBrush)); }
     }
+
+    /// <summary>Current brush color as a SolidColorBrush for use in XAML bindings.</summary>
+    public SolidColorBrush CurrentBrushColorBrush => SolidColorBrush.Parse(_currentBrushColor);
 
     private double _currentBrushThickness = 4.0;
     public double CurrentBrushThickness
@@ -274,10 +277,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public double ZoomInverseFactor => 1.0 / _scale.ScaleX;
 
     /// <summary>Border thickness that remains constant regardless of zoom level.</summary>
-    public Thickness ZoomIndependentBorderThickness => new Thickness(1.5 / _scale.ScaleX);
+    public Thickness ZoomIndependentBorderThickness => new Thickness(2.0 / _scale.ScaleX);
 
     /// <summary>Corner radius that remains constant regardless of zoom level.</summary>
-    public CornerRadius ZoomIndependentCornerRadius => new CornerRadius(4.0 / _scale.ScaleX);
+    public CornerRadius ZoomIndependentCornerRadius => new CornerRadius(0);
 
     /// <summary>Application version string for the status bar.</summary>
     public string VersionText => $"v{Constants.AppVersion}";
