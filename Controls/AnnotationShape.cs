@@ -3,6 +3,7 @@ using System.Collections.Specialized;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using CGReferenceBoard.Helpers;
 using CGReferenceBoard.ViewModels;
 
 namespace CGReferenceBoard.Controls;
@@ -118,7 +119,7 @@ public class AnnotationShape : Control
         var brush = SolidColorBrush.Parse(vm.Color);
         var pen = new Pen(brush, vm.Thickness, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
         var selectPen = vm.IsSelected
-            ? new Pen(Brushes.White, vm.Thickness + 4, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round)
+            ? new Pen(SolidColorBrush.Parse(Constants.AccentColor), vm.Thickness + 4, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round)
             : null;
 
         // Map absolute points to local coordinate space
@@ -219,7 +220,7 @@ public class AnnotationShape : Control
 
         if (selectPen != null)
         {
-            ctx.DrawRectangle(null, new Pen(Brushes.White, 2), new Rect(start, new Size(ft.Width, ft.Height)));
+            ctx.DrawRectangle(null, new Pen(SolidColorBrush.Parse(Constants.AccentColor), 2), new Rect(start, new Size(ft.Width, ft.Height)));
         }
         ctx.DrawText(ft, start);
     }

@@ -106,9 +106,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             if (_isDrawMode == value) return;
             _isDrawMode = value;
+            // Clear any lingering selection when switching modes to avoid confusion
+            ClearSelection();
             OnPropertyChanged(nameof(IsDrawMode));
             OnPropertyChanged(nameof(WindowTitle));
             OnPropertyChanged(nameof(CurrentModeText));
+
             if (value) IsAnnotationsVisible = true;
         }
     }
@@ -195,6 +198,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     /// <summary>Current zoom level as percentage string for the status bar.</summary>
     public string ZoomLevelText => $"{_scale.ScaleX * 100:F0}%";
 
+    /// <summary>Application version string for the status bar.</summary>
+    public string VersionText => $"v{Constants.AppVersion}";
+
     /// <summary>Number of currently selected items for the status bar.</summary>
     public string SelectionCountText
     {
@@ -220,6 +226,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private Point _annotationSelectionStart;
     private Point _annotationDragStart;
     private AnnotationViewModel? _editingTextAnnotation;
+    private string? _editingTextAnnotationOriginalText; // null = new annotation; string = original text of existing
 
     // Board file state
     private string _workspaceDir;
@@ -1274,7 +1281,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var mainCanvas = this.FindControl<Canvas>("MainCanvas");
 
         // Annotation mode: Eraser
-        if (IsDrawMode && IsEraserMode && !e.Handled && props.IsLeftButtonPressed)
+        // Skip when the middle button is also held — that combination is the Nuke-style drag-to-zoom gesture.
+        if (IsDrawMode && IsEraserMode && !e.Handled && props.IsLeftButtonPressed && !props.IsMiddleButtonPressed)
         {
             EraseIntersectingAnnotations(e.GetPosition(mainCanvas));
             e.Pointer.Capture(sender as IInputElement);
@@ -1320,6 +1328,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             {
                 _currentAnnotation.Text = "";
                 _editingTextAnnotation = _currentAnnotation;
+                _editingTextAnnotationOriginalText = null; // null marks this as a brand-new annotation
 
                 var editor = this.FindControl<TextBox>("AnnotationTextEditor");
                 if (editor != null)
@@ -1334,6 +1343,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     editor.TextChanged += AnnotationTextEditor_TextChanged;
                     editor.LostFocus -= AnnotationTextEditor_LostFocus;
                     editor.LostFocus += AnnotationTextEditor_LostFocus;
+                    editor.RemoveHandler(InputElement.KeyDownEvent, AnnotationTextEditor_KeyDown);
+                    editor.AddHandler(InputElement.KeyDownEvent, AnnotationTextEditor_KeyDown, RoutingStrategies.Tunnel);
                 }
             }
 
@@ -1377,8 +1388,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var mainCanvas = this.FindControl<Canvas>("MainCanvas");
         var pt = e.GetPosition(mainCanvas);
 
-        // Eraser drag
-        if (IsDrawMode && IsEraserMode && e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        // Eraser drag — but not when the middle button is also held (that's the Nuke-style zoom gesture)
+        if (IsDrawMode && IsEraserMode
+            && e.GetCurrentPoint(this).Properties.IsLeftButtonPressed
+            && !e.GetCurrentPoint(this).Properties.IsMiddleButtonPressed)
         {
             EraseIntersectingAnnotations(pt);
             return;
@@ -1748,13 +1761,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 }
             }
 
-            // Start drag if annotation(s) are selected
-            if (annGrid.IsSelected)
-            {
-                _isDraggingAnnotations = true;
-                _annotationDragStart = e.GetPosition(this.FindControl<Canvas>("MainCanvas"));
-            }
-
+            // In Grid mode annotations cannot be dragged directly — they are not grid-snapped and
+            // moving them independently is confusing.  Selected annotations will still travel with
+            // a group of grid items when those items are dragged (see Cell_PointerMoved group drag).
             e.Handled = true;
             return;
         }
@@ -1794,6 +1803,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             && sender is Control { DataContext: AnnotationViewModel { Type: "Text" } annText })
         {
             _editingTextAnnotation = annText;
+            _editingTextAnnotationOriginalText = annText.Text; // remember so Escape can revert
             var editor = this.FindControl<TextBox>("AnnotationTextEditor");
             if (editor != null)
             {
@@ -1807,6 +1817,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 editor.TextChanged += AnnotationTextEditor_TextChanged;
                 editor.LostFocus -= AnnotationTextEditor_LostFocus;
                 editor.LostFocus += AnnotationTextEditor_LostFocus;
+                editor.RemoveHandler(InputElement.KeyDownEvent, AnnotationTextEditor_KeyDown);
+                editor.AddHandler(InputElement.KeyDownEvent, AnnotationTextEditor_KeyDown, RoutingStrategies.Tunnel);
             }
             e.Handled = true;
         }
@@ -1818,17 +1830,84 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _editingTextAnnotation.Text = editor.Text ?? "";
     }
 
-    private void AnnotationTextEditor_LostFocus(object? sender, RoutedEventArgs e)
+    private void AnnotationTextEditor_KeyDown(object? sender, KeyEventArgs e)
     {
-        if (sender is TextBox editor)
-            editor.IsVisible = false;
+        if (e.Key == Key.Escape)
+        {
+            CancelTextAnnotationEditing();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.None)
+        {
+            // Plain Enter commits the text — Shift+Enter or Ctrl+Enter inserts a newline.
+            CommitTextAnnotationEditing();
+            e.Handled = true;
+        }
+    }
 
-        if (_editingTextAnnotation != null && string.IsNullOrWhiteSpace(_editingTextAnnotation.Text))
+    /// <summary>
+    /// Cancels an in-progress text annotation edit:
+    /// - If it was a brand-new annotation (original text is null) the annotation is discarded entirely.
+    /// - If it was an existing annotation the text is reverted to what it was before editing started.
+    /// Unsubscribes all editor events before hiding to prevent LostFocus from double-processing.
+    /// </summary>
+    private void CancelTextAnnotationEditing()
+    {
+        if (_editingTextAnnotation == null) return;
+
+        var editor = this.FindControl<TextBox>("AnnotationTextEditor");
+        if (editor != null)
+        {
+            // Unsubscribe before hiding so LostFocus doesn't fire our commit handler.
+            editor.RemoveHandler(InputElement.KeyDownEvent, AnnotationTextEditor_KeyDown);
+            editor.TextChanged -= AnnotationTextEditor_TextChanged;
+            editor.LostFocus -= AnnotationTextEditor_LostFocus;
+            editor.IsVisible = false;
+        }
+
+        if (_editingTextAnnotationOriginalText == null)
+            Annotations.Remove(_editingTextAnnotation);   // new annotation — discard
+        else
+            _editingTextAnnotation.Text = _editingTextAnnotationOriginalText; // existing — revert
+
+        _editingTextAnnotation = null;
+        _editingTextAnnotationOriginalText = null;
+
+        this.FindControl<Border>("CanvasBorder")?.Focus();
+    }
+
+    /// <summary>
+    /// Commits the current text annotation edit (user clicked away or pressed Enter).
+    /// Unsubscribes all editor events before hiding to prevent LostFocus from double-processing.
+    /// </summary>
+    private void CommitTextAnnotationEditing()
+    {
+        if (_editingTextAnnotation == null) return;
+
+        var editor = this.FindControl<TextBox>("AnnotationTextEditor");
+        if (editor != null)
+        {
+            editor.RemoveHandler(InputElement.KeyDownEvent, AnnotationTextEditor_KeyDown);
+            editor.TextChanged -= AnnotationTextEditor_TextChanged;
+            editor.LostFocus -= AnnotationTextEditor_LostFocus;
+            editor.IsVisible = false;
+        }
+
+        if (string.IsNullOrWhiteSpace(_editingTextAnnotation.Text))
             Annotations.Remove(_editingTextAnnotation);
 
         _editingTextAnnotation = null;
+        _editingTextAnnotationOriginalText = null;
         MarkUnsaved();
         SaveBoardData();
+
+        this.FindControl<Border>("CanvasBorder")?.Focus();
+    }
+
+    private void AnnotationTextEditor_LostFocus(object? sender, RoutedEventArgs e)
+    {
+        // User clicked away — treat as a commit.
+        CommitTextAnnotationEditing();
     }
 
     #endregion
@@ -1933,9 +2012,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             return;
         }
 
-        // Don't intercept keys while typing in a TextBox
+        // Don't intercept keys while typing in a visible TextBox.
+        // The IsVisible guard is a safety net: if the AnnotationTextEditor was somehow
+        // still tracked by the FocusManager after being hidden, we must not block shortcuts.
         var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
-        if (focused is TextBox) return;
+        if (focused is TextBox { IsVisible: true }) return;
 
         // Ctrl+Shift+Z or Ctrl+Y: Redo
         if (e.Key == Key.Z && isCtrl && e.KeyModifiers.HasFlag(KeyModifiers.Shift)) { Redo(); return; }
