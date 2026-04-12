@@ -20,8 +20,11 @@ public enum ImageLod
     /// <summary>Small thumbnail (~200 px wide) for zoomed-out views.</summary>
     Thumbnail = 1,
 
-    /// <summary>Full-resolution bitmap for close-up views.</summary>
-    Full = 2
+    /// <summary>Mid-resolution bitmap (~512 px wide) for intermediate zoom levels.</summary>
+    Medium = 2,
+
+    /// <summary>Full-resolution bitmap (up to 2048 px wide) for close-up views.</summary>
+    Full = 3
 }
 
 /// <summary>
@@ -36,12 +39,15 @@ public static class ImageManager
     private const int ThumbnailMaxWidth = 200;
     private const int ColorSampleGrid = 8; // sample an 8×8 grid for average color
 
+    /// <summary>Maximum decoded pixel width for Full-LOD bitmaps (≥ 300 px on screen).</summary>
+    public const int MaxFullDecodeWidth = 2048;
+
     /// <summary>
-    /// Maximum decoded pixel width for Full-LOD bitmaps.
-    /// Images wider than this are downscaled during decode to limit memory.
-    /// 2048 px provides ample quality for cells up to 5× zoom.
+    /// Maximum decoded pixel width for Medium-LOD bitmaps (140–299 px on screen).
+    /// 512 px gives ≥ 3× oversampling at the 140 px boundary and ≥ 1.7× at 299 px,
+    /// while using ¼ the memory of a Full-LOD bitmap.
     /// </summary>
-    private const int MaxFullDecodeWidth = 2048;
+    public const int MaxMediumDecodeWidth = 512;
 
     // ───────── caches ─────────
     // Average color cache: filePath → hex string  e.g. "#FF3A2B1C"
@@ -284,16 +290,18 @@ public static class ImageManager
     }
 
     /// <summary>
-    /// Loads a bitmap from disk. When <paramref name="capSize"/> is true,
-    /// images wider than 2048 px are downscaled during decode to save memory.
+    /// Loads a bitmap from disk, capping the decoded width at <paramref name="maxWidth"/> pixels.
+    /// Pass <see cref="MaxFullDecodeWidth"/> for Full LOD, <see cref="MaxMediumDecodeWidth"/>
+    /// for Medium LOD, or <see cref="int.MaxValue"/> to load at original resolution.
+    /// Returns null on failure.
     /// </summary>
-    public static Bitmap? LoadBitmapFromPath(string? path, bool capSize)
+    public static Bitmap? LoadBitmapFromPath(string? path, int maxWidth = MaxFullDecodeWidth)
     {
         if (string.IsNullOrEmpty(path) || !File.Exists(path))
             return null;
         try
         {
-            return capSize ? LoadBitmapCapped(path, MaxFullDecodeWidth) : new Bitmap(path);
+            return LoadBitmapCapped(path, maxWidth);
         }
         catch
         {
@@ -327,10 +335,11 @@ public static class ImageManager
                 var thumbPath = EnsureThumbnail(imagePath);
                 if (thumbPath != null && File.Exists(thumbPath))
                     return new Bitmap(thumbPath);
+                // Thumbnail generation failed — fall through to medium decode.
             }
 
-            // Full or thumbnail-fallback — cap decode width to save memory
-            return LoadBitmapCapped(imagePath, MaxFullDecodeWidth);
+            int decodeWidth = lod == ImageLod.Full ? MaxFullDecodeWidth : MaxMediumDecodeWidth;
+            return LoadBitmapCapped(imagePath, decodeWidth);
         }
         catch
         {
@@ -353,29 +362,33 @@ public static class ImageManager
     /// <param name="isVisible">Whether the cell's bounding box intersects the viewport.</param>
     /// <remarks>
     /// Tiers:
-    ///   • Off-viewport → Placeholder (colour rect, no bitmap — saves RAM).
-    ///   • Visible, &lt; 140 px on screen → Thumbnail (~200 px JPEG).
-    ///   • Visible, ≥ 140 px on screen → Full resolution.
+    ///   • Off-viewport or &lt; 30 px  → Placeholder (colour rect only — no bitmap).
+    ///   • 30 – 139 px on screen        → Thumbnail  (~200 px JPEG from disk cache).
+    ///   • 140 – 299 px on screen       → Medium     (512 px in-memory decode).
+    ///   • ≥ 300 px on screen           → Full       (2048 px in-memory decode).
     ///
-    /// The 140 px threshold means a 1×1 cell (160 canvas px) switches to full
-    /// quality at ~88 % zoom, so ≥ 90 % zoom always shows originals.
+    /// Reference breakpoints for a 1×1 cell (160 canvas px):
+    ///   Placeholder below ~19 % zoom, Thumbnail 19–87 %, Medium 87–187 %, Full ≥ 187 %.
+    /// For a 2×2 cell (320 canvas px):
+    ///   Placeholder below ~9 %, Thumbnail 9–44 %, Medium 44–94 %, Full ≥ 94 %.
     /// </remarks>
     public static ImageLod DetermineLod(double cellScreenWidth, bool isVisible)
     {
         if (!isVisible)
             return ImageLod.Placeholder;
 
-        // Below 30 px the image is just a few pixels square — the average-colour
-        // placeholder rectangle gives equivalent visual information at zero cost.
+        // Below 30 px the image is a few pixels square — the average-colour
+        // placeholder gives equivalent information at zero decode cost.
         if (cellScreenWidth < 30)
             return ImageLod.Placeholder;
 
-        // Any visible cell gets at least a thumbnail — no colour-only
-        // placeholders for on-screen content.
-        // Full resolution kicks in once the cell is large enough on screen
-        // (~88 % zoom for a 1×1 cell, earlier for multi-span cells).
         if (cellScreenWidth < 140)
             return ImageLod.Thumbnail;
+
+        // Medium LOD (512 px) bridges the gap — avoids loading a 2048 px bitmap
+        // for cells that are only 140–299 px wide on screen.
+        if (cellScreenWidth < 300)
+            return ImageLod.Medium;
 
         return ImageLod.Full;
     }

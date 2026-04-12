@@ -495,8 +495,16 @@ public class CellViewModel : ViewModelBase
                 if (string.IsNullOrEmpty(pathToLoad) || !System.IO.File.Exists(pathToLoad))
                     return null;
 
+                // Select decode width by tier: thumbnail file is already the right size,
+                // Medium decodes at 512 px, Full decodes at 2048 px.
+                int decodeWidth = target switch
+                {
+                    ImageLod.Thumbnail => int.MaxValue,
+                    ImageLod.Medium => ImageManager.MaxMediumDecodeWidth,
+                    _ => ImageManager.MaxFullDecodeWidth,
+                };
                 try
-                { return ImageManager.LoadBitmapFromPath(pathToLoad, target == ImageLod.Full); }
+                { return ImageManager.LoadBitmapFromPath(pathToLoad, decodeWidth); }
                 catch { return null; }
             });
         }
@@ -602,7 +610,7 @@ public class CellViewModel : ViewModelBase
         try
         {
             var old = _image;
-            Image = ImageManager.LoadBitmapFromPath(path, capSize: true) ?? new Bitmap(path);
+            Image = ImageManager.LoadBitmapFromPath(path, ImageManager.MaxFullDecodeWidth) ?? new Bitmap(path);
             old?.Dispose();
             FilePath = path;
             Type = CellType.Image;
@@ -646,7 +654,7 @@ public class CellViewModel : ViewModelBase
         Bitmap? newBitmap = null;
         try
         {
-            newBitmap = ImageManager.LoadBitmapFromPath(thumbPath, capSize: true);
+            newBitmap = ImageManager.LoadBitmapFromPath(thumbPath, ImageManager.MaxFullDecodeWidth);
         }
         catch { /* not a valid image — will use placeholder */ }
 
