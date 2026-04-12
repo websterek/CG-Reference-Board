@@ -125,6 +125,7 @@ public class AnnotationShape : Control
         var selectPen = vm.IsSelected
             ? new Pen(SolidColorBrush.Parse(Constants.AccentColor), vm.Thickness + 4, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round)
             : null;
+        var hitTestPen = new Pen(Brushes.Transparent, Math.Max(20, vm.Thickness + 10), lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
 
         // Map absolute points to local coordinate space
         double offsetX = Bounds.X;
@@ -133,24 +134,24 @@ public class AnnotationShape : Control
         switch (vm.Type)
         {
             case "Pencil":
-                RenderPencil(context, vm, pen, selectPen, offsetX, offsetY);
+                RenderPencil(context, vm, pen, selectPen, hitTestPen, offsetX, offsetY);
                 break;
             case "Rectangle":
-                RenderRectangle(context, vm, pen, selectPen, offsetX, offsetY);
+                RenderRectangle(context, vm, pen, selectPen, hitTestPen, offsetX, offsetY);
                 break;
             case "Ellipse":
-                RenderEllipse(context, vm, pen, selectPen, offsetX, offsetY);
+                RenderEllipse(context, vm, pen, selectPen, hitTestPen, offsetX, offsetY);
                 break;
             case "Arrow":
-                RenderArrow(context, vm, pen, selectPen, offsetX, offsetY);
+                RenderArrow(context, vm, pen, selectPen, hitTestPen, offsetX, offsetY);
                 break;
             case "Text":
-                RenderText(context, vm, brush, selectPen, offsetX, offsetY);
+                RenderText(context, vm, brush, selectPen, hitTestPen, offsetX, offsetY);
                 break;
         }
     }
 
-    private static void RenderPencil(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, double ox, double oy)
+    private static void RenderPencil(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, Pen hitTestPen, double ox, double oy)
     {
         if (vm.Points.Count < 2)
             return;
@@ -183,24 +184,26 @@ public class AnnotationShape : Control
             gc.EndFigure(isClosed: false);
         }
 
+        ctx.DrawGeometry(null, hitTestPen, geometry);
         if (selectPen != null)
             ctx.DrawGeometry(null, selectPen, geometry);
         ctx.DrawGeometry(null, pen, geometry);
     }
 
-    private static void RenderRectangle(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, double ox, double oy)
+    private static void RenderRectangle(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, Pen hitTestPen, double ox, double oy)
     {
         if (vm.Points.Count < 2)
             return;
         var start = new Point(vm.Points[0].X - ox, vm.Points[0].Y - oy);
         var end = new Point(vm.Points[^1].X - ox, vm.Points[^1].Y - oy);
         var rect = new Rect(Math.Min(start.X, end.X), Math.Min(start.Y, end.Y), Math.Abs(end.X - start.X), Math.Abs(end.Y - start.Y));
+        ctx.DrawRectangle(Brushes.Transparent, hitTestPen, rect);
         if (selectPen != null)
             ctx.DrawRectangle(null, selectPen, rect);
         ctx.DrawRectangle(null, pen, rect);
     }
 
-    private static void RenderEllipse(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, double ox, double oy)
+    private static void RenderEllipse(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, Pen hitTestPen, double ox, double oy)
     {
         if (vm.Points.Count < 2)
             return;
@@ -208,18 +211,20 @@ public class AnnotationShape : Control
         var end = new Point(vm.Points[^1].X - ox, vm.Points[^1].Y - oy);
         var rect = new Rect(Math.Min(start.X, end.X), Math.Min(start.Y, end.Y), Math.Abs(end.X - start.X), Math.Abs(end.Y - start.Y));
         var center = rect.Center;
+        ctx.DrawEllipse(Brushes.Transparent, hitTestPen, center, rect.Width / 2, rect.Height / 2);
         if (selectPen != null)
             ctx.DrawEllipse(null, selectPen, center, rect.Width / 2, rect.Height / 2);
         ctx.DrawEllipse(null, pen, center, rect.Width / 2, rect.Height / 2);
     }
 
-    private static void RenderArrow(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, double ox, double oy)
+    private static void RenderArrow(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, Pen hitTestPen, double ox, double oy)
     {
         if (vm.Points.Count < 2)
             return;
         var start = new Point(vm.Points[0].X - ox, vm.Points[0].Y - oy);
         var end = new Point(vm.Points[^1].X - ox, vm.Points[^1].Y - oy);
 
+        ctx.DrawLine(hitTestPen, start, end);
         if (selectPen != null)
             ctx.DrawLine(selectPen, start, end);
         ctx.DrawLine(pen, start, end);
@@ -230,6 +235,8 @@ public class AnnotationShape : Control
         var h1 = new Point(end.X - headLen * Math.Cos(angle - Math.PI / 6), end.Y - headLen * Math.Sin(angle - Math.PI / 6));
         var h2 = new Point(end.X - headLen * Math.Cos(angle + Math.PI / 6), end.Y - headLen * Math.Sin(angle + Math.PI / 6));
 
+        ctx.DrawLine(hitTestPen, end, h1);
+        ctx.DrawLine(hitTestPen, end, h2);
         if (selectPen != null)
         {
             ctx.DrawLine(selectPen, end, h1);
@@ -239,7 +246,7 @@ public class AnnotationShape : Control
         ctx.DrawLine(pen, end, h2);
     }
 
-    private static void RenderText(DrawingContext ctx, AnnotationViewModel vm, IBrush brush, Pen? selectPen, double ox, double oy)
+    private static void RenderText(DrawingContext ctx, AnnotationViewModel vm, IBrush brush, Pen? selectPen, Pen hitTestPen, double ox, double oy)
     {
         if (vm.Points.Count == 0)
             return;
@@ -254,9 +261,12 @@ public class AnnotationShape : Control
             fontSize,
             brush);
 
+        var textRect = new Rect(start, new Size(ft.Width, ft.Height));
+        ctx.DrawRectangle(Brushes.Transparent, null, textRect);
+
         if (selectPen != null)
         {
-            ctx.DrawRectangle(null, new Pen(SolidColorBrush.Parse(Constants.AccentColor), 2), new Rect(start, new Size(ft.Width, ft.Height)));
+            ctx.DrawRectangle(null, new Pen(SolidColorBrush.Parse(Constants.AccentColor), 2), textRect);
         }
         ctx.DrawText(ft, start);
     }
