@@ -9,11 +9,45 @@ using CGReferenceBoard.ViewModels;
 namespace CGReferenceBoard.Controls;
 
 /// <summary>
+/// Annotation effect modes.
+/// </summary>
+public enum AnnotationEffect
+{
+    None,
+    Shadow,
+    Outline
+}
+
+/// <summary>
 /// Custom control that renders an <see cref="AnnotationViewModel"/> as a drawn shape
 /// (pencil stroke, rectangle, ellipse, arrow, or text) on the annotation layer.
+/// Supports optional shadow or outline effects for readability.
 /// </summary>
 public class AnnotationShape : Control
 {
+    // ───────── Static effect state ─────────
+
+    private static AnnotationEffect _currentEffect = AnnotationEffect.None;
+
+    /// <summary>Current global effect mode for all annotation shapes.</summary>
+    public static AnnotationEffect CurrentEffect => _currentEffect;
+
+    /// <summary>Raised when the effect mode changes so all instances can re-render.</summary>
+    public static event Action? EffectModeChanged;
+
+    /// <summary>
+    /// Sets the global effect mode and notifies all instances to re-render.
+    /// </summary>
+    public static void SetEffectMode(AnnotationEffect mode)
+    {
+        if (_currentEffect == mode)
+            return;
+        _currentEffect = mode;
+        EffectModeChanged?.Invoke();
+    }
+
+    // ───────── Instance ─────────
+
     public static readonly StyledProperty<AnnotationViewModel?> AnnotationProperty =
         AvaloniaProperty.Register<AnnotationShape, AnnotationViewModel?>(nameof(Annotation));
 
@@ -26,6 +60,15 @@ public class AnnotationShape : Control
     public AnnotationShape()
     {
         ClipToBounds = false;
+        EffectModeChanged += OnEffectModeChanged;
+    }
+
+    private void OnEffectModeChanged() => InvalidateVisual();
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        EffectModeChanged -= OnEffectModeChanged;
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -108,11 +151,24 @@ public class AnnotationShape : Control
             maxY = _minY + 100;
         }
 
-        double pad = vm.Thickness + 4;
+        double pad = vm.Thickness + Constants.AnnotationEffectPadding;
         Width = (maxX - _minX) + pad * 2;
         Height = (maxY - _minY) + pad * 2;
         Margin = new Thickness(_minX - pad, _minY - pad, 0, 0);
     }
+
+    // ───────── Effect helpers ─────────
+
+    private static readonly IBrush ShadowBrush = SolidColorBrush.Parse(Constants.AnnotationShadowColor);
+    private static readonly IBrush OutlineBrush = SolidColorBrush.Parse(Constants.AnnotationOutlineColor);
+
+    private static Pen MakeShadowPen(double thickness)
+        => new(ShadowBrush, thickness + Constants.AnnotationShadowExtraThickness, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
+
+    private static Pen MakeOutlinePen(double thickness)
+        => new(OutlineBrush, thickness + Constants.AnnotationOutlineExtraThickness, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
+
+    // ───────── Render ─────────
 
     public override void Render(DrawingContext context)
     {
@@ -127,6 +183,8 @@ public class AnnotationShape : Control
             : null;
         var hitTestPen = new Pen(Brushes.Transparent, Math.Max(20, vm.Thickness + 10), lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
 
+        var effect = _currentEffect;
+
         // Map absolute points to local coordinate space
         double offsetX = Bounds.X;
         double offsetY = Bounds.Y;
@@ -134,28 +192,51 @@ public class AnnotationShape : Control
         switch (vm.Type)
         {
             case "Pencil":
-                RenderPencil(context, vm, pen, selectPen, hitTestPen, offsetX, offsetY);
+                RenderPencil(context, vm, pen, selectPen, hitTestPen, effect, offsetX, offsetY);
                 break;
             case "Rectangle":
-                RenderRectangle(context, vm, pen, selectPen, hitTestPen, offsetX, offsetY);
+                RenderRectangle(context, vm, pen, selectPen, hitTestPen, effect, offsetX, offsetY);
                 break;
             case "Ellipse":
-                RenderEllipse(context, vm, pen, selectPen, hitTestPen, offsetX, offsetY);
+                RenderEllipse(context, vm, pen, selectPen, hitTestPen, effect, offsetX, offsetY);
                 break;
             case "Arrow":
-                RenderArrow(context, vm, pen, selectPen, hitTestPen, offsetX, offsetY);
+                RenderArrow(context, vm, pen, selectPen, hitTestPen, effect, offsetX, offsetY);
                 break;
             case "Text":
-                RenderText(context, vm, brush, selectPen, hitTestPen, offsetX, offsetY);
+                RenderText(context, vm, brush, selectPen, hitTestPen, effect, offsetX, offsetY);
                 break;
         }
     }
 
-    private static void RenderPencil(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, Pen hitTestPen, double ox, double oy)
+    // ───────── Shape renderers ─────────
+
+    private static void RenderPencil(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, Pen hitTestPen, AnnotationEffect effect, double ox, double oy)
     {
         if (vm.Points.Count < 2)
             return;
 
+        var geometry = BuildPencilGeometry(vm, ox, oy);
+
+        // Effect pass
+        if (effect == AnnotationEffect.Shadow)
+        {
+            using (ctx.PushTransform(Matrix.CreateTranslation(Constants.AnnotationShadowOffsetX, Constants.AnnotationShadowOffsetY)))
+                ctx.DrawGeometry(null, MakeShadowPen(vm.Thickness), geometry);
+        }
+        else if (effect == AnnotationEffect.Outline)
+        {
+            ctx.DrawGeometry(null, MakeOutlinePen(vm.Thickness), geometry);
+        }
+
+        ctx.DrawGeometry(null, hitTestPen, geometry);
+        if (selectPen != null)
+            ctx.DrawGeometry(null, selectPen, geometry);
+        ctx.DrawGeometry(null, pen, geometry);
+    }
+
+    private static StreamGeometry BuildPencilGeometry(AnnotationViewModel vm, double ox, double oy)
+    {
         var geometry = new StreamGeometry();
         using (var gc = geometry.Open())
         {
@@ -183,27 +264,35 @@ public class AnnotationShape : Control
             }
             gc.EndFigure(isClosed: false);
         }
-
-        ctx.DrawGeometry(null, hitTestPen, geometry);
-        if (selectPen != null)
-            ctx.DrawGeometry(null, selectPen, geometry);
-        ctx.DrawGeometry(null, pen, geometry);
+        return geometry;
     }
 
-    private static void RenderRectangle(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, Pen hitTestPen, double ox, double oy)
+    private static void RenderRectangle(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, Pen hitTestPen, AnnotationEffect effect, double ox, double oy)
     {
         if (vm.Points.Count < 2)
             return;
         var start = new Point(vm.Points[0].X - ox, vm.Points[0].Y - oy);
         var end = new Point(vm.Points[^1].X - ox, vm.Points[^1].Y - oy);
         var rect = new Rect(Math.Min(start.X, end.X), Math.Min(start.Y, end.Y), Math.Abs(end.X - start.X), Math.Abs(end.Y - start.Y));
+
+        // Effect pass
+        if (effect == AnnotationEffect.Shadow)
+        {
+            var shadowRect = rect.Translate(new Vector(Constants.AnnotationShadowOffsetX, Constants.AnnotationShadowOffsetY));
+            ctx.DrawRectangle(null, MakeShadowPen(vm.Thickness), shadowRect);
+        }
+        else if (effect == AnnotationEffect.Outline)
+        {
+            ctx.DrawRectangle(null, MakeOutlinePen(vm.Thickness), rect);
+        }
+
         ctx.DrawRectangle(Brushes.Transparent, hitTestPen, rect);
         if (selectPen != null)
             ctx.DrawRectangle(null, selectPen, rect);
         ctx.DrawRectangle(null, pen, rect);
     }
 
-    private static void RenderEllipse(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, Pen hitTestPen, double ox, double oy)
+    private static void RenderEllipse(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, Pen hitTestPen, AnnotationEffect effect, double ox, double oy)
     {
         if (vm.Points.Count < 2)
             return;
@@ -211,29 +300,60 @@ public class AnnotationShape : Control
         var end = new Point(vm.Points[^1].X - ox, vm.Points[^1].Y - oy);
         var rect = new Rect(Math.Min(start.X, end.X), Math.Min(start.Y, end.Y), Math.Abs(end.X - start.X), Math.Abs(end.Y - start.Y));
         var center = rect.Center;
+
+        // Effect pass
+        if (effect == AnnotationEffect.Shadow)
+        {
+            var sc = new Point(center.X + Constants.AnnotationShadowOffsetX, center.Y + Constants.AnnotationShadowOffsetY);
+            ctx.DrawEllipse(null, MakeShadowPen(vm.Thickness), sc, rect.Width / 2, rect.Height / 2);
+        }
+        else if (effect == AnnotationEffect.Outline)
+        {
+            ctx.DrawEllipse(null, MakeOutlinePen(vm.Thickness), center, rect.Width / 2, rect.Height / 2);
+        }
+
         ctx.DrawEllipse(Brushes.Transparent, hitTestPen, center, rect.Width / 2, rect.Height / 2);
         if (selectPen != null)
             ctx.DrawEllipse(null, selectPen, center, rect.Width / 2, rect.Height / 2);
         ctx.DrawEllipse(null, pen, center, rect.Width / 2, rect.Height / 2);
     }
 
-    private static void RenderArrow(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, Pen hitTestPen, double ox, double oy)
+    private static void RenderArrow(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, Pen hitTestPen, AnnotationEffect effect, double ox, double oy)
     {
         if (vm.Points.Count < 2)
             return;
         var start = new Point(vm.Points[0].X - ox, vm.Points[0].Y - oy);
         var end = new Point(vm.Points[^1].X - ox, vm.Points[^1].Y - oy);
 
-        ctx.DrawLine(hitTestPen, start, end);
-        if (selectPen != null)
-            ctx.DrawLine(selectPen, start, end);
-        ctx.DrawLine(pen, start, end);
-
-        // Arrowhead
+        // Arrowhead points
         double angle = Math.Atan2(end.Y - start.Y, end.X - start.X);
         double headLen = vm.Thickness * 3 + 5;
         var h1 = new Point(end.X - headLen * Math.Cos(angle - Math.PI / 6), end.Y - headLen * Math.Sin(angle - Math.PI / 6));
         var h2 = new Point(end.X - headLen * Math.Cos(angle + Math.PI / 6), end.Y - headLen * Math.Sin(angle + Math.PI / 6));
+
+        // Effect pass
+        if (effect == AnnotationEffect.Shadow)
+        {
+            var sp = MakeShadowPen(vm.Thickness);
+            using (ctx.PushTransform(Matrix.CreateTranslation(Constants.AnnotationShadowOffsetX, Constants.AnnotationShadowOffsetY)))
+            {
+                ctx.DrawLine(sp, start, end);
+                ctx.DrawLine(sp, end, h1);
+                ctx.DrawLine(sp, end, h2);
+            }
+        }
+        else if (effect == AnnotationEffect.Outline)
+        {
+            var op = MakeOutlinePen(vm.Thickness);
+            ctx.DrawLine(op, start, end);
+            ctx.DrawLine(op, end, h1);
+            ctx.DrawLine(op, end, h2);
+        }
+
+        ctx.DrawLine(hitTestPen, start, end);
+        if (selectPen != null)
+            ctx.DrawLine(selectPen, start, end);
+        ctx.DrawLine(pen, start, end);
 
         ctx.DrawLine(hitTestPen, end, h1);
         ctx.DrawLine(hitTestPen, end, h2);
@@ -246,7 +366,7 @@ public class AnnotationShape : Control
         ctx.DrawLine(pen, end, h2);
     }
 
-    private static void RenderText(DrawingContext ctx, AnnotationViewModel vm, IBrush brush, Pen? selectPen, Pen hitTestPen, double ox, double oy)
+    private static void RenderText(DrawingContext ctx, AnnotationViewModel vm, IBrush brush, Pen? selectPen, Pen hitTestPen, AnnotationEffect effect, double ox, double oy)
     {
         if (vm.Points.Count == 0)
             return;
@@ -263,6 +383,39 @@ public class AnnotationShape : Control
 
         var textRect = new Rect(start, new Size(ft.Width, ft.Height));
         ctx.DrawRectangle(Brushes.Transparent, null, textRect);
+
+        // Effect pass
+        if (effect == AnnotationEffect.Shadow)
+        {
+            var shadowFt = new FormattedText(
+                vm.Text ?? "",
+                System.Globalization.CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight,
+                typeface,
+                fontSize,
+                ShadowBrush);
+            ctx.DrawText(shadowFt, new Point(start.X + Constants.AnnotationShadowOffsetX, start.Y + Constants.AnnotationShadowOffsetY));
+        }
+        else if (effect == AnnotationEffect.Outline)
+        {
+            var outlineFt = new FormattedText(
+                vm.Text ?? "",
+                System.Globalization.CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight,
+                typeface,
+                fontSize,
+                OutlineBrush);
+            // Draw at 4 cardinal + 4 diagonal offsets for a smooth outline
+            double d = Constants.AnnotationTextOutlineOffset;
+            ctx.DrawText(outlineFt, new Point(start.X - d, start.Y));
+            ctx.DrawText(outlineFt, new Point(start.X + d, start.Y));
+            ctx.DrawText(outlineFt, new Point(start.X, start.Y - d));
+            ctx.DrawText(outlineFt, new Point(start.X, start.Y + d));
+            ctx.DrawText(outlineFt, new Point(start.X - d, start.Y - d));
+            ctx.DrawText(outlineFt, new Point(start.X + d, start.Y - d));
+            ctx.DrawText(outlineFt, new Point(start.X - d, start.Y + d));
+            ctx.DrawText(outlineFt, new Point(start.X + d, start.Y + d));
+        }
 
         if (selectPen != null)
         {

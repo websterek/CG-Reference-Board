@@ -12,6 +12,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using CGReferenceBoard.Controls;
 using CGReferenceBoard.Helpers;
 using CGReferenceBoard.Models;
 using CGReferenceBoard.Services;
@@ -32,6 +33,11 @@ namespace CGReferenceBoard.Views;
 /// </summary>
 public partial class MainWindow : Window, INotifyPropertyChanged
 {
+    private class UserSettings
+    {
+        public string AnnotationEffect { get; set; } = "None";
+    }
+
     #region INPC Support
 
     public new event PropertyChangedEventHandler? PropertyChanged;
@@ -306,6 +312,33 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public bool IsEraserSelected => CurrentTool == "Eraser";
     public bool IsMoveSelected => CurrentTool == "Move";
 
+    // ───────── Annotation effect ─────────
+    private string _annotationEffect = "None";
+    public string AnnotationEffectMode
+    {
+        get => _annotationEffect;
+        set
+        {
+            if (_annotationEffect == value)
+                return;
+            _annotationEffect = value;
+            AnnotationShape.SetEffectMode(value switch
+            {
+                "Shadow" => AnnotationEffect.Shadow,
+                "Outline" => AnnotationEffect.Outline,
+                _ => AnnotationEffect.None
+            });
+            OnPropertyChanged(nameof(AnnotationEffectMode));
+            OnPropertyChanged(nameof(IsAnnotationEffectNone));
+            OnPropertyChanged(nameof(IsAnnotationEffectShadow));
+            OnPropertyChanged(nameof(IsAnnotationEffectOutline));
+            SaveUserSettings();
+        }
+    }
+    public bool IsAnnotationEffectNone => _annotationEffect == "None";
+    public bool IsAnnotationEffectShadow => _annotationEffect == "Shadow";
+    public bool IsAnnotationEffectOutline => _annotationEffect == "Outline";
+
     #endregion
 
     #region Private State
@@ -418,6 +451,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         InitializeComponent();
 
         LoadRecentBoards();
+        LoadUserSettings();
         RecentBoardsList.ItemsSource = RecentBoards;
 
         _workspaceDir = Path.Combine(
@@ -644,6 +678,51 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             });
         }
         OnPropertyChanged(nameof(HasBoardFilesInDirectory));
+    }
+
+    #endregion
+
+    #region User Settings
+
+    private void LoadUserSettings()
+    {
+        try
+        {
+            string path = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                Constants.ConfigDirName, Constants.UserSettingsFileName);
+
+            if (!File.Exists(path))
+                return;
+
+            string json = File.ReadAllText(path);
+            var settings = JsonSerializer.Deserialize<UserSettings>(json);
+            if (settings != null)
+            {
+                AnnotationEffectMode = settings.AnnotationEffect ?? "None";
+            }
+        }
+        catch { /* ignore corrupt settings */ }
+    }
+
+    private async void SaveUserSettings()
+    {
+        try
+        {
+            string confDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                Constants.ConfigDirName);
+            if (!Directory.Exists(confDir))
+                Directory.CreateDirectory(confDir);
+
+            string confPath = Path.Combine(confDir, Constants.UserSettingsFileName);
+            var settings = new UserSettings
+            {
+                AnnotationEffect = _annotationEffect
+            };
+            await File.WriteAllTextAsync(confPath, JsonSerializer.Serialize(settings));
+        }
+        catch { /* non-critical */ }
     }
 
     #endregion

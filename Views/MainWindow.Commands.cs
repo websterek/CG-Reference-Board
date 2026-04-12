@@ -402,23 +402,46 @@ public partial class MainWindow
     {
         if (_isViewMode)
             return;
-        if (sender is not MenuItem { DataContext: CellViewModel cell })
-            return;
 
-        if (cell.FilePath != null && File.Exists(cell.FilePath))
-            try
-            { File.Delete(cell.FilePath); }
-            catch { }
-        if (cell.VideoPath != null && File.Exists(cell.VideoPath))
-            try
-            { File.Delete(cell.VideoPath); }
-            catch { }
+        bool anyDeleted = false;
 
-        cell.Clear();
-        GridCells.Remove(cell);
-        MarkUnsaved();
-        SaveBoardData();
-        ShowToast("🗑 Deleted");
+        // Delete all selected cells
+        if (_selectedCells.Count > 0)
+        {
+            foreach (var cell in _selectedCells.ToList())
+            {
+                cell.Clear();
+                GridCells.Remove(cell);
+            }
+            _selectedCells.Clear();
+            _hoveredCell = null;
+            anyDeleted = true;
+        }
+
+        // Delete all selected annotations
+        if (_selectedAnnotations.Count > 0)
+        {
+            foreach (var ann in _selectedAnnotations.ToList())
+                Annotations.Remove(ann);
+            _selectedAnnotations.Clear();
+            anyDeleted = true;
+        }
+
+        // Fallback: if nothing was selected, delete the right-clicked cell
+        if (!anyDeleted && sender is MenuItem { DataContext: CellViewModel clickedCell })
+        {
+            clickedCell.Clear();
+            GridCells.Remove(clickedCell);
+            anyDeleted = true;
+        }
+
+        if (anyDeleted)
+        {
+            UpdateSelectionState();
+            MarkUnsaved();
+            SaveBoardData();
+            ShowToast("🗑 Deleted");
+        }
     }
 
     #endregion
@@ -1166,14 +1189,6 @@ public partial class MainWindow
             {
                 foreach (var cell in _selectedCells.ToList())
                 {
-                    if (cell.FilePath != null && File.Exists(cell.FilePath))
-                        try
-                        { File.Delete(cell.FilePath); }
-                        catch { }
-                    if (cell.VideoPath != null && File.Exists(cell.VideoPath))
-                        try
-                        { File.Delete(cell.VideoPath); }
-                        catch { }
                     cell.Clear();
                     GridCells.Remove(cell);
                 }
@@ -1197,15 +1212,6 @@ public partial class MainWindow
             }
             else if (_hoveredCell != null)
             {
-                if (_hoveredCell.FilePath != null && File.Exists(_hoveredCell.FilePath))
-                    try
-                    { File.Delete(_hoveredCell.FilePath); }
-                    catch { }
-                if (_hoveredCell.VideoPath != null && File.Exists(_hoveredCell.VideoPath))
-                    try
-                    { File.Delete(_hoveredCell.VideoPath); }
-                    catch { }
-
                 _hoveredCell.Clear();
                 GridCells.Remove(_hoveredCell);
                 _hoveredCell = null;

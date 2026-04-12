@@ -251,4 +251,67 @@ public partial class MainWindow
     }
 
     #endregion
+
+    #region Annotation Context Menu & Effect
+
+    /// <summary>
+    /// Unified delete handler used by annotation context menu.
+    /// Deletes all selected cells and annotations. If nothing is selected,
+    /// deletes the annotation that was right-clicked.
+    /// </summary>
+    private void DeleteSelection_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_isViewMode)
+            return;
+
+        bool anyDeleted = false;
+
+        // Delete selected cells
+        if (_selectedCells.Count > 0)
+        {
+            foreach (var cell in _selectedCells.ToList())
+            {
+                cell.Clear();
+                GridCells.Remove(cell);
+            }
+            _selectedCells.Clear();
+            _hoveredCell = null;
+            anyDeleted = true;
+        }
+
+        // Delete selected annotations
+        if (_selectedAnnotations.Count > 0)
+        {
+            foreach (var ann in _selectedAnnotations.ToList())
+                Annotations.Remove(ann);
+            _selectedAnnotations.Clear();
+            anyDeleted = true;
+        }
+
+        // If nothing was selected, delete the right-clicked annotation
+        if (!anyDeleted && sender is MenuItem { DataContext: AnnotationViewModel clickedAnn })
+        {
+            Annotations.Remove(clickedAnn);
+            anyDeleted = true;
+        }
+
+        if (anyDeleted)
+        {
+            UpdateSelectionState();
+            MarkUnsaved();
+            SaveBoardData();
+            ShowToast("🗑 Deleted");
+        }
+    }
+
+    private void AnnotationEffectNone_Click(object? sender, RoutedEventArgs e)
+        => AnnotationEffectMode = "None";
+
+    private void AnnotationEffectShadow_Click(object? sender, RoutedEventArgs e)
+        => AnnotationEffectMode = "Shadow";
+
+    private void AnnotationEffectOutline_Click(object? sender, RoutedEventArgs e)
+        => AnnotationEffectMode = "Outline";
+
+    #endregion
 }

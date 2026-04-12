@@ -32,6 +32,9 @@ public static class Constants
     /// <summary>File name for the recent boards list.</summary>
     public const string RecentBoardsFileName = "recent_boards.json";
 
+    /// <summary>File name for per-user application settings.</summary>
+    public const string UserSettingsFileName = "user_settings.json";
+
     /// <summary>Default file extension for board files.</summary>
     public const string DefaultBoardExtension = ".cgrb";
 
@@ -64,4 +67,30 @@ public static class Constants
 
     /// <summary>Minimum drag distance in pixels before initiating a drag operation.</summary>
     public const double DragThreshold = 3.0;
+
+    // ───────── Annotation effect settings ─────────
+
+    /// <summary>Shadow colour (ARGB hex). Semi-transparent black works on most backgrounds.</summary>
+    public const string AnnotationShadowColor = "#78000000";
+
+    /// <summary>Shadow X offset in pixels.</summary>
+    public const double AnnotationShadowOffsetX = 2.0;
+
+    /// <summary>Shadow Y offset in pixels.</summary>
+    public const double AnnotationShadowOffsetY = 2.0;
+
+    /// <summary>Extra pen thickness added to the annotation stroke for shadow rendering.</summary>
+    public const double AnnotationShadowExtraThickness = 1.0;
+
+    /// <summary>Outline colour (ARGB hex). Dark semi-transparent for contrast.</summary>
+    public const string AnnotationOutlineColor = "#C8000000";
+
+    /// <summary>Extra pen thickness added to the annotation stroke for outline rendering.</summary>
+    public const double AnnotationOutlineExtraThickness = 3.0;
+
+    /// <summary>Offset distance in pixels for each text-outline pass (cardinal + diagonal).</summary>
+    public const double AnnotationTextOutlineOffset = 1.5;
+
+    /// <summary>Extra padding around annotation shapes to avoid clipping effects.</summary>
+    public const double AnnotationEffectPadding = 8.0;
 }
