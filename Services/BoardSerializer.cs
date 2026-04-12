@@ -17,7 +17,42 @@ public static class BoardSerializer
     /// <summary>
     /// Serializes the current board state to a JSON string.
     /// </summary>
-    public static string Serialize(IEnumerable<CellViewModel> cells, IEnumerable<AnnotationViewModel> annotations)
+    private static string? GetRelativePath(string? fullPath, string? basePath)
+    {
+        if (string.IsNullOrEmpty(fullPath) || string.IsNullOrEmpty(basePath))
+            return fullPath;
+        try
+        {
+            string baseDir = Path.GetDirectoryName(basePath) ?? basePath;
+            return Path.GetRelativePath(baseDir, fullPath);
+        }
+        catch
+        {
+            return fullPath;
+        }
+    }
+
+    private static string? GetAbsolutePath(string? relPath, string? basePath)
+    {
+        if (string.IsNullOrEmpty(relPath) || string.IsNullOrEmpty(basePath))
+            return relPath;
+        if (Path.IsPathRooted(relPath))
+            return relPath;
+        try
+        {
+            string baseDir = Path.GetDirectoryName(basePath) ?? basePath;
+            return Path.GetFullPath(Path.Combine(baseDir, relPath));
+        }
+        catch
+        {
+            return relPath;
+        }
+    }
+
+    /// <summary>
+    /// Serializes the current board state to a JSON string.
+    /// </summary>
+    public static string Serialize(IEnumerable<CellViewModel> cells, IEnumerable<AnnotationViewModel> annotations, string? basePath = null)
     {
         var state = new
         {
@@ -25,30 +60,35 @@ public static class BoardSerializer
             {
                 c.CanvasX,
                 c.CanvasY,
-                c.ColSpan,
-                c.RowSpan,
+                ColSpan = c.ColSpan > 1 ? c.ColSpan : (int?)null,
+                RowSpan = c.RowSpan > 1 ? c.RowSpan : (int?)null,
                 c.Type,
-                c.FilePath,
-                c.VideoPath,
+                FilePath = GetRelativePath(c.FilePath, basePath),
+                VideoPath = GetRelativePath(c.VideoPath, basePath),
                 c.TextContent,
                 c.BackgroundColor,
                 c.ForegroundColor,
-                c.FontSize,
-                c.ImageStretch
+                FontSize = c.FontSize != 14 ? c.FontSize : (double?)null,
+                ImageStretch = c.ImageStretch != "Uniform" ? c.ImageStretch : null
             }).ToList(),
             Annotations = annotations.Select(a => new
             {
-                a.Type,
+                Type = a.Type != "Pencil" ? a.Type : null,
                 a.Text,
                 a.CanvasX,
                 a.CanvasY,
-                a.Color,
-                a.Thickness,
+                Color = a.Color != "#FFFF4444" ? a.Color : null,
+                Thickness = a.Thickness != 2 ? a.Thickness : (double?)null,
                 Points = a.Points.Select(p => new { p.X, p.Y }).ToList()
             }).ToList()
         };
 
-        return JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true });
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = false,
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+        };
+        return JsonSerializer.Serialize(state, options);
     }
 
     /// <summary>
@@ -56,7 +96,7 @@ public static class BoardSerializer
     /// Supports both the legacy format (top-level array of cells) and
     /// the current format ({ Cells: [...], Annotations: [...] }).
     /// </summary>
-    public static (List<CellViewModel> Cells, List<AnnotationViewModel> Annotations) Deserialize(string json)
+    public static (List<CellViewModel> Cells, List<AnnotationViewModel> Annotations) Deserialize(string json, string? basePath = null)
     {
         var cells = new List<CellViewModel>();
         var annotations = new List<AnnotationViewModel>();
@@ -74,15 +114,17 @@ public static class BoardSerializer
         }
         else
         {
-            if (root.TryGetProperty("Cells", out var c)) cellsElement = c;
-            if (root.TryGetProperty("Annotations", out var a)) annotationsElement = a;
+            if (root.TryGetProperty("Cells", out var c))
+                cellsElement = c;
+            if (root.TryGetProperty("Annotations", out var a))
+                annotationsElement = a;
         }
 
         if (cellsElement.ValueKind == JsonValueKind.Array)
         {
             foreach (var element in cellsElement.EnumerateArray())
             {
-                cells.Add(DeserializeCell(element));
+                cells.Add(DeserializeCell(element, basePath));
             }
         }
 
@@ -102,7 +144,7 @@ public static class BoardSerializer
     /// </summary>
     public static async Task SaveAsync(string filePath, IEnumerable<CellViewModel> cells, IEnumerable<AnnotationViewModel> annotations)
     {
-        string json = Serialize(cells, annotations);
+        string json = Serialize(cells, annotations, filePath);
         await File.WriteAllTextAsync(filePath, json);
     }
 
@@ -115,10 +157,10 @@ public static class BoardSerializer
             return (new List<CellViewModel>(), new List<AnnotationViewModel>());
 
         string json = await File.ReadAllTextAsync(filePath);
-        return Deserialize(json);
+        return Deserialize(json, filePath);
     }
 
-    private static CellViewModel DeserializeCell(JsonElement element)
+    private static CellViewModel DeserializeCell(JsonElement element, string? basePath)
     {
         double cx = element.GetProperty("CanvasX").GetDouble();
         double cy = element.GetProperty("CanvasY").GetDouble();
@@ -131,7 +173,7 @@ public static class BoardSerializer
         switch ((CellType)type)
         {
             case CellType.Image:
-                cell.SetImage(element.GetProperty("FilePath").GetString()!);
+                cell.SetImage(GetAbsolutePath(element.GetProperty("FilePath").GetString(), basePath)!);
                 break;
 
             case CellType.Text:
@@ -143,8 +185,8 @@ public static class BoardSerializer
 
             case CellType.Video:
                 cell.SetVideo(
-                    element.GetProperty("VideoPath").GetString()!,
-                    element.GetProperty("FilePath").GetString()!);
+                    GetAbsolutePath(element.GetProperty("VideoPath").GetString(), basePath)!,
+                    GetAbsolutePath(element.GetProperty("FilePath").GetString(), basePath)!);
                 break;
         }
 
@@ -168,8 +210,8 @@ public static class BoardSerializer
             Text = element.TryGetProperty("Text", out var textProp) ? textProp.GetString() ?? "" : "",
             CanvasX = element.GetProperty("CanvasX").GetDouble(),
             CanvasY = element.GetProperty("CanvasY").GetDouble(),
-            Color = element.GetProperty("Color").GetString() ?? "#FFFF4444",
-            Thickness = element.GetProperty("Thickness").GetDouble()
+            Color = element.TryGetProperty("Color", out var colProp) ? colProp.GetString() ?? "#FFFF4444" : "#FFFF4444",
+            Thickness = element.TryGetProperty("Thickness", out var thickProp) ? thickProp.GetDouble() : 2.0
         };
 
         if (element.TryGetProperty("Points", out var pts))

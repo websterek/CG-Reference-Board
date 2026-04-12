@@ -88,7 +88,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _currentAnnotation = null;
         _editingTextAnnotation = null;
 
-        var (cells, annotations) = BoardSerializer.Deserialize(json);
+        var (cells, annotations) = BoardSerializer.Deserialize(json, _currentBoardFile);
         foreach (var cell in cells)
             GridCells.Add(cell);
         foreach (var ann in annotations)
@@ -457,7 +457,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _currentAnnotation = null;
             _editingTextAnnotation = null;
 
-            var (cells, annotations) = BoardSerializer.Deserialize(json);
+            var (cells, annotations) = BoardSerializer.Deserialize(json, _currentBoardFile);
             foreach (var cell in cells)
                 GridCells.Add(cell);
             foreach (var ann in annotations)
@@ -487,7 +487,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (string.IsNullOrEmpty(_currentBoardFile))
             return;
 
-        string json = BoardSerializer.Serialize(GridCells, Annotations);
+        string json = BoardSerializer.Serialize(GridCells, Annotations, _currentBoardFile);
 
         if (!_isRestoringState && !_isViewMode)
         {
