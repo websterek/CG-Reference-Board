@@ -605,7 +605,7 @@
                             </Border.ContextMenu>
 
                             <!-- Canvas background layers – one visible at a time -->
-                            <Panel>
+                            <Panel IsVisible="{Binding IsCanvasBackgroundVisible}">
                                 <!-- Dots: subtle grid lines + centred dot in each cell -->
                                 <Border IsVisible="{Binding IsGridBackgroundDots}">
                                     <Border.Background>

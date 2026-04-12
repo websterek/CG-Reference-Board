@@ -293,8 +293,8 @@ public class AnnotationShape : Control
             : null;
         var hitTestPen = new Pen(Brushes.Transparent, Math.Max(20, vm.Thickness + 10), lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
 
-        // Skip expensive effects when zoomed out past 25% — visually irrelevant at that scale
-        var effect = _currentScale < 0.25 ? AnnotationEffect.None : _currentEffect;
+        // Skip expensive effects when zoomed out past 50% — visually irrelevant at that scale
+        var effect = _currentScale <= 0.5 ? AnnotationEffect.None : _currentEffect;
 
         // Map absolute points to local coordinate space
         double offsetX = Bounds.X;

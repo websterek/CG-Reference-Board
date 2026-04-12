@@ -330,6 +330,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _ => "✏️"
     };
 
+    /// <summary>Hide the dot/grid background below 25 % zoom — VisualBrush tile count explodes at low scale.</summary>
+    public bool IsCanvasBackgroundVisible => _scale.ScaleX >= 0.25;
+
     /// <summary>Notifies the UI that all zoom-dependent properties have changed.</summary>
     private void NotifyZoomChanged()
     {
@@ -337,6 +340,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         OnPropertyChanged(nameof(ZoomInverseFactor));
         OnPropertyChanged(nameof(ZoomIndependentBorderThickness));
         OnPropertyChanged(nameof(ZoomIndependentCornerRadius));
+        OnPropertyChanged(nameof(IsCanvasBackgroundVisible));
 
         // Push current scale to AnnotationShape so it can LOD-decimate brush geometry
         CGReferenceBoard.Controls.AnnotationShape.SetScale(_scale.ScaleX);
