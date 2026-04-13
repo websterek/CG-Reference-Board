@@ -278,6 +278,34 @@ public class AnnotationShape : Control
         return _cachedGeometry;
     }
 
+    // ───────── Hit pen helpers ─────────
+
+    /// <summary>
+    /// Returns a transparent pen whose stroke thickness — when multiplied by the current
+    /// canvas scale — always covers roughly <paramref name="targetScreenRadius"/> pixels on
+    /// each side of the drawn path.  The result is clamped to be at least as wide as the
+    /// visible stroke so clicking right on the line always works.
+    ///
+    /// Avalonia's rendering-based hit testing checks whether a pointer position falls
+    /// inside the recorded drawing operations.  A pen drawn with <see cref="Brushes.Transparent"/>
+    /// is invisible but still creates a hit-testable surface via StrokeContains.
+    /// </summary>
+    private static Pen MakeScaledHitPen(double strokeThickness, double targetScreenRadius = 15.0)
+    {
+        // canvas units needed so that (units * scale) == targetScreenRadius
+        double canvasRadius = targetScreenRadius / Math.Max(_currentScale, 0.01);
+        double hitThickness = Math.Max(strokeThickness + 10.0, canvasRadius * 2.0);
+        return new Pen(Brushes.Transparent, hitThickness, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
+    }
+
+    /// <summary>
+    /// Standard hit pen used for shapes that already have a transparent fill covering
+    /// their interior (Rectangle, Ellipse).  A moderately-wide stroke is enough here
+    /// because clicking anywhere in the interior already hits via the fill.
+    /// </summary>
+    private static Pen MakeStandardHitPen(double strokeThickness)
+        => new(Brushes.Transparent, Math.Max(strokeThickness + 10.0, 20.0), lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
+
     // ───────── Render ─────────
 
     public override void Render(DrawingContext context)
@@ -291,7 +319,6 @@ public class AnnotationShape : Control
         var selectPen = vm.IsSelected
             ? new Pen(SolidColorBrush.Parse(Constants.AccentColor), vm.Thickness + 4, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round)
             : null;
-        var hitTestPen = new Pen(Brushes.Transparent, Math.Max(20, vm.Thickness + 10), lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
 
         // Skip expensive effects when zoomed out past 50% — visually irrelevant at that scale
         var effect = _currentScale <= 0.51 ? AnnotationEffect.None : _currentEffect;
@@ -303,26 +330,26 @@ public class AnnotationShape : Control
         switch (vm.Type)
         {
             case "Brush":
-                RenderBrush(context, vm, pen, selectPen, hitTestPen, effect, offsetX, offsetY);
+                RenderBrush(context, vm, pen, selectPen, effect, offsetX, offsetY);
                 break;
             case "Rectangle":
-                RenderRectangle(context, vm, pen, selectPen, hitTestPen, effect, offsetX, offsetY);
+                RenderRectangle(context, vm, pen, selectPen, effect, offsetX, offsetY);
                 break;
             case "Ellipse":
-                RenderEllipse(context, vm, pen, selectPen, hitTestPen, effect, offsetX, offsetY);
+                RenderEllipse(context, vm, pen, selectPen, effect, offsetX, offsetY);
                 break;
             case "Arrow":
-                RenderArrow(context, vm, pen, selectPen, hitTestPen, effect, offsetX, offsetY);
+                RenderArrow(context, vm, pen, selectPen, effect, offsetX, offsetY);
                 break;
             case "Text":
-                RenderText(context, vm, brush, selectPen, hitTestPen, effect, offsetX, offsetY);
+                RenderText(context, vm, brush, selectPen, effect, offsetX, offsetY);
                 break;
         }
     }
 
     // ───────── Shape renderers ─────────
 
-    private void RenderBrush(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, Pen hitTestPen, AnnotationEffect effect, double ox, double oy)
+    private void RenderBrush(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, AnnotationEffect effect, double ox, double oy)
     {
         if (vm.Points.Count < 2)
             return;
@@ -340,7 +367,11 @@ public class AnnotationShape : Control
             ctx.DrawGeometry(null, MakeOutlinePen(vm.Thickness), geometry);
         }
 
-        ctx.DrawGeometry(null, hitTestPen, geometry);
+        // Scale-aware transparent stroke: keeps ~15 screen-pixel grab radius at any zoom.
+        // DrawGeometry with null fill + transparent pen → Avalonia uses StrokeContains for
+        // hit testing, so the effective hit radius equals hitPen.Thickness / 2.
+        ctx.DrawGeometry(null, MakeScaledHitPen(vm.Thickness), geometry);
+
         if (selectPen != null)
             ctx.DrawGeometry(null, selectPen, geometry);
         ctx.DrawGeometry(null, pen, geometry);
@@ -391,7 +422,7 @@ public class AnnotationShape : Control
         return geometry;
     }
 
-    private static void RenderRectangle(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, Pen hitTestPen, AnnotationEffect effect, double ox, double oy)
+    private static void RenderRectangle(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, AnnotationEffect effect, double ox, double oy)
     {
         if (vm.Points.Count < 2)
             return;
@@ -410,13 +441,14 @@ public class AnnotationShape : Control
             ctx.DrawRectangle(null, MakeOutlinePen(vm.Thickness), rect);
         }
 
-        ctx.DrawRectangle(Brushes.Transparent, hitTestPen, rect);
+        // Transparent fill makes the entire interior hit-testable (not just the stroke).
+        ctx.DrawRectangle(Brushes.Transparent, MakeStandardHitPen(vm.Thickness), rect);
         if (selectPen != null)
             ctx.DrawRectangle(null, selectPen, rect);
         ctx.DrawRectangle(null, pen, rect);
     }
 
-    private static void RenderEllipse(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, Pen hitTestPen, AnnotationEffect effect, double ox, double oy)
+    private static void RenderEllipse(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, AnnotationEffect effect, double ox, double oy)
     {
         if (vm.Points.Count < 2)
             return;
@@ -436,13 +468,14 @@ public class AnnotationShape : Control
             ctx.DrawEllipse(null, MakeOutlinePen(vm.Thickness), center, rect.Width / 2, rect.Height / 2);
         }
 
-        ctx.DrawEllipse(Brushes.Transparent, hitTestPen, center, rect.Width / 2, rect.Height / 2);
+        // Transparent fill makes the entire interior hit-testable (not just the stroke).
+        ctx.DrawEllipse(Brushes.Transparent, MakeStandardHitPen(vm.Thickness), center, rect.Width / 2, rect.Height / 2);
         if (selectPen != null)
             ctx.DrawEllipse(null, selectPen, center, rect.Width / 2, rect.Height / 2);
         ctx.DrawEllipse(null, pen, center, rect.Width / 2, rect.Height / 2);
     }
 
-    private static void RenderArrow(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, Pen hitTestPen, AnnotationEffect effect, double ox, double oy)
+    private static void RenderArrow(DrawingContext ctx, AnnotationViewModel vm, Pen pen, Pen? selectPen, AnnotationEffect effect, double ox, double oy)
     {
         if (vm.Points.Count < 2)
             return;
@@ -474,23 +507,24 @@ public class AnnotationShape : Control
             ctx.DrawLine(op, end, h2);
         }
 
-        ctx.DrawLine(hitTestPen, start, end);
-        if (selectPen != null)
-            ctx.DrawLine(selectPen, start, end);
-        ctx.DrawLine(pen, start, end);
+        // Scale-aware transparent hit lines: keeps ~15 screen-pixel grab radius at any zoom.
+        var hitPen = MakeScaledHitPen(vm.Thickness);
+        ctx.DrawLine(hitPen, start, end);
+        ctx.DrawLine(hitPen, end, h1);
+        ctx.DrawLine(hitPen, end, h2);
 
-        ctx.DrawLine(hitTestPen, end, h1);
-        ctx.DrawLine(hitTestPen, end, h2);
         if (selectPen != null)
         {
+            ctx.DrawLine(selectPen, start, end);
             ctx.DrawLine(selectPen, end, h1);
             ctx.DrawLine(selectPen, end, h2);
         }
+        ctx.DrawLine(pen, start, end);
         ctx.DrawLine(pen, end, h1);
         ctx.DrawLine(pen, end, h2);
     }
 
-    private static void RenderText(DrawingContext ctx, AnnotationViewModel vm, IBrush brush, Pen? selectPen, Pen hitTestPen, AnnotationEffect effect, double ox, double oy)
+    private static void RenderText(DrawingContext ctx, AnnotationViewModel vm, IBrush brush, Pen? selectPen, AnnotationEffect effect, double ox, double oy)
     {
         if (vm.Points.Count == 0)
             return;
@@ -506,6 +540,8 @@ public class AnnotationShape : Control
             brush);
 
         var textRect = new Rect(start, new Size(ft.Width, ft.Height));
+
+        // Transparent filled rect makes the entire text bounding box hit-testable.
         ctx.DrawRectangle(Brushes.Transparent, null, textRect);
 
         // Effect pass
