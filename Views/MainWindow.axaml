@@ -418,6 +418,7 @@
                             Height="1000000"
                             Canvas.Left="-500000"
                             Canvas.Top="-500000"
+                            Background="Transparent"
                         >
                             <Border.ContextMenu>
                                 <ContextMenu>
