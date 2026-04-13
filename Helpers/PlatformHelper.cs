@@ -84,7 +84,7 @@ public static class PlatformHelper
     /// </summary>
     public static void EnsureExecutable(string path)
     {
-        if (!IsLinux || !File.Exists(path))
+        if (!OperatingSystem.IsLinux() || !File.Exists(path))
             return;
 
         try

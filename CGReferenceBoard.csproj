@@ -23,9 +23,38 @@
     <PackageReference Include="YoutubeDLSharp" Version="1.2.0" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Content Include="Include\**\*">
+  <!-- No RID specified (dotnet run / IDE debug): include all binaries so both platforms work locally -->
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == ''">
+    <Content Include="Include/**/*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Windows publish: ship only the Windows binaries -->
+  <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('win'))">
+    <Content Include="Include/ffmpeg-windows/**/*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Include="Include/yt-dlp-windows/**/*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+  </ItemGroup>
+
+  <!-- Linux publish: ship only the Linux binaries -->
+  <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('linux'))">
+    <Content Include="Include/ffmpeg-linux/**/*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Include="Include/yt-dlp-linux/**/*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
     </Content>
   </ItemGroup>
 </Project>

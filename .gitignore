@@ -54,3 +54,5 @@ TestResult.xml
 nunit-*.xml
 Include/*/**
 Temp/**
+dist/**
+dist/linux/CGReferenceBoard
