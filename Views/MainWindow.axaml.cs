@@ -447,6 +447,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly TranslateTransform _translate = new(0, 0);
     private readonly ScaleTransform _scale = new(1, 1);
 
+
+
     // Zoom toggle state (PureRef-style: double-click to zoom in, double-click again to restore)
     private double _savedTranslateX;
     private double _savedTranslateY;
@@ -520,10 +522,39 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     #endregion
 
 
+
+
     #region Constructor
 
     /// <summary>Parameterless constructor required by Avalonia designer.</summary>
     public MainWindow() : this(false, null) { }
+
+    // Restore pan cursor when window loses activation (e.g., Alt-Tab) to avoid leaving the hand cursor stuck
+    private void Window_Deactivated(object? sender, EventArgs e)
+    {
+        try
+        {
+            RestorePanCursor(this.FindControl<Border>("CanvasBorder"));
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    // When the canvas border loses pointer capture (e.g., due to OS-level modal or other capture-loss),
+    // ensure we restore the cursor so it doesn't remain as the hand icon.
+    private void CanvasBorder_PointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
+    {
+        try
+        {
+            RestorePanCursor(this.FindControl<Border>("CanvasBorder"));
+        }
+        catch
+        {
+            // ignore
+        }
+    }
 
     public MainWindow(bool isViewMode, string? startFile)
     {
@@ -535,6 +566,24 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         DataContext = this;
         _isViewMode = isViewMode;
         InitializeComponent();
+
+        // Attach a tunneled PointerPressed handler to CanvasBorder so Ctrl+Left-click
+        // or Middle-click will start panning even when the pointer is over child elements.
+        try
+        {
+            var canvasBorder = this.FindControl<Border>("CanvasBorder");
+            if (canvasBorder != null)
+            {
+                // Use tunneling routing so this runs before child handlers and can take priority.
+                canvasBorder.AddHandler(InputElement.PointerPressedEvent,
+                    new EventHandler<PointerPressedEventArgs>(CanvasBorder_Tunneled_PointerPressed),
+                    Avalonia.Interactivity.RoutingStrategies.Tunnel);
+            }
+        }
+        catch
+        {
+            // ignore if attach fails on some platforms
+        }
 
         LoadRecentBoards();
         LoadUserSettings();
@@ -931,6 +980,50 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             a.IsSelected = false;
         _selectedAnnotations.Clear();
         UpdateSelectionState();
+    }
+
+    // Tunneled PointerPressed handler attached to CanvasBorder to prioritize panning gestures.
+    // This runs in the tunneling phase (before child controls get the PointerPressed),
+    // allowing Ctrl+Left-click (or middle-click) to start panning even when over other objects.
+    private void CanvasBorder_Tunneled_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        // If event already handled by something more important, do nothing.
+        if (e.Handled)
+            return;
+
+        var props = e.GetCurrentPoint(this).Properties;
+
+        // Prioritize panning when middle button is pressed OR left button with Ctrl modifier.
+        bool shouldStartPan = props.IsMiddleButtonPressed || (props.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Control));
+        if (!shouldStartPan)
+            return;
+
+        // Start panning and capture pointer to the CanvasBorder to handle subsequent moves/releases.
+        _isPanning = true;
+        _panStartPoint = e.GetPosition(this);
+
+        // For middle-button we also prepare middle-zoom states as existing logic expects.
+        if (props.IsMiddleButtonPressed)
+            _middleZoomStartY = e.GetPosition(this).Y;
+
+        // Apply pan cursor on canvas border
+        try
+        {
+            var canvasBorder = this.FindControl<Border>("CanvasBorder");
+            if (canvasBorder != null)
+            {
+                ApplyPanCursor(canvasBorder);
+                // Capture the pointer on the canvas border so we get PointerMoved/PointerReleased.
+                e.Pointer.Capture(canvasBorder);
+            }
+        }
+        catch
+        {
+            // ignore cursor/capture errors
+        }
+
+        // Mark handled so child elements don't intercept the gesture.
+        e.Handled = true;
     }
 
     public void UpdateSelectionState()

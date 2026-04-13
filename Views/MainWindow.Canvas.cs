@@ -15,6 +15,50 @@ namespace CGReferenceBoard.Views;
 public partial class MainWindow
 {
     #region Canvas Pointer Handlers (Pan, Draw, Hover)
+    // Indicates whether we've applied a pan cursor override on the CanvasBorder
+    private bool _cursorApplied;
+    // Helper saved cursor for restoring
+    private Cursor? _savedCanvasCursor;
+
+    private void ApplyPanCursor(Border? canvasBorder)
+    {
+        if (canvasBorder == null)
+            return;
+        try
+        {
+            if (!_cursorApplied)
+            {
+                // Save the existing cursor if not already saved
+                if (_savedCanvasCursor == null)
+                    _savedCanvasCursor = canvasBorder.Cursor;
+                canvasBorder.Cursor = new Cursor(StandardCursorType.Hand);
+                _cursorApplied = true;
+            }
+        }
+        catch
+        {
+            // Non-critical; ignore failures
+        }
+    }
+
+    private void RestorePanCursor(Border? canvasBorder)
+    {
+        if (canvasBorder == null)
+            return;
+        try
+        {
+            if (_cursorApplied)
+            {
+                canvasBorder.Cursor = _savedCanvasCursor ?? Cursor.Default;
+                _savedCanvasCursor = null;
+                _cursorApplied = false;
+            }
+        }
+        catch
+        {
+            // Non-critical; ignore failures
+        }
+    }
 
     private void MainCanvas_PointerEntered(object? sender, PointerEventArgs e)
     {
@@ -146,12 +190,17 @@ public partial class MainWindow
             return;
         }
 
-        // Grid mode: Middle button starts pan
-        if (props.IsMiddleButtonPressed)
+        // Grid mode: Middle button or Ctrl+Left starts pan
+        if (props.IsMiddleButtonPressed || (props.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Control)))
         {
             _isPanning = true;
             _panStartPoint = e.GetPosition(this);
-            _middleZoomStartY = e.GetPosition(this).Y;
+            if (props.IsMiddleButtonPressed)
+                _middleZoomStartY = e.GetPosition(this).Y;
+
+            // Set pan cursor on the CanvasBorder and remember previous cursor via helper
+            var canvasBorder = this.FindControl<Border>("CanvasBorder");
+            ApplyPanCursor(canvasBorder);
         }
         // Left-click on empty canvas space: start cell marquee selection
         else if (!e.Handled && props.IsLeftButtonPressed && !IsDrawMode)
@@ -355,6 +404,23 @@ public partial class MainWindow
 
         // Nuke-style drag-to-zoom
         var currentProps = e.GetCurrentPoint(this).Properties;
+
+        // Show hand cursor only while the user is actively performing a pan gesture:
+        // - middle mouse button pressed OR
+        // - left button pressed while Ctrl is held
+        // Do NOT show the hand cursor for Ctrl being held alone.
+        // Save previous cursor from the CanvasBorder the first time we switch it so it can be restored later.
+        bool wantsPanCursor = currentProps.IsMiddleButtonPressed || (currentProps.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Control));
+        var canvasBorder = this.FindControl<Border>("CanvasBorder");
+        if (wantsPanCursor)
+        {
+            ApplyPanCursor(canvasBorder);
+        }
+        else
+        {
+            RestorePanCursor(canvasBorder);
+        }
+
         bool bothButtons = currentProps.IsMiddleButtonPressed && currentProps.IsLeftButtonPressed;
 
         if (bothButtons)
@@ -403,7 +469,7 @@ public partial class MainWindow
             _middleZoomStartY = screenPt.Y;
             _panStartPoint = screenPt;
         }
-        else if (_isPanning && (currentProps.IsMiddleButtonPressed || currentProps.IsLeftButtonPressed))
+        else if (_isPanning && (currentProps.IsMiddleButtonPressed || (currentProps.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Control))))
         {
             var screenPt = e.GetPosition(this);
             _translate.X += (screenPt.X - _panStartPoint.X) / _scale.ScaleX;
@@ -593,6 +659,18 @@ public partial class MainWindow
         _isPanning = false;
         _middleZoomAnchorSet = false;
         _middleZoomActive = false;
+
+        // Restore previous cursor on the CanvasBorder when panning stops
+        try
+        {
+            var canvasBorder = this.FindControl<Border>("CanvasBorder");
+            RestorePanCursor(canvasBorder);
+        }
+        catch
+        {
+            // ignore cursor restore failures
+        }
+
         UpdateSelectionState();
     }
 
@@ -601,6 +679,17 @@ public partial class MainWindow
         var hoverHighlight = this.FindControl<Border>("HoverHighlight");
         if (hoverHighlight != null)
             hoverHighlight.IsVisible = false;
+
+        // Restore previous cursor when leaving canvas border (if we changed it for panning)
+        try
+        {
+            var canvasBorder = sender as Border ?? this.FindControl<Border>("CanvasBorder");
+            RestorePanCursor(canvasBorder);
+        }
+        catch
+        {
+            // ignore failures
+        }
     }
 
     private void Canvas_PointerWheelChanged(object? sender, PointerWheelEventArgs e)

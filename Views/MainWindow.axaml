@@ -14,6 +14,7 @@
     Height="800"
     WindowDecorations="None"
     KeyDown="Window_KeyDown"
+    Window.Deactivated="Window_Deactivated"
     DragDrop.AllowDrop="True"
 >
 
@@ -372,6 +373,7 @@
                 PointerReleased="Canvas_PointerReleased"
                 PointerWheelChanged="Canvas_PointerWheelChanged"
                 PointerExited="CanvasBorder_PointerExited"
+                PointerCaptureLost="CanvasBorder_PointerCaptureLost"
                 DragDrop.AllowDrop="True"
             >
                 <Grid Background="Transparent">
