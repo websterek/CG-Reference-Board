@@ -958,11 +958,25 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         cell.SetText($"Downloading Video...\n{url}");
         cell.IsDownloading = true;
+        cell.DownloadProgress = 0f;
+        cell.DownloadStatusText = "Starting...";
 
         string videoDir = Path.Combine(_workspaceDir, "videos");
-        var result = await YtDlpService.DownloadVideoAsync(url, videoDir);
+
+        void OnProgress(float percent, string status)
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                cell.DownloadProgress = percent;
+                cell.DownloadStatusText = status;
+            }, Avalonia.Threading.DispatcherPriority.Background);
+        }
+
+        var result = await YtDlpService.DownloadVideoAsync(url, videoDir, onProgress: OnProgress);
 
         cell.IsDownloading = false;
+        cell.DownloadProgress = 0f;
+        cell.DownloadStatusText = "Downloading...";
 
         if (result.Success)
         {

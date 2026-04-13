@@ -20,6 +20,7 @@
     <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.0" />
     <!-- Explicit pin: transitive dep of Avalonia.FreeDesktop; 0.90.3 has CVE GHSA-xrw6-gwf8-vvr9 -->
     <PackageReference Include="Tmds.DBus.Protocol" Version="0.92.0" />
+    <PackageReference Include="YoutubeDLSharp" Version="1.2.0" />
   </ItemGroup>
 
   <ItemGroup>

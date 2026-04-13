@@ -1151,21 +1151,59 @@
                                                 <StackPanel
                                                     VerticalAlignment="Center"
                                                     HorizontalAlignment="Center"
-                                                    Orientation="Horizontal"
-                                                    Spacing="10"
+                                                    Orientation="Vertical"
+                                                    Spacing="8"
+                                                    Margin="16"
                                                 >
-                                                    <Ellipse
-                                                        Classes="PulsingDot"
-                                                        Width="10"
-                                                        Height="10"
-                                                        Fill="{StaticResource AccentBrush}"
+                                                    <!-- Status row: pulsing dot + status text -->
+                                                    <StackPanel
+                                                        Orientation="Horizontal"
+                                                        HorizontalAlignment="Center"
+                                                        Spacing="8"
+                                                    >
+                                                        <Ellipse
+                                                            Classes="PulsingDot"
+                                                            Width="8"
+                                                            Height="8"
+                                                            Fill="{StaticResource AccentBrush}"
+                                                            VerticalAlignment="Center"
+                                                        />
+                                                        <TextBlock
+                                                            Text="{Binding DownloadStatusText}"
+                                                            Foreground="#DDDDDD"
+                                                            FontSize="11"
+                                                            FontWeight="SemiBold"
+                                                            VerticalAlignment="Center"
+                                                            TextTrimming="CharacterEllipsis"
+                                                            MaxWidth="200"
+                                                        />
+                                                    </StackPanel>
+
+                                                    <!-- Progress bar -->
+                                                    <ProgressBar
+                                                        Minimum="0"
+                                                        Maximum="100"
+                                                        Value="{Binding DownloadProgress}"
+                                                        Height="4"
+                                                        MinWidth="120"
+                                                        Foreground="{StaticResource AccentBrush}"
+                                                        Background="#44FFFFFF"
+                                                        CornerRadius="2"
                                                     />
+
+                                                    <!-- Percentage label -->
                                                     <TextBlock
-                                                        Text="Downloading..."
-                                                        Foreground="#DDDDDD"
-                                                        FontSize="14"
+                                                        HorizontalAlignment="Center"
+                                                        Foreground="#88FFFFFF"
+                                                        FontSize="10"
                                                         FontWeight="SemiBold"
-                                                    />
+                                                    >
+                                                        <TextBlock.Text>
+                                                            <MultiBinding StringFormat="{}{0:F0}%">
+                                                                <Binding Path="DownloadProgress" />
+                                                            </MultiBinding>
+                                                        </TextBlock.Text>
+                                                    </TextBlock>
                                                 </StackPanel>
                                             </Border>
 

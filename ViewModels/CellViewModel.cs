@@ -128,6 +128,22 @@ public class CellViewModel : ViewModelBase
         set => SetProperty(ref _isDownloading, value);
     }
 
+    private float _downloadProgress;
+    /// <summary>Download progress 0–100. Updated during active yt-dlp downloads.</summary>
+    public float DownloadProgress
+    {
+        get => _downloadProgress;
+        set => SetProperty(ref _downloadProgress, value);
+    }
+
+    private string _downloadStatusText = "Downloading...";
+    /// <summary>Human-readable download status string, e.g. "Downloading 45% @ 1.5MiB/s ETA 00:30".</summary>
+    public string DownloadStatusText
+    {
+        get => _downloadStatusText;
+        set => SetProperty(ref _downloadStatusText, value);
+    }
+
     private bool _isSelected;
     /// <summary>Whether this cell is currently selected (for multi-selection operations).</summary>
     public bool IsSelected

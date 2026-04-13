@@ -3,7 +3,10 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
+using YoutubeDLSharp;
+using YoutubeDLSharp.Options;
 
 namespace CGReferenceBoard.Services;
 
@@ -13,59 +16,78 @@ namespace CGReferenceBoard.Services;
 public record VideoDownloadResult(bool Success, string? VideoPath, string? ThumbnailPath, string? ErrorMessage);
 
 /// <summary>
-/// Provides functionality to download videos and thumbnails using yt-dlp.
+/// Provides functionality to download videos and thumbnails using yt-dlp via YoutubeDLSharp.
 /// </summary>
 public static class YtDlpService
 {
     /// <summary>
-    /// Downloads a video and its thumbnail from the given URL using yt-dlp.
-    /// The work is performed on a background thread.
+    /// Downloads a video and its thumbnail from the given URL using yt-dlp via YoutubeDLSharp.
     /// </summary>
     /// <param name="url">The video URL to download.</param>
     /// <param name="videosDirectory">The directory where downloaded files will be stored.</param>
+    /// <param name="onProgress">
+    /// Optional callback invoked with (percentComplete 0–100, statusString) as download progresses.
+    /// The callback is invoked on the thread that YoutubeDLSharp reports progress on;
+    /// the caller is responsible for dispatching to the UI thread if needed.
+    /// </param>
+    /// <param name="cancellationToken">Token to cancel the download.</param>
     /// <returns>A <see cref="VideoDownloadResult"/> indicating success or failure.</returns>
-    public static Task<VideoDownloadResult> DownloadVideoAsync(string url, string videosDirectory)
+    public static async Task<VideoDownloadResult> DownloadVideoAsync(
+        string url,
+        string videosDirectory,
+        Action<float, string>? onProgress = null,
+        CancellationToken cancellationToken = default)
     {
-        return Task.Run(() =>
+        try
         {
-            try
+            var guid = Guid.NewGuid().ToString();
+
+            if (!Directory.Exists(videosDirectory))
+                Directory.CreateDirectory(videosDirectory);
+
+            var ytdl = new YoutubeDL
             {
-                var guid = Guid.NewGuid().ToString();
+                YoutubeDLPath = ResolveYtDlpPath(),
+                FFmpegPath = ResolveFfmpegPath(),
+                OutputFolder = videosDirectory,
+                OutputFileTemplate = guid + ".%(ext)s"
+            };
 
-                if (!Directory.Exists(videosDirectory))
-                    Directory.CreateDirectory(videosDirectory);
+            var progressHandler = new Progress<DownloadProgress>(progress =>
+            {
+                if (onProgress == null)
+                    return;
 
-                var ytDlpPath = ResolveYtDlpPath();
-                var outputTemplate = Path.Combine(videosDirectory, guid + ".%(ext)s");
+                float percent = progress.Progress * 100f;
 
-                using var process = new Process
+                string status = progress.State switch
                 {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = ytDlpPath,
-                        Arguments = $"--no-playlist --write-thumbnail --merge-output-format mp4 -o \"{outputTemplate}\" \"{url}\"",
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    }
+                    DownloadState.Downloading =>
+                        $"Downloading {progress.Progress * 100:F0}% @ {progress.DownloadSpeed} ETA {progress.ETA}",
+                    DownloadState.PostProcessing => "Post-processing...",
+                    DownloadState.PreProcessing => "Starting...",
+                    _ => $"{percent:F0}%"
                 };
 
-                process.Start();
+                onProgress(percent, status);
+            });
 
-                // Read redirected streams before WaitForExit to avoid deadlocks
-                // when the process writes more than the OS buffer can hold.
-                var stdout = process.StandardOutput.ReadToEnd();
-                var stderr = process.StandardError.ReadToEnd();
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
-                if (!process.WaitForExit(TimeSpan.FromMinutes(5)))
+            var result = await ytdl.RunVideoDownload(
+                url,
+                mergeFormat: DownloadMergeFormat.Mp4,
+                ct: linkedCts.Token,
+                progress: progressHandler,
+                overrideOptions: new OptionSet
                 {
-                    try
-                    { process.Kill(entireProcessTree: true); }
-                    catch { }
-                    return new VideoDownloadResult(false, null, null, "Download timed out after 5 minutes.");
-                }
+                    NoPlaylist = true,
+                    WriteThumbnail = true
+                });
 
+            if (result.Success)
+            {
                 string[] videoExtensions = { ".mp4", ".mkv", ".webm", ".avi", ".mov", ".m4v" };
                 string[] thumbExtensions = { ".jpg", ".jpeg", ".webp", ".png" };
 
@@ -77,19 +99,31 @@ public static class YtDlpService
                     thumbExtensions.Any(ext => f.EndsWith(ext, StringComparison.OrdinalIgnoreCase)));
 
                 if (videoFile != null && thumbnailFile != null)
-                {
                     return new VideoDownloadResult(true, videoFile, thumbnailFile, null);
-                }
 
+                // Downloaded successfully but couldn't locate expected output files.
                 return new VideoDownloadResult(false, null, null,
-                    $"yt-dlp exited with code {process.ExitCode}. " +
-                    (string.IsNullOrWhiteSpace(stderr) ? "No error output." : $"stderr: {stderr}"));
+                    "Download reported success but the output files could not be found.");
             }
-            catch (Exception ex)
-            {
-                return new VideoDownloadResult(false, null, null, ex.Message);
-            }
-        });
+
+            var errorMessage = result.ErrorOutput is { Length: > 0 }
+                ? string.Join(Environment.NewLine, result.ErrorOutput)
+                : "yt-dlp reported failure with no additional output.";
+
+            return new VideoDownloadResult(false, null, null, errorMessage);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return new VideoDownloadResult(false, null, null, "Download was cancelled.");
+        }
+        catch (OperationCanceledException)
+        {
+            return new VideoDownloadResult(false, null, null, "Download timed out after 5 minutes.");
+        }
+        catch (Exception ex)
+        {
+            return new VideoDownloadResult(false, null, null, ex.Message);
+        }
     }
 
     /// <summary>
