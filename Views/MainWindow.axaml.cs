@@ -794,19 +794,29 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         OnPropertyChanged(nameof(HasRecentBoards));
     }
 
-    private void UpdateBoardDirectoryList()
+    private async void UpdateBoardDirectoryList()
     {
         BoardFilesInDirectory.Clear();
         if (string.IsNullOrEmpty(_workspaceDir) || !Directory.Exists(_workspaceDir))
             return;
 
-        foreach (var file in Directory.GetFiles(_workspaceDir, $"*{Constants.DefaultBoardExtension}").OrderBy(Path.GetFileName))
+        var currentFile = _currentBoardFile;
+        var workspaceDir = _workspaceDir;
+        var extension = Constants.DefaultBoardExtension;
+
+        var files = await Task.Run(() =>
+            Directory.GetFiles(workspaceDir, $"*{extension}")
+                     .OrderBy(Path.GetFileName)
+                     .ToList());
+
+        BoardFilesInDirectory.Clear();
+        foreach (var file in files)
         {
             BoardFilesInDirectory.Add(new BoardMenuItemViewModel
             {
                 FileName = Path.GetFileName(file),
-                IsActive = !string.IsNullOrEmpty(_currentBoardFile) &&
-                           Path.GetFullPath(file) == Path.GetFullPath(_currentBoardFile)
+                IsActive = !string.IsNullOrEmpty(currentFile) &&
+                           Path.GetFullPath(file) == Path.GetFullPath(currentFile)
             });
         }
         OnPropertyChanged(nameof(HasBoardFilesInDirectory));
@@ -1208,7 +1218,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 _translate.X += dx;
                 _translate.Y += dy;
             }
-        });
+        }, Avalonia.Threading.DispatcherPriority.Background);
     }
 
     #endregion

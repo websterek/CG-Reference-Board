@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Skia;
 using System;
 
 namespace CGReferenceBoard;
@@ -15,5 +16,6 @@ internal class Program
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
             .WithInterFont()
-            .LogToTrace();
+            .LogToTrace()
+            .With(new SkiaOptions { MaxGpuResourceSizeBytes = 256 * 1024 * 1024 });
 }

@@ -34,6 +34,9 @@
                 PointerPressed="TopBar_PointerPressed"
                 BackgroundSizing="InnerBorderEdge"
             >
+                <Border.CacheMode>
+                    <BitmapCache RenderAtScale="1" SnapsToDevicePixels="True" />
+                </Border.CacheMode>
                 <Grid ColumnDefinitions="Auto, *, Auto">
                     <Menu
                         Grid.Column="0"
@@ -607,7 +610,7 @@
                             </Border.ContextMenu>
 
                             <!-- Canvas background layers – one visible at a time -->
-                            <Panel IsVisible="{Binding IsCanvasBackgroundVisible}">
+                            <Panel IsVisible="{Binding IsCanvasBackgroundVisible}" IsHitTestVisible="False">
                                 <!-- Dots: subtle grid lines + centred dot in each cell -->
                                 <Border IsVisible="{Binding IsGridBackgroundDots}">
                                     <Border.Background>
@@ -1046,6 +1049,7 @@
                                                     Source="{Binding Image}"
                                                     Stretch="{Binding ImageStretch}"
                                                     DoubleTapped="CanvasImage_DoubleTapped"
+                                                    RenderOptions.BitmapInterpolationMode="MediumQuality"
                                                 />
                                             </Border>
 
@@ -1055,6 +1059,7 @@
                                                     Source="{Binding Image}"
                                                     Stretch="UniformToFill"
                                                     DoubleTapped="CanvasImage_DoubleTapped"
+                                                    RenderOptions.BitmapInterpolationMode="MediumQuality"
                                                 />
                                                 <!-- Play icon overlay (shown on hover via style) -->
                                                 <Border
@@ -1184,7 +1189,7 @@
 
                                             <!-- Resize Thumb (edit mode only) -->
                                             <Panel
-                                                IsVisible="{ReflectionBinding !IsViewMode, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                IsVisible="{Binding !IsViewMode, RelativeSource={RelativeSource AncestorType=views:MainWindow}}"
                                                 ZIndex="10"
                                             >
                                                 <Border
