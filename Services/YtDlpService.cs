@@ -2,9 +2,9 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using CGReferenceBoard.Helpers;
 using YoutubeDLSharp;
 using YoutubeDLSharp.Options;
 
@@ -187,44 +187,18 @@ public static class YtDlpService
     /// <summary>
     /// Resolves the path to the bundled ffmpeg executable, or falls back to a system-wide install.
     /// </summary>
-    private static string ResolveFfmpegPath()
-    {
-        bool isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-
-        string relativePath = isWindows
-            ? Path.Combine("Include", "ffmpeg-windows", "ffmpeg.exe")
-            : Path.Combine("Include", "ffmpeg-linux", "ffmpeg");
-
-        if (File.Exists(relativePath))
-            return relativePath;
-
-        string baseDirPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", relativePath);
-        if (File.Exists(baseDirPath))
-            return baseDirPath;
-
-        // Fall back to system-wide ffmpeg
-        return "ffmpeg";
-    }
+    private static string ResolveFfmpegPath() =>
+        PlatformHelper.ResolveBundledBinary(
+            windowsRelativePath: Path.Combine("Include", "ffmpeg-windows", "ffmpeg.exe"),
+            linuxRelativePath: Path.Combine("Include", "ffmpeg-linux", "ffmpeg"),
+            fallbackName: "ffmpeg");
 
     /// <summary>
     /// Resolves the path to the bundled yt-dlp executable, or falls back to a system-wide install.
     /// </summary>
-    private static string ResolveYtDlpPath()
-    {
-        bool isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-
-        string relativePath = isWindows
-            ? Path.Combine("Include", "yt-dlp-windows", "yt-dlp.exe")
-            : Path.Combine("Include", "yt-dlp-linux", "yt-dlp_linux");
-
-        if (File.Exists(relativePath))
-            return relativePath;
-
-        string baseDirPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", relativePath);
-        if (File.Exists(baseDirPath))
-            return baseDirPath;
-
-        // Fall back to system-wide yt-dlp
-        return "yt-dlp";
-    }
+    private static string ResolveYtDlpPath() =>
+        PlatformHelper.ResolveBundledBinary(
+            windowsRelativePath: Path.Combine("Include", "yt-dlp-windows", "yt-dlp.exe"),
+            linuxRelativePath: Path.Combine("Include", "yt-dlp-linux", "yt-dlp_linux"),
+            fallbackName: "yt-dlp");
 }
