@@ -73,11 +73,17 @@ public class CellViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>Total pixel width including backdrop padding when applicable.</summary>
-    public double PixelWidth => ColSpan * Constants.GridSize + (Type == CellType.Backdrop ? Constants.GridSize : 0);
+    /// <summary>Total pixel width including backdrop visual padding when applicable.
+    /// Backdrops are drawn to extend by <see cref="Constants.BackdropPadding"/> on both
+    /// the left and right sides, so the extra space equals 2 × BackdropPadding.
+    /// </summary>
+    public double PixelWidth => ColSpan * Constants.GridSize + (Type == CellType.Backdrop ? 2 * Constants.BackdropPadding : 0);
 
-    /// <summary>Total pixel height including backdrop padding when applicable.</summary>
-    public double PixelHeight => RowSpan * Constants.GridSize + (Type == CellType.Backdrop ? Constants.GridSize : 0);
+    /// <summary>Total pixel height including backdrop visual padding when applicable.
+    /// Backdrops are drawn to extend by <see cref="Constants.BackdropPadding"/> on both
+    /// the top and bottom sides, so the extra space equals 2 × BackdropPadding.
+    /// </summary>
+    public double PixelHeight => RowSpan * Constants.GridSize + (Type == CellType.Backdrop ? 2 * Constants.BackdropPadding : 0);
 
     #endregion
 

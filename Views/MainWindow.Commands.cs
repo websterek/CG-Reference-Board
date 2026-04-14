@@ -696,6 +696,11 @@ public partial class MainWindow
             int gridX = (int)(Math.Floor(minX / Constants.GridSize) * Constants.GridSize);
             int gridY = (int)(Math.Floor(minY / Constants.GridSize) * Constants.GridSize);
 
+            // Note: BackdropPadding is defined as half a grid cell (GridSize / 2).
+            // The layout intentionally applies half-grid padding on both sides:
+            // - Visual origin (VisualX/VisualY) is offset by BackdropPadding (left/top).
+            // - PixelWidth/PixelHeight add a full GridSize, which equals 2 * BackdropPadding,
+            //   so the backdrop extends half a grid outside the selected region on each side.
             double width = maxX - gridX + Constants.BackdropPadding;
             double height = maxY - gridY + Constants.BackdropPadding;
 
