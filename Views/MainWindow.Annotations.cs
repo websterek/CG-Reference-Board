@@ -78,9 +78,23 @@ public partial class MainWindow
         if (_isViewMode || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             return;
 
-        // Grid mode: drag already-selected annotations (unselected ones are not hit-testable)
-        if (!IsDrawMode && sender is Control { DataContext: AnnotationViewModel annGrid } && annGrid.IsSelected)
+        // Grid mode: handle Ctrl+click to deselect selected annotations
+        if (!IsDrawMode && sender is Control { DataContext: AnnotationViewModel annGrid })
         {
+            bool isCtrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+            
+            if (isCtrl && annGrid.IsSelected)
+            {
+                annGrid.IsSelected = false;
+                _selectedAnnotations.Remove(annGrid);
+                UpdateSelectionState();
+                e.Handled = true;
+                return;
+            }
+            
+            if (!annGrid.IsSelected)
+                return;
+            
             _isDraggingAnnotations = true;
             _annotationDragCellOriginals = _selectedCells.Select(c => (c, c.CanvasX, c.CanvasY)).ToList();
             foreach (var (c, _, _) in _annotationDragCellOriginals)
@@ -101,7 +115,20 @@ public partial class MainWindow
         // Move mode: select and drag annotation
         if (IsMoveMode && sender is Control { DataContext: AnnotationViewModel annMove })
         {
-            if (!_selectedAnnotations.Contains(annMove))
+            bool isCtrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+
+            if (isCtrl)
+            {
+                annMove.IsSelected = !annMove.IsSelected;
+                if (annMove.IsSelected)
+                    _selectedAnnotations.Add(annMove);
+                else
+                    _selectedAnnotations.Remove(annMove);
+                UpdateSelectionState();
+                e.Handled = true;
+                return;
+            }
+            else if (!_selectedAnnotations.Contains(annMove))
             {
                 _selectedAnnotations.Clear();
                 foreach (var a in Annotations)
