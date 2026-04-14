@@ -1,11 +1,16 @@
 **The Precision Reference Organizer**
 A grid-based alternative to PureRef that keeps your files organized, local, and always accessible to your creative pipeline.
-
-**Built for artists who find traditional "free-form" reference boards chaotic.** 
-CGRB enforces a strict grid layout, ensuring your workspace remains clean while keeping every asset directly accessible on your hard drive for easy use in Photoshop, Nuke, Blender, Houdini etc.
  
 <br>
- 
+
+<center>
+<img width="128" height="128" alt="logo" src="https://github.com/user-attachments/assets/0f27f6bc-9a5f-4091-9808-1728946d0cad" />
+<br>
+<img width="1200" height="800" alt="image" src="https://github.com/user-attachments/assets/c8eef5f5-333a-432b-a823-fd8462fe774b" />
+</center>
+
+<br>
+  
 # 🛠 Why this exists?
 Most reference tools hide your images in proprietary save files. This project is built on the philosophy of **transparency** and **direct accessibility**:
 - **Direct HDD Access:** All items are stored right on your drive. Need that image in Maya? Just grab it from the folder or copy the path directly from the app.
