@@ -100,11 +100,6 @@ Most reference tools hide your images in proprietary save files. This project is
  
 <br>
 
-# 🚀 Getting Started
-[ TODO ]
- 
-<br>
-
 # 🗺 Plans for the Future
 This is a personal project made in the "free time of free time," but I hope to eventually add:
 -   [ ] **Built-in Players:** Better handling for video playback within the grid.
