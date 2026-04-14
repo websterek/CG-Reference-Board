@@ -31,8 +31,7 @@ Most reference tools hide your images in proprietary save files. This project is
     - **Quick Switch:** Use the Boards top menu to instantly jump between different board files within your current database.
     - **New Board Wizard:** A dedicated setup tool to help you create and configure new boards with ease.Interface & Persistence
 - ✨ **Top Menu:** While shortcuts are available for power users, the Top Menu provides easy access to mode switching, board customization, and visual settings.
-
-Auto-Save: Focus on your work without worry—every action is automatically saved to the board file in real-time.
+- 💾 **Auto-Save:** Focus on your work without worry—every action is automatically saved to the board file in real-time.
 
 ### Controls & Shortcuts
 - 🖱 Mouse & Navigation
