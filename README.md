@@ -14,6 +14,31 @@ Most reference tools hide your images in proprietary save files. This project is
 - **Direct HDD Access:** All items are stored right on your drive. Need that image in Maya? Just grab it from the folder or copy the path directly from the app.
 - **The "Database" Dir:** Every item is automatically downloaded and organized into a local directory.
 - **Json File Format:** *.cgrb files are just JSONs!
+
+# Getting Started
+- 🖱 Mouse & Navigation
+    - **Pan:** Middle _`Click`_ + _`drag`_ or `Shift` + `Left Click` + _`drag`_.
+    - **Zoom:** `Mouse Wheel` to zoom at pointer, or `Middle` + `Left Click` + _`drag up/down`_ (Nuke like).
+    - **Reset View:** Press `Home` to reset zoom and center.
+    - **Board View:** Press `F` to show every item on the board. 
+    - **Focus Item:** `Double-click` an image, video, or text cell to fill the screen.
+    - **Focus Selection:** `Shift` + `F` with selected item(s)
+    - **External Open:** `Shift` + `Double-click` to open the file in your system’s default application.
+- 🔲 Grid & Cell Selection
+    - **Select:** `Left Click` on empty canvas for marquee selection.
+    - **Multi-select:** `Hold Ctrl` while clicking to add/remove items.
+    - **Duplicate:** `Alt` + `Left Click` + _`drag`_ on an item/draw to clone it instantly.
+    - **Delete:** `Delete` or `Backspace` removes selected (or hovered) items/draw.
+    - **Clear:** `Escape` clears selection or cancels the current operation.
+📋 Clipboard & I/O
+    - Copy Path/Text: Ctrl + C copies the file path (image/video) or the raw text.
+    - Copy Bitmap: Ctrl + Shift + C copies the actual image to your clipboard.
+    - Smart Paste: Ctrl + V handles everything:
+    - URLs: Links (like YouTube) trigger automatic video downloads to your HDD.
+    - Files: Pasting files from your OS copies them into your local database.
+    - Images: Pasted bitmap data is saved as a new image file automatically.
+    - Import: Ctrl + I to manually browse and import media.
+
  
 <br>
  
