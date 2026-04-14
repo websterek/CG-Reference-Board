@@ -67,7 +67,14 @@ public partial class MainWindow
     private void MaximizeWindow_Click(object? sender, RoutedEventArgs e)
         => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
 
-    private void CloseWindow_Click(object? sender, RoutedEventArgs e) => Close();
+    private async void CloseWindow_Click(object? sender, RoutedEventArgs e)
+    {
+        if (!await ConfirmDiscardChanges())
+            return;
+        // Set flag so OnWindowClosing does not show a second prompt.
+        _closingConfirmed = true;
+        Close();
+    }
 
     private void TopLeft_PointerPressed(object? sender, PointerPressedEventArgs e) => this.BeginResizeDrag(WindowEdge.NorthWest, e);
     private void Top_PointerPressed(object? sender, PointerPressedEventArgs e) => this.BeginResizeDrag(WindowEdge.North, e);
@@ -127,6 +134,10 @@ public partial class MainWindow
 
     private async void LoadBoard_Click(object? sender, RoutedEventArgs e)
     {
+        // #17: Warn before discarding the current board.
+        if (!await ConfirmDiscardChanges())
+            return;
+
         var topLevel = TopLevel.GetTopLevel(this);
         var files = await topLevel!.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
@@ -148,11 +159,31 @@ public partial class MainWindow
         }
     }
 
-    private void NewBoard_Click(object? sender, RoutedEventArgs e)
+    private async void NewBoard_Click(object? sender, RoutedEventArgs e)
     {
-        _currentBoardFile = "";
+        // #17: warn about unsaved changes before wiping the board.
+        if (!await ConfirmDiscardChanges())
+            return;
+
+        // #1: release all loaded bitmaps so they are not leaked.
+        foreach (var cell in GridCells)
+            cell.UnloadImage();
+        ImageManager.ClearCaches();
+
+        // #1: clear every piece of stale state before discarding view-models.
+        foreach (var c in _selectedCells)
+            c.IsSelected = false;
+        _selectedCells.Clear();
+        _selectedAnnotations.Clear();
+        _currentAnnotation = null;
+        _editingTextAnnotation = null;
+        _undoStack.Clear();
+        _redoStack.Clear();
+
         GridCells.Clear();
         Annotations.Clear();
+
+        _currentBoardFile = "";
         CurrentBoardName = "New Board";
         _hasUnsavedChanges = false;
         Title = Constants.AppName;
@@ -519,7 +550,18 @@ public partial class MainWindow
         double x = Canvas.GetLeft(hoverHighlight);
         double y = Canvas.GetTop(hoverHighlight);
 
-        var newCell = new CellViewModel { CanvasX = x, CanvasY = y, ColSpan = 2, RowSpan = 2 };
+        // Check for collisions and find an empty slot, just like AddBackdrop does.
+        Point? pos = GridLayoutService.IsSpaceEmpty(GridCells, x, y, 2, 2, collisionLayer: 1)
+            ? new Point(x, y)
+            : GridLayoutService.FindEmptySpace(GridCells, x, y, 2, 2, collisionLayer: 1);
+
+        if (pos == null)
+        {
+            ShakeScreen();
+            return;
+        }
+
+        var newCell = new CellViewModel { CanvasX = pos.Value.X, CanvasY = pos.Value.Y, ColSpan = 2, RowSpan = 2 };
         newCell.Type = CellType.Text;
         newCell.SetText("New Text Block");
 
@@ -540,12 +582,23 @@ public partial class MainWindow
         double x = Canvas.GetLeft(hoverHighlight);
         double y = Canvas.GetTop(hoverHighlight);
 
+        // Labels use collision layer 2; check for space before placing.
+        Point? pos = GridLayoutService.IsSpaceEmpty(GridCells, x, y, 4, 2, collisionLayer: 2)
+            ? new Point(x, y)
+            : GridLayoutService.FindEmptySpace(GridCells, x, y, 4, 2, collisionLayer: 2);
+
+        if (pos == null)
+        {
+            ShakeScreen();
+            return;
+        }
+
         int colorIdx = Random.Shared.Next(Constants.BackdropBackgroundColors.Length);
 
         var newCell = new CellViewModel
         {
-            CanvasX = x,
-            CanvasY = y,
+            CanvasX = pos.Value.X,
+            CanvasY = pos.Value.Y,
             ColSpan = 4,
             RowSpan = 2,
             BackgroundColor = Constants.BackdropBackgroundColors[colorIdx],
@@ -1851,8 +1904,13 @@ public partial class MainWindow
             if (_isViewMode)
                 return;
             var cell = _hoveredCell ?? GetHighlightedCell();
-            cell.SetText("New Description...");
+            // Push the pre-mutation state onto the undo stack before modifying the cell,
+            // so the user can undo this destructive action.
             SaveBoardData();
+            cell.SetText("New Description...");
+            MarkUnsaved();
+            SaveBoardData();
+            ShowToast("📝 Converted to text");
             return;
         }
 
@@ -1887,6 +1945,7 @@ public partial class MainWindow
             {
                 MarkUnsaved();
                 SaveBoardData();
+                ShowToast("🗑 Deleted");
             }
             else if (_hoveredCell != null)
             {
@@ -1895,6 +1954,7 @@ public partial class MainWindow
                 _hoveredCell = null;
                 MarkUnsaved();
                 SaveBoardData();
+                ShowToast("🗑 Deleted");
             }
         }
     }

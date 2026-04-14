@@ -11,7 +11,7 @@ namespace CGReferenceBoard.ViewModels;
 /// <summary>
 /// Represents a single cell on the reference board (image, text, video, label, or backdrop).
 /// </summary>
-public class CellViewModel : ViewModelBase
+public class CellViewModel : ViewModelBase, IDisposable
 {
     #region Position
 
@@ -117,6 +117,13 @@ public class CellViewModel : ViewModelBase
             OnPropertyChanged(nameof(ShowTextContent));
             OnPropertyChanged(nameof(ShowLabelContent));
             OnPropertyChanged(nameof(ShowIconBadge));
+
+            // Context-menu visibility flags derived from Type
+            OnPropertyChanged(nameof(HasAppearanceOptions));
+            OnPropertyChanged(nameof(HasArrangeOptions));
+            OnPropertyChanged(nameof(HasFileOptions));
+            OnPropertyChanged(nameof(HasTextOptions));
+            OnPropertyChanged(nameof(HasClipboardOptions));
         }
     }
 
@@ -543,8 +550,9 @@ public class CellViewModel : ViewModelBase
         }
 
         // Update thumbnail path if it was generated during this load.
+        // Use the property setter (not the backing field) so UI bindings are notified.
         if (target == ImageLod.Thumbnail && thumbPath != _thumbnailPath)
-            _thumbnailPath = thumbPath;
+            ThumbnailPath = thumbPath;
 
         var oldBitmap = _image;
         Image = newBitmap;
@@ -628,35 +636,42 @@ public class CellViewModel : ViewModelBase
     /// </summary>
     public void SetImage(string path)
     {
+        // Load the bitmap BEFORE touching any cell state so that a decode failure
+        // leaves the cell completely unchanged — no partial property updates, no leaks.
+        Bitmap? newBitmap;
         try
         {
-            var old = _image;
-            Image = ImageManager.LoadBitmapFromPath(path, ImageManager.MaxFullDecodeWidth) ?? new Bitmap(path);
-            old?.Dispose();
-            FilePath = path;
-            Type = CellType.Image;
-            CurrentLod = ImageLod.Full;
-
-            // Kick off background work: thumbnail + average colour.
-            var bgToken = Interlocked.Increment(ref _lodToken);
-            _ = Task.Run(async () =>
-            {
-                var thumb = await ImageManager.EnsureThumbnailAsync(path);
-                var color = await ImageManager.ComputeAverageColorAsync(path);
-
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    if (bgToken != _lodToken)
-                        return; // cell was cleared/reassigned
-                    ThumbnailPath = thumb;
-                    PlaceholderColor = color;
-                });
-            });
+            newBitmap = ImageManager.LoadBitmapFromPath(path, ImageManager.MaxFullDecodeWidth)
+                        ?? new Bitmap(path);
         }
         catch
         {
-            // Image file may be missing or corrupt
+            // Image file is missing or corrupt — leave cell state unchanged.
+            return;
         }
+
+        var old = _image;
+        Image = newBitmap;
+        old?.Dispose();
+        FilePath = path;
+        Type = CellType.Image;
+        CurrentLod = ImageLod.Full;
+
+        // Kick off background work: thumbnail + average colour.
+        var bgToken = Interlocked.Increment(ref _lodToken);
+        _ = Task.Run(async () =>
+        {
+            var thumb = await ImageManager.EnsureThumbnailAsync(path);
+            var color = await ImageManager.ComputeAverageColorAsync(path);
+
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (bgToken != _lodToken)
+                    return; // cell was cleared/reassigned
+                ThumbnailPath = thumb;
+                PlaceholderColor = color;
+            });
+        });
     }
 
     /// <summary>
@@ -718,11 +733,16 @@ public class CellViewModel : ViewModelBase
     /// </summary>
     public void SetText(string text)
     {
+        // Cancel any in-flight LOD load so it cannot overwrite the text cell
+        // with a bitmap after we've already switched to CellType.Text.
+        Interlocked.Increment(ref _lodToken);
+
         TextContent = text;
         if (!IsBoardElement)
             Type = CellType.Text;
         var old = _image;
         Image = null;
+        CurrentLod = ImageLod.Placeholder;
         old?.Dispose();
         FilePath = null;
     }
@@ -742,6 +762,19 @@ public class CellViewModel : ViewModelBase
         ThumbnailPath = null;
         PlaceholderColor = "#FF2A2A2A";
         CurrentLod = ImageLod.Placeholder;
+        old?.Dispose();
+    }
+
+    /// <summary>
+    /// Releases the held bitmap. Call when removing a cell from the board to avoid
+    /// leaking unmanaged Skia pixel buffers when the VM is discarded without <see cref="Clear"/>.
+    /// </summary>
+    public void Dispose()
+    {
+        // Cancel any in-flight LOD load so it cannot resurrect the bitmap.
+        Interlocked.Increment(ref _lodToken);
+        var old = _image;
+        _image = null;
         old?.Dispose();
     }
 

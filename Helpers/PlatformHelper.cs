@@ -6,12 +6,13 @@ using System.Runtime.InteropServices;
 namespace CGReferenceBoard.Helpers;
 
 /// <summary>
-/// Helper utilities for file/process operations on Windows and Linux.
+/// Helper utilities for file/process operations on Windows, Linux, and macOS.
 /// </summary>
 public static class PlatformHelper
 {
     public static bool IsWindows => RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
     public static bool IsLinux => RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+    public static bool IsMacOS => RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
 
     /// <summary>
     /// Opens a file or directory with the system's default application.
@@ -21,9 +22,23 @@ public static class PlatformHelper
         try
         {
             if (IsWindows)
+            {
                 Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
+            }
             else if (IsLinux)
-                Process.Start(new ProcessStartInfo { FileName = "xdg-open", Arguments = $"\"{path}\"", UseShellExecute = false });
+            {
+                // Use ArgumentList instead of Arguments string to prevent shell injection
+                // when the path contains quotes or special characters.
+                var psi = new ProcessStartInfo { FileName = "xdg-open", UseShellExecute = false };
+                psi.ArgumentList.Add(path);
+                Process.Start(psi);
+            }
+            else if (IsMacOS)
+            {
+                var psi = new ProcessStartInfo { FileName = "open", UseShellExecute = false };
+                psi.ArgumentList.Add(path);
+                Process.Start(psi);
+            }
         }
         catch (Exception ex)
         {
@@ -60,6 +75,14 @@ public static class PlatformHelper
                                 $"array:string:\"file://{path}\" string:\"\"",
                     UseShellExecute = true
                 });
+            }
+            else if (IsMacOS)
+            {
+                // `open -R <path>` reveals the file in Finder.
+                var psi = new ProcessStartInfo { FileName = "open", UseShellExecute = false };
+                psi.ArgumentList.Add("-R");
+                psi.ArgumentList.Add(path);
+                Process.Start(psi);
             }
         }
         catch (Exception ex)

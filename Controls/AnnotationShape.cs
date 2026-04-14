@@ -91,6 +91,14 @@ public class AnnotationShape : Control
     public AnnotationShape()
     {
         ClipToBounds = false;
+        // Static event subscriptions are made in OnAttachedToVisualTree and removed
+        // in OnDetachedFromVisualTree. Subscribing in the constructor would leak the
+        // instance if the control is created but never added to the visual tree.
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
         EffectModeChanged += OnEffectModeChanged;
         ScaleChanged += OnScaleChanged;
     }
@@ -209,9 +217,19 @@ public class AnnotationShape : Control
 
         if (vm.Type == "Text")
         {
-            // Reserve rough space for text to avoid clipping
-            maxX = _minX + 300;
-            maxY = _minY + 100;
+            // Measure the actual rendered text size using the same font parameters
+            // as RenderText so the control bounds are tight around the content.
+            double fontSize = Math.Max(12, vm.Thickness * 4 + 10);
+            var ft = new FormattedText(
+                vm.Text ?? "",
+                System.Globalization.CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight,
+                new Typeface("Inter, Arial"),
+                fontSize,
+                Avalonia.Media.Brushes.White);
+            // Add padding so shadow/outline effects are not clipped.
+            maxX = _minX + Math.Max(40, ft.Width + 20);
+            maxY = _minY + Math.Max(20, ft.Height + 20);
         }
 
         double pad = vm.Thickness + Constants.AnnotationEffectPadding;

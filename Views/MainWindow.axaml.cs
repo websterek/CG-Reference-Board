@@ -54,6 +54,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly Stack<string> _redoStack = new();
     private bool _isRestoringState;
 
+    // Serialises concurrent SaveBoardData calls so writes never interleave.
+    private readonly System.Threading.SemaphoreSlim _saveSemaphore = new(1, 1);
+
+    // Cached process handle used by MemoryUsageText to avoid leaking a handle on every binding refresh.
+    private static readonly System.Diagnostics.Process _thisProcess =
+        System.Diagnostics.Process.GetCurrentProcess();
+
+    // Set to true once the user has confirmed they want to close/discard; prevents double-prompt.
+    private bool _closingConfirmed;
+
     private void Undo()
     {
         if (_undoStack.Count <= 1 || _isViewMode)
@@ -95,6 +105,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         foreach (var c in GridCells)
             c.UnloadImage();
 
+        // Deselect cells whose view-models are about to be discarded so stale
+        // references never linger in _selectedCells after the undo/redo swap.
+        foreach (var c in _selectedCells)
+            c.IsSelected = false;
+        _selectedCells.Clear();
+
         GridCells.Clear();
         Annotations.Clear();
         _selectedAnnotations.Clear();
@@ -109,6 +125,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             ann.IsInDrawMode = IsDrawMode;
             Annotations.Add(ann);
         }
+
+        // Sync SelectionCountText and related bindings after the VM swap.
+        UpdateSelectionState();
     }
 
     #endregion
@@ -293,7 +312,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             int loaded = GridCells.Count(c => c.NeedsImage && c.Image != null);
             int total = GridCells.Count(c => c.NeedsImage);
-            long mb = System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
+            _thisProcess.Refresh();
+            long mb = _thisProcess.WorkingSet64 / (1024 * 1024);
             return total > 0 ? $"IMG {loaded}/{total} | {mb} MB" : $"{mb} MB";
         }
     }
@@ -642,6 +662,109 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             Avalonia.Threading.Dispatcher.UIThread.Post(() => LoadBoardFromFile(startFile));
         }
+
+        // Unsaved-changes confirmation on OS close button / Alt-F4.
+        Closing += OnWindowClosing;
+    }
+
+    /// <summary>
+    /// Intercepts window close requests to prompt the user when there are unsaved changes.
+    /// Uses a two-step approach: cancel the first close, show an async dialog, then
+    /// re-close if the user confirms — setting <see cref="_closingConfirmed"/> to skip
+    /// the prompt on the second pass.
+    /// </summary>
+    private async void OnWindowClosing(object? sender, WindowClosingEventArgs e)
+    {
+        // Already confirmed, or nothing unsaved, or triggered programmatically from
+        // within this handler — let the close proceed.
+        if (_closingConfirmed || !_hasUnsavedChanges || e.IsProgrammatic)
+            return;
+
+        // Cancel this close attempt and show the confirmation dialog asynchronously.
+        e.Cancel = true;
+
+        bool discard = await ConfirmDiscardChanges();
+        if (discard)
+        {
+            _closingConfirmed = true;
+            Close(); // will re-enter OnWindowClosing with _closingConfirmed == true
+        }
+    }
+
+    /// <summary>
+    /// Stops and releases background timers when the window is fully closed.
+    /// </summary>
+    protected override void OnClosed(EventArgs e)
+    {
+        base.OnClosed(e);
+        _viewportLodTimer?.Stop();
+        _edgeScrollTimer?.Stop();
+        _edgeScrollTimer?.Dispose();
+        _saveSemaphore.Dispose();
+    }
+
+    /// <summary>
+    /// Shows an inline confirmation dialog asking the user whether to discard unsaved changes.
+    /// Returns <c>true</c> if the user chose to discard, <c>false</c> if they cancelled.
+    /// Returns <c>true</c> immediately when there are no unsaved changes.
+    /// </summary>
+    private async Task<bool> ConfirmDiscardChanges()
+    {
+        if (!_hasUnsavedChanges)
+            return true;
+
+        bool result = false;
+
+        var dialog = new Window
+        {
+            Title = "Unsaved Changes",
+            Width = 380,
+            Height = 145,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#1E1E1E")),
+        };
+
+        var msgText = new TextBlock
+        {
+            Text = "You have unsaved changes. Discard them and continue?",
+            Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#EEEEEE")),
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+            FontSize = 13,
+            Margin = new Thickness(24, 20, 24, 0),
+        };
+
+        var discardBtn = new Button
+        {
+            Content = "Discard Changes",
+            Margin = new Thickness(0, 0, 8, 0),
+        };
+        var cancelBtn = new Button
+        {
+            Content = "Cancel",
+        };
+
+        discardBtn.Click += (_, _) => { result = true; dialog.Close(); };
+        cancelBtn.Click += (_, _) => { result = false; dialog.Close(); };
+
+        var btnRow = new Avalonia.Controls.StackPanel
+        {
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+            Margin = new Thickness(24, 16, 24, 0),
+            Spacing = 8,
+        };
+        btnRow.Children.Add(discardBtn);
+        btnRow.Children.Add(cancelBtn);
+
+        var layout = new Avalonia.Controls.StackPanel();
+        layout.Children.Add(msgText);
+        layout.Children.Add(btnRow);
+
+        dialog.Content = layout;
+
+        await dialog.ShowDialog(this);
+        return result;
     }
 
     #endregion
@@ -653,33 +776,51 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     /// </summary>
     private async void LoadBoardFromFile(string filePath)
     {
+        // Read the file BEFORE touching any board state so that if the read fails
+        // the current board remains valid and _currentBoardFile is left unchanged.
+        string json;
         try
         {
-            _currentBoardFile = filePath;
-            _workspaceDir = Path.GetDirectoryName(_currentBoardFile)!;
-            CurrentBoardName = Path.GetFileNameWithoutExtension(_currentBoardFile);
-            OnPropertyChanged(nameof(WindowTitle));
-            UpdateBoardDirectoryList();
+            json = await File.ReadAllTextAsync(filePath);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Load error (read): {ex.Message}");
+            ShowToast("⚠️ Could not open board file");
+            return;
+        }
 
-            var startupOverlay = this.FindControl<Border>("StartupOverlay");
-            if (startupOverlay != null)
-                startupOverlay.IsVisible = false;
+        // Commit the new file identity now that we successfully have the data.
+        _currentBoardFile = filePath;
+        _workspaceDir = Path.GetDirectoryName(_currentBoardFile)!;
+        CurrentBoardName = Path.GetFileNameWithoutExtension(_currentBoardFile);
+        OnPropertyChanged(nameof(WindowTitle));
+        UpdateBoardDirectoryList();
 
-            OnPropertyChanged(nameof(WindowTitle));
+        var startupOverlay = this.FindControl<Border>("StartupOverlay");
+        if (startupOverlay != null)
+            startupOverlay.IsVisible = false;
 
-            string json = await File.ReadAllTextAsync(_currentBoardFile);
+        OnPropertyChanged(nameof(WindowTitle));
 
-            // Dispose existing cell bitmaps and clear colour caches
-            foreach (var c in GridCells)
-                c.UnloadImage();
-            ImageManager.ClearCaches();
+        // Dispose existing cell bitmaps and clear colour caches.
+        foreach (var c in GridCells)
+            c.UnloadImage();
+        ImageManager.ClearCaches();
 
-            GridCells.Clear();
-            Annotations.Clear();
-            _selectedAnnotations.Clear();
-            _currentAnnotation = null;
-            _editingTextAnnotation = null;
+        // Clear stale selection references before discarding the view-models.
+        foreach (var c in _selectedCells)
+            c.IsSelected = false;
+        _selectedCells.Clear();
 
+        GridCells.Clear();
+        Annotations.Clear();
+        _selectedAnnotations.Clear();
+        _currentAnnotation = null;
+        _editingTextAnnotation = null;
+
+        try
+        {
             var (cells, annotations) = BoardSerializer.Deserialize(json, _currentBoardFile);
             foreach (var cell in cells)
                 GridCells.Add(cell);
@@ -688,38 +829,44 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 ann.IsInDrawMode = IsDrawMode;
                 Annotations.Add(ann);
             }
-
-            _hasUnsavedChanges = false;
-            Title = $"{Constants.AppName} - {Path.GetFileName(_currentBoardFile)}" + (_isViewMode ? " [VIEW MODE]" : "");
-            AddRecentBoard(_currentBoardFile);
-
-            _undoStack.Clear();
-            _redoStack.Clear();
-            SaveBoardData();
-
-            // For cells loaded from older .cgrb files without a saved PlaceholderColor,
-            // kick off background average-colour computation so the placeholder rects
-            // show a meaningful colour instead of default dark grey.
-            foreach (var cell in GridCells)
-            {
-                if (cell.NeedsImage && cell.PlaceholderColor == "#FF2A2A2A")
-                    _ = cell.EnsurePlaceholderColorAsync();
-            }
-
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            {
-                ShowAll_Click(null, null!);
-                ScheduleViewportUpdate();
-            });
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"Load error: {ex.Message}");
+            Debug.WriteLine($"Load error (deserialize): {ex.Message}");
+            ShowToast("⚠️ Board file is corrupt or unreadable");
+            _hasUnsavedChanges = false;
+            return;
         }
+
+        _hasUnsavedChanges = false;
+        Title = $"{Constants.AppName} - {Path.GetFileName(_currentBoardFile)}" + (_isViewMode ? " [VIEW MODE]" : "");
+        AddRecentBoard(_currentBoardFile);
+
+        _undoStack.Clear();
+        _redoStack.Clear();
+        SaveBoardData();
+
+        // For cells loaded from older .cgrb files without a saved PlaceholderColor,
+        // kick off background average-colour computation so the placeholder rects
+        // show a meaningful colour instead of default dark grey.
+        foreach (var cell in GridCells)
+        {
+            if (cell.NeedsImage && cell.PlaceholderColor == "#FF2A2A2A")
+                _ = cell.EnsurePlaceholderColorAsync();
+        }
+
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            ShowAll_Click(null, null!);
+            ScheduleViewportUpdate();
+        });
     }
 
     /// <summary>
     /// Saves the current board state to the active .cgrb file and pushes to undo stack.
+    /// Concurrent calls are serialised via <see cref="_saveSemaphore"/> so that rapid
+    /// mutations (drag end, undo, redo …) never interleave writes or corrupt the file.
+    /// Uses a write-to-temp-then-rename pattern for atomicity.
     /// </summary>
     private async void SaveBoardData()
     {
@@ -728,6 +875,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         string json = BoardSerializer.Serialize(GridCells, Annotations, _currentBoardFile);
 
+        // Undo stack management is synchronous — do it before the async I/O so the
+        // stack is consistent even if the write below fails.
         if (!_isRestoringState && !_isViewMode)
         {
             if (_undoStack.Count == 0 || _undoStack.Peek() != json)
@@ -747,7 +896,28 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             }
         }
 
-        await File.WriteAllTextAsync(_currentBoardFile, json);
+        // Serialise file I/O: only one write at a time, regardless of how many
+        // concurrent async void invocations are in flight.
+        await _saveSemaphore.WaitAsync();
+        try
+        {
+            // Write to a temp file first, then atomically rename.
+            // This prevents a partial write from leaving a corrupt .cgrb if the
+            // process is killed mid-write or if the disk fills up.
+            string tempFile = _currentBoardFile + ".tmp";
+            await File.WriteAllTextAsync(tempFile, json);
+            File.Move(tempFile, _currentBoardFile, overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Save error: {ex.Message}");
+            ShowToast("⚠️ Save failed — check disk space");
+            return;
+        }
+        finally
+        {
+            _saveSemaphore.Release();
+        }
 
         _hasUnsavedChanges = false;
         Title = $"{Constants.AppName} - {Path.GetFileName(_currentBoardFile)}" + (_isViewMode ? " [VIEW MODE]" : "");

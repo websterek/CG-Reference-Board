@@ -15,7 +15,7 @@ public static class Constants
     public const int MaxRecentBoards = 5;
 
     /// <summary>Maximum number of undo snapshots to keep in memory.</summary>
-    public const int MaxUndoDepth = 5;
+    public const int MaxUndoDepth = 50;
 
     /// <summary>Application display name.</summary>
     public const string AppName = "CG Reference Board";
@@ -23,7 +23,10 @@ public static class Constants
     /// <summary>Application version string. Bump this on every release.</summary>
     public const string AppVersion = "0.9.6";
 
-    /// <summary>Primary accent colour used for selection highlights and interactive chrome.</summary>
+    /// <summary>
+    /// Primary accent colour used for selection highlights and interactive chrome.
+    /// NOTE: Must stay in sync with &lt;Color x:Key="AccentColor"&gt; in App.axaml (#44AAFF, same hue without the FF alpha prefix).
+    /// </summary>
     public const string AccentColor = "#FF44AAFF";
 
     /// <summary>Name of the application config directory inside the user profile.</summary>

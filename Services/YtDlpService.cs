@@ -134,7 +134,7 @@ public static class YtDlpService
     /// <param name="outputDirectory">Directory where the thumbnail will be saved.</param>
     public static Task<string?> ExtractThumbnailAsync(string videoPath, string outputDirectory)
     {
-        return Task.Run(() =>
+        return Task.Run(async () =>
         {
             try
             {
@@ -164,8 +164,13 @@ public static class YtDlpService
                 };
 
                 process.Start();
-                process.StandardOutput.ReadToEnd();
-                process.StandardError.ReadToEnd();
+
+                // Drain both pipes concurrently. Reading them sequentially can deadlock:
+                // if ffmpeg fills one pipe's OS buffer while we're blocked on the other,
+                // neither side makes progress.
+                var stdoutTask = process.StandardOutput.ReadToEndAsync();
+                var stderrTask = process.StandardError.ReadToEndAsync();
+                await Task.WhenAll(stdoutTask, stderrTask);
 
                 if (!process.WaitForExit(TimeSpan.FromSeconds(30)))
                 {

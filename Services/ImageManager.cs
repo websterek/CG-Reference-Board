@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
@@ -190,6 +191,14 @@ public static class ImageManager
             int avgB = (int)(b / count);
 
             string hex = $"#FF{avgR:X2}{avgG:X2}{avgB:X2}";
+
+            // Evict oldest-accessible entries when the cache grows too large.
+            const int maxCacheSize = 500;
+            if (_colorCache.Count >= maxCacheSize)
+            {
+                foreach (var k in _colorCache.Keys.Take(50).ToList())
+                    _colorCache.TryRemove(k, out _);
+            }
             _colorCache[imagePath] = hex;
             return hex;
         }
