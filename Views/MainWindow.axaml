@@ -1439,40 +1439,38 @@
                     />
 
                     <!-- Action buttons -->
-                    <StackPanel
-                        Orientation="Horizontal"
-                        Spacing="16"
-                        HorizontalAlignment="Center"
-                    >
+                    <StackPanel HorizontalAlignment="Center" Spacing="8">
                         <Button
-                            Content="Open Board..."
+                            Content="New Board Wizard"
                             Classes="startupBtn"
-                            Click="LoadBoard_Click"
-                            Background="{StaticResource SurfaceBrushLight}"
-                            Foreground="{StaticResource TextLight}"
-                            BorderBrush="{StaticResource BorderBrushMedium}"
-                        />
-                        <Button
-                            Content="New Board"
-                            Classes="startupBtn"
-                            Click="SaveBoard_Click"
-                            Background="{StaticResource AccentBrush}"
+                            Click="CreateDatabaseWizard_Click"
+                            Background="#AAFF6666"
                             Foreground="White"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Center"
                         />
+                        <StackPanel
+                            Orientation="Horizontal"
+                            Spacing="16"
+                            HorizontalAlignment="Center"
+                        >
+                            <Button
+                                Content="Open Board..."
+                                Classes="startupBtn"
+                                Click="LoadBoard_Click"
+                                Background="{StaticResource SurfaceBrushLight}"
+                                Foreground="{StaticResource TextLight}"
+                                BorderBrush="{StaticResource BorderBrushMedium}"
+                            />
+                            <Button
+                                Content="New Board"
+                                Classes="startupBtn"
+                                Click="SaveBoard_Click"
+                                Background="{StaticResource AccentBrush}"
+                                Foreground="White"
+                            />
+                        </StackPanel>
                     </StackPanel>
-                    
-                    <!-- Secondary action -->
-                    <Button
-                        Content="Create Database..."
-                        Click="CreateDatabaseWizard_Click"
-                        Background="Transparent"
-                        Foreground="{StaticResource TextSecondary}"
-                        FontSize="12"
-                        Margin="0,8,0,0"
-                        Padding="8,4"
-                        Cursor="Hand"
-                        BorderThickness="0"
-                    />
 
                     <!-- Recent boards -->
                     <TextBlock
