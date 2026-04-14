@@ -245,7 +245,7 @@ public partial class MainWindow
         var brushCircle = this.FindControl<Ellipse>("BrushCursorCircle");
         if (brushCircle != null)
         {
-            bool showCircle = IsDrawMode && CurrentTool == "Brush";
+            bool showCircle = IsDrawMode && (CurrentTool == "Brush" || CurrentTool == "Arrow" || CurrentTool == "Rectangle" || CurrentTool == "Ellipse");
             brushCircle.IsVisible = showCircle;
             if (showCircle)
             {
