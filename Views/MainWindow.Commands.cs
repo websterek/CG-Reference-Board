@@ -962,15 +962,6 @@ public partial class MainWindow
     private static readonly string[] _videoExtensions = { ".mp4", ".webm", ".avi", ".mov", ".mkv" };
     private static readonly string[] _textExtensions = { ".txt", ".md", ".log", ".csv", ".json", ".xml" };
 
-    // One shared HttpClient for downloading remote images from dropped URLs.
-    private static readonly HttpClient _httpClient = CreateHttpClient();
-    private static HttpClient CreateHttpClient()
-    {
-        var c = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-        c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; CGReferenceBoard/1.0)");
-        return c;
-    }
-
     /// <summary>
     /// All data types that may arrive in a single drag-and-drop transfer.
     /// <list type="bullet">
@@ -1198,59 +1189,7 @@ public partial class MainWindow
         if (!string.IsNullOrWhiteSpace(rawHtml))
             htmlContent = rawHtml;
 
-        return new DropPayload(localPaths, webUrls, plainText, htmlContent);
-    }
-
-    /// <summary>
-    /// Downloads a remote image to the workspace images directory.
-    /// Returns the local file path on success, or <c>null</c> when the URL does
-    /// not resolve to a recognised image type or when the download fails.
-    /// </summary>
-    private async Task<string?> DownloadImageFromUrlAsync(string url, string destDir)
-    {
-        try
-        {
-            Directory.CreateDirectory(destDir);
-
-            using var response = await _httpClient.GetAsync(
-                url, HttpCompletionOption.ResponseHeadersRead);
-
-            if (!response.IsSuccessStatusCode)
-                return null;
-
-            // Validate by content-type first, then by URL file extension.
-            var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
-            bool isImageByType = contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
-
-            string urlExt = Path.GetExtension(new Uri(url).AbsolutePath).ToLowerInvariant();
-            bool isImageByExt = _imageExtensions.Contains(urlExt);
-
-            if (!isImageByType && !isImageByExt)
-                return null;
-
-            string ext = isImageByType
-                ? contentType.ToLowerInvariant() switch
-                {
-                    "image/png" => ".png",
-                    "image/gif" => ".gif",
-                    "image/webp" => ".webp",
-                    "image/bmp" => ".bmp",
-                    "image/avif" => ".avif",
-                    _ => ".jpg"
-                }
-                : (string.IsNullOrEmpty(urlExt) ? ".jpg" : urlExt);
-
-            string destPath = Path.Combine(destDir, Guid.NewGuid() + ext);
-            using var stream = await response.Content.ReadAsStreamAsync();
-            using var fs = File.Create(destPath);
-            await stream.CopyToAsync(fs);
-
-            return destPath;
-        }
-        catch
-        {
-            return null;
-        }
+return new DropPayload(localPaths, webUrls, plainText, htmlContent);
     }
 
     /// <summary>
@@ -1488,43 +1427,17 @@ public partial class MainWindow
             };
 
             if (isVideoUrl)
-            {
-                GridCells.Add(cell);
-                HighlightCell(cell);
-                await DownloadVideoToCell(cell, url);
-            }
-            else
-            {
-                // Attempt image download; fall back to a URL text cell on failure.
-                string imgDir = Path.Combine(_workspaceDir, "images");
-                string? imgPath = await DownloadImageFromUrlAsync(url, imgDir);
-
-                if (imgPath != null)
                 {
-                    // Resize cell to match the downloaded image's aspect ratio.
-                    var dim = GridLayoutService.GetImageDimensions(imgPath);
-                    if (dim.HasValue)
-                    {
-                        var (bestCols, bestRows) = GridLayoutService.CalculateOptimalCellSize(dim.Value.Width, dim.Value.Height);
-                        var betterSpace = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, bestCols, bestRows, collisionLayer: 1);
-                        if (betterSpace != null)
-                        {
-                            cell.CanvasX = betterSpace.Value.X;
-                            cell.CanvasY = betterSpace.Value.Y;
-                            cell.ColSpan = bestCols;
-                            cell.RowSpan = bestRows;
-                        }
-                    }
-                    cell.SetImage(imgPath);
+                    GridCells.Add(cell);
+                    HighlightCell(cell);
+                    await DownloadMediaToCell(cell, url);
                 }
                 else
                 {
-                    cell.SetText(url); // URL text cell as fallback
+                    GridCells.Add(cell);
+                    HighlightCell(cell);
+                    await DownloadMediaToCell(cell, url);
                 }
-
-                GridCells.Add(cell);
-                HighlightCell(cell);
-            }
 
             placedCount++;
             nextX = cell.CanvasX + cell.ColSpan * Constants.GridSize;
@@ -1769,7 +1682,7 @@ public partial class MainWindow
                 SelectAndPanToCell(newCell);
 
                 if (text.Contains("youtube.com") || text.Contains("youtu.be") || text.StartsWith("http"))
-                    await DownloadVideoToCell(newCell, text);
+                    await DownloadMediaToCell(newCell, text);
                 else
                     newCell.SetText(text);
 

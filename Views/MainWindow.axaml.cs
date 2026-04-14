@@ -1142,7 +1142,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         SaveBoardData();
     }
 
-private async Task DownloadVideoToCell(CellViewModel cell, string url)
+private async Task DownloadMediaToCell(CellViewModel cell, string url)
     {
         cell.SetText($"Checking availability...\n{url}");
 
@@ -1152,12 +1152,12 @@ private async Task DownloadVideoToCell(CellViewModel cell, string url)
             return;
         }
 
-        cell.SetText($"Downloading Video...\n{url}");
+        cell.SetText($"Downloading...\n{url}");
         cell.IsDownloading = true;
         cell.DownloadProgress = 0f;
         cell.DownloadStatusText = "Starting...";
 
-        string videoDir = Path.Combine(_workspaceDir, "videos");
+        string mediaDir = Path.Combine(_workspaceDir, "videos");
 
         void OnProgress(float percent, string status)
         {
@@ -1168,7 +1168,7 @@ private async Task DownloadVideoToCell(CellViewModel cell, string url)
             }, Avalonia.Threading.DispatcherPriority.Background);
         }
 
-        var result = await YtDlpService.DownloadVideoAsync(url, videoDir, onProgress: OnProgress);
+        var result = await YtDlpService.DownloadMediaAsync(url, mediaDir, onProgress: OnProgress);
 
         cell.IsDownloading = false;
         cell.DownloadProgress = 0f;
@@ -1176,7 +1176,26 @@ private async Task DownloadVideoToCell(CellViewModel cell, string url)
 
         if (result.Success)
         {
-            cell.SetVideo(result.VideoPath!, result.ThumbnailPath!);
+            if (result.IsVideo)
+            {
+                cell.SetVideo(result.MediaPath!, result.ThumbnailPath!);
+            }
+            else
+            {
+                if (result.MediaPath == null)
+                {
+                    cell.SetText(url);
+                    return;
+                }
+                var imgDir = Path.Combine(_workspaceDir, "images");
+                Directory.CreateDirectory(imgDir);
+                string destPath = Path.Combine(imgDir, Path.GetFileName(result.MediaPath));
+                if (result.MediaPath != destPath && !File.Exists(destPath))
+                {
+                    File.Move(result.MediaPath, destPath);
+                }
+                cell.SetImage(destPath);
+            }
             MarkUnsaved();
             SaveBoardData();
         }

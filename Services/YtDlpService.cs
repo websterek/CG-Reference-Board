@@ -16,6 +16,11 @@ namespace CGReferenceBoard.Services;
 public record VideoDownloadResult(bool Success, string? VideoPath, string? ThumbnailPath, string? ErrorMessage);
 
 /// <summary>
+/// Represents the outcome of a yt-dlp media download operation (video or image).
+/// </summary>
+public record MediaDownloadResult(bool Success, string? MediaPath, string? ThumbnailPath, bool IsVideo, string? ErrorMessage);
+
+/// <summary>
 /// Provides functionality to download videos and thumbnails using yt-dlp via YoutubeDLSharp.
 /// </summary>
 public static class YtDlpService
@@ -161,6 +166,191 @@ public static class YtDlpService
         {
             return new VideoDownloadResult(false, null, null, ex.Message);
         }
+    }
+
+    /// <summary>
+    /// Downloads media (video or image) from the given URL using yt-dlp.
+    /// Handles both video URLs and direct image URLs uniformly.
+    /// </summary>
+    /// <param name="url">The URL to download (video or image).</param>
+    /// <param name="outputDirectory">The directory where downloaded files will be stored.</param>
+    /// <param name="onProgress">Optional progress callback (percent 0-100, status string).</param>
+    /// <param name="cancellationToken">Token to cancel the download.</param>
+    /// <returns>A <see cref="MediaDownloadResult"/> indicating success or failure.</returns>
+    public static async Task<MediaDownloadResult> DownloadMediaAsync(
+        string url,
+        string outputDirectory,
+        Action<float, string>? onProgress = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var guid = Guid.NewGuid().ToString();
+
+            if (!Directory.Exists(outputDirectory))
+                Directory.CreateDirectory(outputDirectory);
+
+            var ytdl = new YoutubeDL
+            {
+                YoutubeDLPath = ResolveYtDlpPath(),
+                FFmpegPath = ResolveFfmpegPath(),
+                OutputFolder = outputDirectory,
+                OutputFileTemplate = guid + ".%(ext)s"
+            };
+
+            var progressHandler = new Progress<DownloadProgress>(progress =>
+            {
+                if (onProgress == null)
+                    return;
+
+                float percent = progress.Progress * 100f;
+
+                string status = progress.State switch
+                {
+                    DownloadState.Downloading =>
+                        $"Downloading {progress.Progress * 100:F0}% @ {progress.DownloadSpeed} ETA {progress.ETA}",
+                    DownloadState.PostProcessing => "Post-processing...",
+                    DownloadState.PreProcessing => "Starting...",
+                    _ => $"{percent:F0}%"
+                };
+
+                onProgress(percent, status);
+            });
+
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
+            var result = await ytdl.RunVideoDownload(
+                url,
+                mergeFormat: DownloadMergeFormat.Mp4,
+                ct: linkedCts.Token,
+                progress: progressHandler,
+                overrideOptions: new OptionSet
+                {
+                    NoPlaylist = true,
+                    WriteThumbnail = true
+                });
+
+            if (!result.Success)
+            {
+                var errorMessage = result.ErrorOutput is { Length: > 0 }
+                    ? string.Join(Environment.NewLine, result.ErrorOutput)
+                    : "yt-dlp reported failure with no additional output.";
+                return new MediaDownloadResult(false, null, null, false, errorMessage);
+            }
+
+            string[] videoExtensions = { ".mp4", ".mkv", ".webm", ".avi", ".mov", ".m4v" };
+            string[] imageExtensions = { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".avif" };
+
+            var allFiles = Directory.GetFiles(outputDirectory, guid + ".*");
+
+            // Find and fix files with .unknown_video or other incorrect extensions
+            foreach (var file in allFiles)
+            {
+                string ext = Path.GetExtension(file).ToLowerInvariant();
+                if (ext == ".unknown_video" || ext == ".unknown")
+                {
+                    string? fixedExt = TryDetectImageExtension(file, url);
+                    if (fixedExt != null)
+                    {
+                        string newPath = Path.Combine(
+                            Path.GetDirectoryName(file)!,
+                            Path.GetFileNameWithoutExtension(file) + fixedExt);
+                        try
+                        {
+                            File.Move(file, newPath);
+                            // Update the file list
+                            allFiles = Directory.GetFiles(outputDirectory, guid + ".*");
+                        }
+                        catch { /* ignore rename failures */ }
+                    }
+                }
+            }
+
+            allFiles = Directory.GetFiles(outputDirectory, guid + ".*");
+
+            var videoFile = allFiles.FirstOrDefault(f =>
+                videoExtensions.Any(ext => f.EndsWith(ext, StringComparison.OrdinalIgnoreCase)));
+            var imageFile = allFiles.FirstOrDefault(f =>
+                imageExtensions.Any(ext => f.EndsWith(ext, StringComparison.OrdinalIgnoreCase)));
+            var thumbnailFile = allFiles.FirstOrDefault(f =>
+                imageExtensions.Any(ext => f.EndsWith(ext, StringComparison.OrdinalIgnoreCase)));
+
+            if (videoFile != null)
+            {
+                // It's a video - thumbnail is separate
+                var thumb = allFiles.FirstOrDefault(f =>
+                    f != videoFile && imageExtensions.Any(ext => f.EndsWith(ext, StringComparison.OrdinalIgnoreCase)));
+                return new MediaDownloadResult(true, videoFile, thumb, true, null);
+            }
+
+            if (imageFile != null)
+            {
+                // It's an image - the file itself is the media, no separate thumbnail
+                return new MediaDownloadResult(true, imageFile, null, false, null);
+            }
+
+            return new MediaDownloadResult(false, null, null, false,
+                "Download reported success but the output files could not be found.");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return new MediaDownloadResult(false, null, null, false, "Download was cancelled.");
+        }
+        catch (OperationCanceledException)
+        {
+            return new MediaDownloadResult(false, null, null, false, "Download timed out after 5 minutes.");
+        }
+        catch (Exception ex)
+        {
+            return new MediaDownloadResult(false, null, null, false, ex.Message);
+        }
+    }
+
+    private static string? TryDetectImageExtension(string filePath, string originalUrl)
+    {
+        // Try to get extension from URL
+        try
+        {
+            string urlExt = Path.GetExtension(new Uri(originalUrl).AbsolutePath).ToLowerInvariant();
+            string[] validImageExts = { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".avif" };
+            if (validImageExts.Contains(urlExt))
+                return urlExt;
+        }
+        catch { }
+
+        // Try to detect from file header
+        try
+        {
+            using var fs = File.OpenRead(filePath);
+            var buffer = new byte[12];
+            int read = fs.Read(buffer, 0, buffer.Length);
+            if (read < 4)
+                return null;
+
+            // JPEG: FF D8 FF
+            if (buffer[0] == 0xFF && buffer[1] == 0xD8 && buffer[2] == 0xFF)
+                return ".jpg";
+
+            // PNG: 89 50 4E 47
+            if (buffer[0] == 0x89 && buffer[1] == 0x50 && buffer[2] == 0x4E && buffer[3] == 0x47)
+                return ".png";
+
+            // GIF: 47 49 46 38
+            if (buffer[0] == 0x47 && buffer[1] == 0x49 && buffer[2] == 0x46 && buffer[3] == 0x38)
+                return ".gif";
+
+            // WebP: 52 49 46 46 ... 57 45 42 50
+            if (buffer[0] == 0x52 && buffer[1] == 0x49 && buffer[2] == 0x46 && buffer[3] == 0x46)
+                return ".webp";
+
+            // BMP: 42 4D
+            if (buffer[0] == 0x42 && buffer[1] == 0x4D)
+                return ".bmp";
+        }
+        catch { }
+
+        return null;
     }
 
     /// <summary>
