@@ -1189,7 +1189,7 @@ public partial class MainWindow
         if (!string.IsNullOrWhiteSpace(rawHtml))
             htmlContent = rawHtml;
 
-return new DropPayload(localPaths, webUrls, plainText, htmlContent);
+        return new DropPayload(localPaths, webUrls, plainText, htmlContent);
     }
 
     /// <summary>
@@ -1427,17 +1427,17 @@ return new DropPayload(localPaths, webUrls, plainText, htmlContent);
             };
 
             if (isVideoUrl)
-                {
-                    GridCells.Add(cell);
-                    HighlightCell(cell);
-                    await DownloadMediaToCell(cell, url);
-                }
-                else
-                {
-                    GridCells.Add(cell);
-                    HighlightCell(cell);
-                    await DownloadMediaToCell(cell, url);
-                }
+            {
+                GridCells.Add(cell);
+                HighlightCell(cell);
+                await DownloadMediaToCell(cell, url);
+            }
+            else
+            {
+                GridCells.Add(cell);
+                HighlightCell(cell);
+                await DownloadMediaToCell(cell, url);
+            }
 
             placedCount++;
             nextX = cell.CanvasX + cell.ColSpan * Constants.GridSize;
@@ -1664,33 +1664,199 @@ return new DropPayload(localPaths, webUrls, plainText, htmlContent);
             var text = await data.TryGetTextAsync();
             if (!string.IsNullOrEmpty(text))
             {
-                Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, preferredX, preferredY, 2, 2, collisionLayer: 1);
-                if (emptySpace == null)
+                // If the pasted text is a file:// URI or one or more absolute file paths,
+                // treat it like a file import (copy into workspace and create cells).
+                var lines = text.Trim()
+                                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                                .Select(l => l.Trim())
+                                .Where(l => !string.IsNullOrEmpty(l))
+                                .ToList();
+
+                var filePaths = new List<string>();
+                foreach (var line in lines)
                 {
-                    ShakeScreen();
+                    if (line.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+                    {
+                        try
+                        {
+                            var uri = new Uri(line);
+                            if (uri.IsFile)
+                            {
+                                var lp = uri.LocalPath;
+                                if (!string.IsNullOrEmpty(lp) && File.Exists(lp))
+                                    filePaths.Add(lp);
+                            }
+                        }
+                        catch { }
+                    }
+                    else
+                    {
+                        try
+                        {
+                            if (Path.IsPathRooted(line) && File.Exists(line))
+                                filePaths.Add(line);
+                        }
+                        catch { }
+                    }
+                }
+
+                if (filePaths.Count > 0)
+                {
+                    double nextX = preferredX;
+                    double nextY = preferredY;
+                    var pastedCells = new List<CellViewModel>();
+
+                    foreach (var filePath in filePaths)
+                    {
+                        string ext = Path.GetExtension(filePath).ToLowerInvariant();
+                        bool isImage = _imageExtensions.Contains(ext);
+                        bool isVideo = _videoExtensions.Contains(ext);
+                        bool isText = _textExtensions.Contains(ext);
+
+                        if (!isImage && !isVideo && !isText)
+                            continue; // skip unsupported — don't abort the whole batch
+
+                        try
+                        {
+                            int colSpan = 2, rowSpan = 2;
+                            if (isImage)
+                            {
+                                var dimensions = GridLayoutService.GetImageDimensions(filePath);
+                                if (dimensions != null)
+                                    (colSpan, rowSpan) = GridLayoutService.CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height);
+                            }
+
+                            Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, colSpan, rowSpan, collisionLayer: 1);
+                            if (emptySpace == null)
+                                continue; // no room — skip this file
+
+                            var newCell = new CellViewModel
+                            {
+                                CanvasX = emptySpace.Value.X,
+                                CanvasY = emptySpace.Value.Y,
+                                ColSpan = colSpan,
+                                RowSpan = rowSpan
+                            };
+
+                            if (isVideo)
+                            {
+                                string destDir = Path.Combine(_workspaceDir, "videos");
+                                Directory.CreateDirectory(destDir);
+                                string destPath = Path.Combine(destDir, Path.GetFileName(filePath));
+                                if (filePath != destPath && !File.Exists(destPath))
+                                    File.Copy(filePath, destPath);
+
+                                string thumbDir = Path.Combine(_workspaceDir, "images");
+                                string? thumbPath = await YtDlpService.ExtractThumbnailAsync(destPath, thumbDir);
+                                newCell.SetVideo(destPath, thumbPath ?? destPath);
+                            }
+                            else if (isText)
+                            {
+                                newCell.SetText(File.ReadAllText(filePath));
+                            }
+                            else
+                            {
+                                string destDir = Path.Combine(_workspaceDir, "images");
+                                Directory.CreateDirectory(destDir);
+                                string destPath = Path.Combine(destDir, Path.GetFileName(filePath));
+                                if (filePath != destPath && !File.Exists(destPath))
+                                    File.Copy(filePath, destPath);
+                                newCell.SetImage(destPath);
+                            }
+
+                            if (!newCell.HasContent)
+                                continue; // corrupt / unreadable file
+
+                            GridCells.Add(newCell);
+                            HighlightCell(newCell);
+                            pastedCells.Add(newCell);
+
+                            // Advance the preferred origin so the next file lands to the right.
+                            nextX = emptySpace.Value.X + colSpan * Constants.GridSize;
+                        }
+                        catch { /* skip unreadable files silently */ }
+                    }
+
+                    if (pastedCells.Count == 0)
+                    {
+                        ShowToast("⚠️ No supported files to paste");
+                        return;
+                    }
+
+                    // Select all pasted cells and pan to the first one.
+                    ClearSelection();
+                    foreach (var c in pastedCells)
+                    {
+                        c.IsSelected = true;
+                        _selectedCells.Add(c);
+                    }
+                    UpdateSelectionState();
+                    PanToPosition(
+                        pastedCells[0].CanvasX + pastedCells[0].ColSpan * Constants.GridSize / 2.0,
+                        pastedCells[0].CanvasY + pastedCells[0].RowSpan * Constants.GridSize / 2.0);
+
+                    MarkUnsaved();
+                    SaveBoardData();
+                    ShowToast(pastedCells.Count == 1 ? "📋 Pasted" : $"📋 Pasted {pastedCells.Count} items");
                     return;
                 }
 
-                var newCell = new CellViewModel
+                // Not file paths — fall back to URL or plain text handling.
+                var single = text.Trim();
+                if (single.Contains("youtube.com") || single.Contains("youtu.be") || single.StartsWith("http", StringComparison.OrdinalIgnoreCase))
                 {
-                    CanvasX = emptySpace.Value.X,
-                    CanvasY = emptySpace.Value.Y,
-                    ColSpan = 2,
-                    RowSpan = 2
-                };
-                GridCells.Add(newCell);
-                SelectAndPanToCell(newCell);
+                    Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, preferredX, preferredY, 2, 2, collisionLayer: 1);
+                    if (emptySpace == null)
+                    {
+                        ShakeScreen();
+                        return;
+                    }
 
-                if (text.Contains("youtube.com") || text.Contains("youtu.be") || text.StartsWith("http"))
-                    await DownloadMediaToCell(newCell, text);
+                    var newCell = new CellViewModel
+                    {
+                        CanvasX = emptySpace.Value.X,
+                        CanvasY = emptySpace.Value.Y,
+                        ColSpan = 2,
+                        RowSpan = 2
+                    };
+                    GridCells.Add(newCell);
+                    SelectAndPanToCell(newCell);
+
+                    await DownloadMediaToCell(newCell, single);
+
+                    HighlightCell(newCell);
+                    MarkUnsaved();
+                    SaveBoardData();
+                    ShowToast("📋 Pasted");
+                    return;
+                }
                 else
-                    newCell.SetText(text);
+                {
+                    Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, preferredX, preferredY, 2, 2, collisionLayer: 1);
+                    if (emptySpace == null)
+                    {
+                        ShakeScreen();
+                        return;
+                    }
 
-                HighlightCell(newCell);
-                MarkUnsaved();
-                SaveBoardData();
-                ShowToast("📋 Pasted");
-                return;
+                    var newCell = new CellViewModel
+                    {
+                        CanvasX = emptySpace.Value.X,
+                        CanvasY = emptySpace.Value.Y,
+                        ColSpan = 2,
+                        RowSpan = 2
+                    };
+                    GridCells.Add(newCell);
+                    SelectAndPanToCell(newCell);
+
+                    newCell.SetText(single);
+
+                    HighlightCell(newCell);
+                    MarkUnsaved();
+                    SaveBoardData();
+                    ShowToast("📋 Pasted");
+                    return;
+                }
             }
 
             var pastedFiles = await data.TryGetFilesAsync();
