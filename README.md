@@ -17,20 +17,20 @@ Most reference tools hide your images in proprietary save files. This project is
 
 # 👋 Getting Started
 ### Basic Concept
-- **Dual-Mode System:** The application is divided into two primary modes to keep the interface clean and focused:
+- 🕹️ **Dual-Mode System:** The application is divided into two primary modes to keep the interface clean and focused:
     - **Grid Mode (Default):** For high-level board management, arranging items, and organizing your reference layout.
     - **Annotation Mode:** For freehand drawing, sketching, and taking notes directly on the board.
     - **Note:** Tools are context-sensitive. Right-click anywhere to access mode-specific actions, such as drawing tools in Annotation mode or backdrop creation in Grid mode.
-- **Universal Input:** Adding references is designed to be as universal as possible:
+- 📥 **Universal Input:** Adding references is designed to be as universal as possible:
     - **Drag & Drop:** Pull files directly from your local drive onto the canvas.
     - **Smart Links:** Paste URLs from video sites (like YouTube) to trigger automatic local downloads.
     - **File Explorer:** Copy and paste files just as you would in Windows Explorer or KDE Dolphin.
     - **Web Integration:** Copy images directly from your browser and paste them into the grid.
-- **Board & Data Management:** Your work is organized within a central Data Base directory:
+- 📂 **Board & Data Management:** Your work is organized within a central Data Base directory:
     - **The Data Base:** All files across all boards are stored in this directory, ensuring your assets are always local and accessible.
     - **Quick Switch:** Use the Boards top menu to instantly jump between different board files within your current database.
     - **New Board Wizard:** A dedicated setup tool to help you create and configure new boards with ease.Interface & Persistence
-- **Top Menu:** While shortcuts are available for power users, the Top Menu provides easy access to mode switching, board customization, and visual settings.
+- ✨ **Top Menu:** While shortcuts are available for power users, the Top Menu provides easy access to mode switching, board customization, and visual settings.
 
 Auto-Save: Focus on your work without worry—every action is automatically saved to the board file in real-time.
 
