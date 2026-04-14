@@ -31,14 +31,35 @@ Most reference tools hide your images in proprietary save files. This project is
     - **Delete:** `Delete` or `Backspace` removes selected (or hovered) items/draw.
     - **Clear:** `Escape` clears selection or cancels the current operation.
 📋 Clipboard & I/O
-    - Copy Path/Text: Ctrl + C copies the file path (image/video) or the raw text.
-    - Copy Bitmap: Ctrl + Shift + C copies the actual image to your clipboard.
-    - Smart Paste: Ctrl + V handles everything:
-    - URLs: Links (like YouTube) trigger automatic video downloads to your HDD.
-    - Files: Pasting files from your OS copies them into your local database.
-    - Images: Pasted bitmap data is saved as a new image file automatically.
-    - Import: Ctrl + I to manually browse and import media.
-
+    - **Copy Path/Text:** `Ctrl` + `C` copies the file path (image/video) or the raw text.
+    - **Copy Bitmap:** `Ctrl` + `Shift` + `C` copies the actual image to your clipboard.
+    - **Smart Paste:** `Ctrl` + `V` handles everything:
+        - **URLs:** Links (like YouTube) trigger automatic video downloads to your HDD.
+        - **Files (supported):** Pasting files from your OS copies them into your local database.
+        - **Images:** Pasted bitmap data is saved as a new image file automatically.
+    - **Import:** `Ctrl` + `I` to manually browse and import media.
+- 🎨 Annotation & Drawing
+    - **Mode Switch:**
+        - `Ctrl` + `1` for Grid/View mode.
+        - `Ctrl` + `2` for Draw/Annotation mode.
+    - **Visibility:** `Shift` + `A` to toggle all annotations on/off.
+    - **Tools:**
+        - `V` - Move / Select
+        - `B` - Brush
+        - `E` - Eraser
+        - `T` - Text (Press Enter to commit text, Esc to cancel)
+        - `L` - Arrow
+        - `U` - Rectangle
+        - `O` - Ellipse
+- 💾 General Commands
+    - **File:**
+        - `Ctrl` + `N` - New Board
+        - `Ctrl` + `O` - Open Board
+        - `Ctrl` + `S` - Save (As) Board
+    - **History:**
+        - `Ctrl` + `Z` - Undo
+        - `Ctrl` + `Y` or `Ctrl` + `Shift` + `Z` - Redo
+    - **Always on Top:** `Ctrl` + `Shift` + `T`.
  
 <br>
  
