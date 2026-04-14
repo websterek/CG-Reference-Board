@@ -1209,20 +1209,15 @@ public partial class MainWindow
 
     private void OnDragEnter(object? sender, DragEventArgs e)
     {
-        System.Diagnostics.Debug.WriteLine($"[DnD] OnDragEnter - DataTransfer: {e.DataTransfer?.GetType().Name ?? "null"}");
-        
         // Must explicitly accept the drag during DragEnter on Linux/Wayland.
         // Without this, the compositor treats the window as a non-target and
         // stops delivering DragOver and Drop events entirely.
         e.DragEffects = DragDropEffects.Copy | DragDropEffects.Move;
         e.Handled = true;
-        System.Diagnostics.Debug.WriteLine($"[DnD] OnDragEnter - Accepted, Effects: {e.DragEffects}");
     }
 
     private void OnDragOver(object? sender, DragEventArgs e)
-    {
-        System.Diagnostics.Debug.WriteLine($"[DnD] OnDragOver");
-        e.DragEffects = DragDropEffects.Copy | DragDropEffects.Move;
+    {e.DragEffects = DragDropEffects.Copy | DragDropEffects.Move;
         e.Handled = true;
     }
 

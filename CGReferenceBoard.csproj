@@ -9,17 +9,21 @@
     <ApplicationIcon>Images/icon.ico</ApplicationIcon>
   </PropertyGroup>
 
+  <!-- Avalonia preview feed for XDND fix (PR #20926) -->
+  <ItemGroup>
+    <PackageSource Include="https://nuget-feed-all.avaloniaui.net/v3/index.json" />
+  </ItemGroup>
+
   <ItemGroup>
     <AvaloniaResource Include="Images\**\*" />
   </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Avalonia" Version="12.0.0" />
-    <PackageReference Include="Avalonia.Desktop" Version="12.0.0" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.0" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.0" />
-    <!-- Explicit pin: transitive dep of Avalonia.FreeDesktop; 0.90.3 has CVE GHSA-xrw6-gwf8-vvr9 -->
-    <PackageReference Include="Tmds.DBus.Protocol" Version="0.92.0" />
+  <ItemGroup><!-- Avalonia 12.0.999-cibuild0064469-alpha includes XDND fix for Linux drag-drop -->
+    <PackageReference Include="Avalonia" Version="12.0.999-cibuild0064469-alpha" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.0.999-cibuild0064469-alpha" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.999-cibuild0064469-alpha" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.999-cibuild0064469-alpha" />
+    <!-- Explicit pin: transitive dep of Avalonia.FreeDesktop; 0.90.3 has CVE GHSA-xrw6-gwf8-vvr9 --><PackageReference Include="Tmds.DBus.Protocol" Version="0.92.0" />
     <PackageReference Include="YoutubeDLSharp" Version="1.2.0" />
   </ItemGroup>
 
