@@ -1204,7 +1204,7 @@ private async Task DownloadVideoToCell(CellViewModel cell, string url)
 
     // Tunneled PointerPressed handler attached to CanvasBorder to prioritize panning gestures.
     // This runs in the tunneling phase (before child controls get the PointerPressed),
-    // allowing Ctrl+Left-click (or middle-click) to start panning even when over other objects.
+    // allowing Shift+Left-click (or middle-click) to start panning even when over other objects.
     private void CanvasBorder_Tunneled_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
         // If event already handled by something more important, do nothing.
@@ -1213,8 +1213,8 @@ private async Task DownloadVideoToCell(CellViewModel cell, string url)
 
         var props = e.GetCurrentPoint(this).Properties;
 
-        // Prioritize panning when middle button is pressed OR left button with Ctrl modifier.
-        bool shouldStartPan = props.IsMiddleButtonPressed || (props.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Control));
+        // Prioritize panning when middle button is pressed OR left button with Shift modifier.
+        bool shouldStartPan = props.IsMiddleButtonPressed || (props.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Shift));
         if (!shouldStartPan)
             return;
 

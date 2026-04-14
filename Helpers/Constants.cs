@@ -21,7 +21,7 @@ public static class Constants
     public const string AppName = "CG Reference Board";
 
     /// <summary>Application version string. Bump this on every release.</summary>
-    public const string AppVersion = "0.9.6";
+    public const string AppVersion = "0.9.7";
 
     /// <summary>
     /// Primary accent colour used for selection highlights and interactive chrome.

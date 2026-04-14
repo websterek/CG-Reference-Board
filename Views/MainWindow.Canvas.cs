@@ -190,8 +190,8 @@ public partial class MainWindow
             return;
         }
 
-        // Grid mode: Middle button or Ctrl+Left starts pan
-        if (props.IsMiddleButtonPressed || (props.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Control)))
+// Grid mode: Middle button or Shift+Left starts pan
+if (props.IsMiddleButtonPressed || (props.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Shift)))
         {
             _isPanning = true;
             _panStartPoint = e.GetPosition(this);
@@ -410,7 +410,7 @@ public partial class MainWindow
         // - left button pressed while Ctrl is held
         // Do NOT show the hand cursor for Ctrl being held alone.
         // Save previous cursor from the CanvasBorder the first time we switch it so it can be restored later.
-        bool wantsPanCursor = currentProps.IsMiddleButtonPressed || (currentProps.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Control));
+        bool wantsPanCursor = currentProps.IsMiddleButtonPressed || (currentProps.IsLeftButtonPressed&& e.KeyModifiers.HasFlag(KeyModifiers.Shift));
         var canvasBorder = this.FindControl<Border>("CanvasBorder");
         if (wantsPanCursor)
         {
@@ -469,7 +469,7 @@ public partial class MainWindow
             _middleZoomStartY = screenPt.Y;
             _panStartPoint = screenPt;
         }
-        else if (_isPanning && (currentProps.IsMiddleButtonPressed || (currentProps.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Control))))
+        else if (_isPanning && (currentProps.IsMiddleButtonPressed || (currentProps.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Shift))))
         {
             var screenPt = e.GetPosition(this);
             _translate.X += (screenPt.X - _panStartPoint.X) / _scale.ScaleX;
