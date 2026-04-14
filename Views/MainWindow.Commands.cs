@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -834,6 +836,333 @@ public partial class MainWindow
 
     #region Drag & Drop
 
+    // ── File-type sets shared across all drop and paste paths ─────────────
+
+    private static readonly string[] _imageExtensions = { ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".avif" };
+    private static readonly string[] _videoExtensions = { ".mp4", ".webm", ".avi", ".mov", ".mkv" };
+    private static readonly string[] _textExtensions = { ".txt", ".md", ".log", ".csv", ".json", ".xml" };
+
+    // One shared HttpClient for downloading remote images from dropped URLs.
+    private static readonly HttpClient _httpClient = CreateHttpClient();
+    private static HttpClient CreateHttpClient()
+    {
+        var c = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; CGReferenceBoard/1.0)");
+        return c;
+    }
+
+    /// <summary>
+    /// All data types that may arrive in a single drag-and-drop transfer.
+    /// <list type="bullet">
+    ///   <item><b>LocalPaths</b>  — absolute paths from file-manager drops.</item>
+    ///   <item><b>WebUrls</b>     — http/https URLs from browser or link drags.</item>
+    ///   <item><b>PlainText</b>   — raw text from any source.</item>
+    ///   <item><b>HtmlContent</b> — HTML fragment (browser image / selection drag).</item>
+    /// </list>
+    /// </summary>
+    private sealed record DropPayload(
+        List<string> LocalPaths,
+        List<string> WebUrls,
+        string? PlainText,
+        string? HtmlContent
+    );
+
+    /// <summary>
+    /// Collects all useful data from an async DnD transfer (Linux / Wayland path).
+    /// <para>
+    /// On Wayland the compositor hands data only via async pipe reads — the
+    /// synchronous <c>TryGetFiles()</c> / <c>TryGetValue()</c> wrappers always
+    /// return null there.  Every known MIME type is therefore read asynchronously
+    /// so that file-manager drops, browser image drags, and bare-URL drops all work.
+    /// </para>
+    /// </summary>
+    private static async Task<DropPayload> CollectDropPayloadAsync(IAsyncDataTransfer data)
+    {
+        var localPaths = new List<string>();
+        var webUrls = new List<string>();
+        string? plainText = null;
+        string? htmlContent = null;
+
+        // ── 1. Avalonia typed file list ──────────────────────────────────
+        // Works on X11 and on Wayland when the backend can automatically map
+        // the platform format to an IStorageItem sequence.
+        var storageItems = await data.TryGetFilesAsync();
+        if (storageItems != null)
+        {
+            foreach (var item in storageItems)
+            {
+                try
+                {
+                    var lp = item.Path.LocalPath;
+                    if (!string.IsNullOrEmpty(lp))
+                        localPaths.Add(lp);
+                }
+                catch { }
+            }
+        }
+
+        // ── 2. text/uri-list  (RFC 2483) ────────────────────────────────
+        // Dolphin, Nautilus, Thunar and most GTK/Qt file managers deliver
+        // dragged files via this MIME type over both XDND (X11) and the
+        // xdg-desktop-portal / Wayland DnD protocol.
+        // Browser drags also put the image or page URL here.
+        var uriListFmt = DataFormat.CreateStringPlatformFormat("text/uri-list");
+        var uriListText = await data.TryGetValueAsync(uriListFmt);
+        if (!string.IsNullOrEmpty(uriListText))
+        {
+            foreach (var rawLine in uriListText.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var line = rawLine.Trim();
+                if (line.StartsWith('#'))
+                    continue; // RFC 2483 comment
+                try
+                {
+                    var uri = new Uri(line);
+                    if (uri.IsFile)
+                    {
+                        var lp = uri.LocalPath;
+                        if (!localPaths.Contains(lp))
+                            localPaths.Add(lp);
+                    }
+                    else if (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+                    {
+                        if (!webUrls.Contains(line))
+                            webUrls.Add(line);
+                    }
+                }
+                catch { }
+            }
+        }
+
+        // ── 3. text/x-moz-url  (Firefox) ────────────────────────────────
+        // Firefox encodes dragged links and images as "URL\r\nTitle" in this
+        // proprietary type — it is the highest-fidelity source for Firefox
+        // image drags on Linux.
+        var mozUrlFmt = DataFormat.CreateStringPlatformFormat("text/x-moz-url");
+        var mozUrlText = await data.TryGetValueAsync(mozUrlFmt);
+        if (!string.IsNullOrEmpty(mozUrlText))
+        {
+            var firstLine = mozUrlText
+                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .FirstOrDefault()?.Trim();
+            if (!string.IsNullOrEmpty(firstLine))
+            {
+                try
+                {
+                    var uri = new Uri(firstLine);
+                    if (uri.IsFile)
+                    {
+                        var lp = uri.LocalPath;
+                        if (!localPaths.Contains(lp))
+                            localPaths.Add(lp);
+                    }
+                    else if (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+                    {
+                        if (!webUrls.Contains(firstLine))
+                            webUrls.Add(firstLine);
+                    }
+                }
+                catch { }
+            }
+        }
+
+        // ── 4. text/html ────────────────────────────────────────────────
+        // Chromium and Firefox populate this when dragging images or selected
+        // page content.  Stored for later <img src="…"> extraction.
+        var htmlFmt = DataFormat.CreateStringPlatformFormat("text/html");
+        var rawHtml = await data.TryGetValueAsync(htmlFmt);
+        if (!string.IsNullOrWhiteSpace(rawHtml))
+            htmlContent = rawHtml;
+
+        // ── 5. text/plain ───────────────────────────────────────────────
+        // Plain-text fallback — could be a bare URL or free-form text.
+        plainText = await data.TryGetTextAsync();
+        if (string.IsNullOrWhiteSpace(plainText))
+        {
+            var plainFmt = DataFormat.CreateStringPlatformFormat("text/plain");
+            plainText = await data.TryGetValueAsync(plainFmt);
+        }
+        if (string.IsNullOrWhiteSpace(plainText))
+            plainText = null;
+
+        // Promote a single bare URL in plain text to the webUrls list.
+        if (plainText != null)
+        {
+            var trimmed = plainText.Trim();
+            if (!trimmed.Contains('\n') && !trimmed.Contains(' ') &&
+                (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                 trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+            {
+                if (!webUrls.Contains(trimmed))
+                    webUrls.Add(trimmed);
+            }
+        }
+
+        return new DropPayload(localPaths, webUrls, plainText, htmlContent);
+    }
+
+    /// <summary>
+    /// Collects all useful data from a synchronous DnD transfer (Windows path).
+    /// Windows uses COM <c>IDataObject</c> with <c>CF_HDROP</c> for files, so
+    /// the Avalonia <c>TryGetFiles()</c> path works reliably there.
+    /// </summary>
+    private static DropPayload CollectDropPayload(IDataTransfer data)
+    {
+        var localPaths = new List<string>();
+        var webUrls = new List<string>();
+        string? plainText = null;
+        string? htmlContent = null;
+
+        // Primary: Avalonia IStorageItem list (CF_HDROP on Windows).
+        var storageItems = data.TryGetFiles();
+        if (storageItems != null)
+        {
+            foreach (var item in storageItems)
+            {
+                try
+                {
+                    var lp = item.Path.LocalPath;
+                    if (!string.IsNullOrEmpty(lp))
+                        localPaths.Add(lp);
+                }
+                catch { }
+            }
+        }
+
+        if (localPaths.Count == 0)
+        {
+            // text/uri-list fallback (some Windows apps also use this format).
+            var uriListFmt = DataFormat.CreateStringPlatformFormat("text/uri-list");
+            var uriListText = data.TryGetValue(uriListFmt);
+            if (!string.IsNullOrEmpty(uriListText))
+            {
+                foreach (var rawLine in uriListText.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var line = rawLine.Trim();
+                    if (line.StartsWith('#'))
+                        continue;
+                    try
+                    {
+                        var uri = new Uri(line);
+                        if (uri.IsFile)
+                            localPaths.Add(uri.LocalPath);
+                        else if (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+                            webUrls.Add(line);
+                    }
+                    catch { }
+                }
+            }
+        }
+
+        // text/plain — might be a URL or free-form text.
+        var plainFmt = DataFormat.CreateStringPlatformFormat("text/plain");
+        var rawText = data.TryGetValue(plainFmt);
+        if (!string.IsNullOrWhiteSpace(rawText))
+            plainText = rawText;
+
+        if (plainText != null)
+        {
+            var trimmed = plainText.Trim();
+            if (!trimmed.Contains('\n') && !trimmed.Contains(' ') &&
+                (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                 trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+            {
+                if (!webUrls.Contains(trimmed))
+                    webUrls.Add(trimmed);
+            }
+        }
+
+        // text/html — browser image / selection drags.
+        var htmlFmt = DataFormat.CreateStringPlatformFormat("text/html");
+        var rawHtml = data.TryGetValue(htmlFmt);
+        if (!string.IsNullOrWhiteSpace(rawHtml))
+            htmlContent = rawHtml;
+
+        return new DropPayload(localPaths, webUrls, plainText, htmlContent);
+    }
+
+    /// <summary>
+    /// Downloads a remote image to the workspace images directory.
+    /// Returns the local file path on success, or <c>null</c> when the URL does
+    /// not resolve to a recognised image type or when the download fails.
+    /// </summary>
+    private async Task<string?> DownloadImageFromUrlAsync(string url, string destDir)
+    {
+        try
+        {
+            Directory.CreateDirectory(destDir);
+
+            using var response = await _httpClient.GetAsync(
+                url, HttpCompletionOption.ResponseHeadersRead);
+
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            // Validate by content-type first, then by URL file extension.
+            var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
+            bool isImageByType = contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+
+            string urlExt = Path.GetExtension(new Uri(url).AbsolutePath).ToLowerInvariant();
+            bool isImageByExt = _imageExtensions.Contains(urlExt);
+
+            if (!isImageByType && !isImageByExt)
+                return null;
+
+            string ext = isImageByType
+                ? contentType.ToLowerInvariant() switch
+                {
+                    "image/png" => ".png",
+                    "image/gif" => ".gif",
+                    "image/webp" => ".webp",
+                    "image/bmp" => ".bmp",
+                    "image/avif" => ".avif",
+                    _ => ".jpg"
+                }
+                : (string.IsNullOrEmpty(urlExt) ? ".jpg" : urlExt);
+
+            string destPath = Path.Combine(destDir, Guid.NewGuid() + ext);
+            using var stream = await response.Content.ReadAsStreamAsync();
+            using var fs = File.Create(destPath);
+            await stream.CopyToAsync(fs);
+
+            return destPath;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Extracts the first absolute http/https <c>src</c> URL from an &lt;img&gt; tag
+    /// inside an HTML fragment (e.g. the <c>text/html</c> payload from a browser drag).
+    /// Returns <c>null</c> when no such URL is found.
+    /// </summary>
+    private static string? TryExtractImageUrlFromHtml(string html)
+    {
+        var m = Regex.Match(html,
+            @"<img\b[^>]*?\bsrc\s*=\s*[""']([^""']+)[""']",
+            RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+        if (!m.Success)
+            return null;
+
+        var src = m.Groups[1].Value.Trim();
+        return (src.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                src.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            ? src
+            : null;
+    }
+
+    private void OnDragEnter(object? sender, DragEventArgs e)
+    {
+        // Must explicitly accept the drag during DragEnter on Linux/Wayland.
+        // Without this, the compositor treats the window as a non-target and
+        // stops delivering DragOver and Drop events entirely.
+        e.DragEffects = DragDropEffects.Copy | DragDropEffects.Move;
+        e.Handled = true;
+    }
+
     private void OnDragOver(object? sender, DragEventArgs e)
     {
         e.DragEffects = DragDropEffects.Copy | DragDropEffects.Move;
@@ -847,104 +1176,231 @@ public partial class MainWindow
         e.Handled = true;
 
         var dropPt = e.GetPosition(CanvasGrid);
-        int gridX = (int)(Math.Floor(dropPt.X / Constants.GridSize) * Constants.GridSize);
-        int gridY = (int)(Math.Floor(dropPt.Y / Constants.GridSize) * Constants.GridSize);
+        double nextX = Math.Floor(dropPt.X / Constants.GridSize) * Constants.GridSize;
+        double nextY = Math.Floor(dropPt.Y / Constants.GridSize) * Constants.GridSize;
 
-        var files = e.DataTransfer.TryGetFiles();
-        if (files != null && files.Any())
+        // On Linux/Wayland DataTransfer implements IAsyncDataTransfer and data is
+        // only accessible through async pipe reads.  Detect and use the async
+        // collection path; fall back to the sync (Windows) path otherwise.
+        DropPayload payload = e.DataTransfer is IAsyncDataTransfer asyncTransfer
+            ? await CollectDropPayloadAsync(asyncTransfer)
+            : CollectDropPayload(e.DataTransfer);
+
+        int placedCount = 0;
+
+        // ── Pass 1: local files (file-manager drops) ──────────────────────
+        foreach (var path in payload.LocalPaths)
         {
-            string[] imageExtensions = { ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp" };
-            string[] videoExtensions = { ".mp4", ".webm", ".avi", ".mov", ".mkv" };
-            string[] textExtensions = { ".txt", ".md", ".log", ".csv", ".json", ".xml" };
+            if (!File.Exists(path))
+                continue;
 
-            double nextX = gridX;
-            double nextY = gridY;
-            int placedCount = 0;
+            string ext = Path.GetExtension(path).ToLowerInvariant();
+            bool isImage = _imageExtensions.Contains(ext);
+            bool isVideo = _videoExtensions.Contains(ext);
+            bool isText = _textExtensions.Contains(ext);
+            if (!isImage && !isVideo && !isText)
+                continue;
 
-            foreach (var file in files)
+            int colSpan = 2, rowSpan = 2;
+            if (isImage)
             {
-                string path = file.Path.LocalPath;
-                if (!File.Exists(path))
-                    continue;
+                var dim = GridLayoutService.GetImageDimensions(path);
+                if (dim.HasValue)
+                    (colSpan, rowSpan) = GridLayoutService.CalculateOptimalCellSize(dim.Value.Width, dim.Value.Height);
+            }
 
-                string ext = Path.GetExtension(path).ToLowerInvariant();
-                bool isImage = imageExtensions.Contains(ext);
-                bool isVideo = videoExtensions.Contains(ext);
-                bool isText = textExtensions.Contains(ext);
+            var space = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, colSpan, rowSpan, collisionLayer: 1);
+            if (space == null)
+                continue;
 
-                if (!isImage && !isVideo && !isText)
-                    continue; // Skip unsupported file types
+            var cell = new CellViewModel
+            {
+                CanvasX = space.Value.X,
+                CanvasY = space.Value.Y,
+                ColSpan = colSpan,
+                RowSpan = rowSpan
+            };
 
-                int colSpan = 2, rowSpan = 2;
-                if (isImage)
+            if (isVideo)
+            {
+                string destDir = Path.Combine(_workspaceDir, "videos");
+                Directory.CreateDirectory(destDir);
+                string destPath = Path.Combine(destDir, Path.GetFileName(path));
+                if (path != destPath && !File.Exists(destPath))
+                    File.Copy(path, destPath);
+                string thumbDir = Path.Combine(_workspaceDir, "images");
+                string? thumb = await YtDlpService.ExtractThumbnailAsync(destPath, thumbDir);
+                cell.SetVideo(destPath, thumb ?? destPath);
+            }
+            else if (isText)
+            {
+                try
+                { cell.SetText(File.ReadAllText(path)); }
+                catch { continue; }
+            }
+            else
+            {
+                string destDir = Path.Combine(_workspaceDir, "images");
+                Directory.CreateDirectory(destDir);
+                string destPath = Path.Combine(destDir, Path.GetFileName(path));
+                if (path != destPath && !File.Exists(destPath))
+                    File.Copy(path, destPath);
+                cell.SetImage(destPath);
+            }
+
+            GridCells.Add(cell);
+            HighlightCell(cell);
+            placedCount++;
+            nextX = space.Value.X + colSpan * Constants.GridSize;
+        }
+
+        if (placedCount > 0)
+        {
+            MarkUnsaved();
+            SaveBoardData();
+            ShowToast($"📥 Dropped {placedCount} item(s)");
+            return;
+        }
+
+        // ── Pass 2: web URLs (browser image / link drags) ─────────────────
+        // Also check the HTML payload for an <img src="…"> URL — Chromium omits
+        // direct image URLs from uri-list for cross-origin images, but always
+        // provides them in the text/html fragment.
+        var webUrls = new List<string>(payload.WebUrls);
+        if (payload.HtmlContent != null)
+        {
+            var imgSrc = TryExtractImageUrlFromHtml(payload.HtmlContent);
+            if (imgSrc != null && !webUrls.Contains(imgSrc))
+                webUrls.Insert(0, imgSrc); // prefer the direct img src
+        }
+
+        foreach (var url in webUrls)
+        {
+            string urlPathStr;
+            try
+            { urlPathStr = new Uri(url).AbsolutePath; }
+            catch { continue; }
+
+            string urlExt = Path.GetExtension(urlPathStr).ToLowerInvariant();
+            bool isVideoUrl = _videoExtensions.Contains(urlExt)
+                             || url.Contains("youtube.com", StringComparison.OrdinalIgnoreCase)
+                             || url.Contains("youtu.be", StringComparison.OrdinalIgnoreCase)
+                             || url.Contains("vimeo.com", StringComparison.OrdinalIgnoreCase);
+
+            // Reserve a 2×2 slot; resized after image dimensions become known.
+            var space = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, 2, 2, collisionLayer: 1);
+            if (space == null)
+                continue;
+
+            var cell = new CellViewModel
+            {
+                CanvasX = space.Value.X,
+                CanvasY = space.Value.Y,
+                ColSpan = 2,
+                RowSpan = 2
+            };
+
+            if (isVideoUrl)
+            {
+                GridCells.Add(cell);
+                HighlightCell(cell);
+                await DownloadVideoToCell(cell, url);
+            }
+            else
+            {
+                // Attempt image download; fall back to a URL text cell on failure.
+                string imgDir = Path.Combine(_workspaceDir, "images");
+                string? imgPath = await DownloadImageFromUrlAsync(url, imgDir);
+
+                if (imgPath != null)
                 {
-                    var dimensions = GridLayoutService.GetImageDimensions(path);
-                    if (dimensions.HasValue)
-                        (colSpan, rowSpan) = GridLayoutService.CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height);
-                }
-
-                var emptySpace = GridLayoutService.FindEmptySpace(
-                    GridCells, nextX, nextY, colSpan, rowSpan, collisionLayer: 1);
-
-                if (emptySpace == null)
-                    continue;
-
-                var cell = new CellViewModel
-                {
-                    CanvasX = emptySpace.Value.X,
-                    CanvasY = emptySpace.Value.Y,
-                    ColSpan = colSpan,
-                    RowSpan = rowSpan
-                };
-
-                if (isVideo)
-                {
-                    string destDir = Path.Combine(_workspaceDir, "videos");
-                    Directory.CreateDirectory(destDir);
-                    string destPath = Path.Combine(destDir, Path.GetFileName(path));
-                    if (path != destPath && !File.Exists(destPath))
-                        File.Copy(path, destPath);
-
-                    // Try to extract a thumbnail frame via ffmpeg
-                    string thumbDir = Path.Combine(_workspaceDir, "images");
-                    string? thumbPath = await YtDlpService.ExtractThumbnailAsync(destPath, thumbDir);
-                    cell.SetVideo(destPath, thumbPath ?? destPath);
-                }
-                else if (isText)
-                {
-                    try
-                    { cell.SetText(File.ReadAllText(path)); }
-                    catch { continue; }
+                    // Resize cell to match the downloaded image's aspect ratio.
+                    var dim = GridLayoutService.GetImageDimensions(imgPath);
+                    if (dim.HasValue)
+                    {
+                        var (bestCols, bestRows) = GridLayoutService.CalculateOptimalCellSize(dim.Value.Width, dim.Value.Height);
+                        var betterSpace = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, bestCols, bestRows, collisionLayer: 1);
+                        if (betterSpace != null)
+                        {
+                            cell.CanvasX = betterSpace.Value.X;
+                            cell.CanvasY = betterSpace.Value.Y;
+                            cell.ColSpan = bestCols;
+                            cell.RowSpan = bestRows;
+                        }
+                    }
+                    cell.SetImage(imgPath);
                 }
                 else
                 {
-                    string destDir = Path.Combine(_workspaceDir, "images");
-                    Directory.CreateDirectory(destDir);
-                    string destPath = Path.Combine(destDir, Path.GetFileName(path));
-                    if (path != destPath && !File.Exists(destPath))
-                        File.Copy(path, destPath);
-                    cell.SetImage(destPath);
+                    cell.SetText(url); // URL text cell as fallback
                 }
 
                 GridCells.Add(cell);
                 HighlightCell(cell);
-                placedCount++;
-
-                nextX = emptySpace.Value.X + colSpan * Constants.GridSize;
             }
 
-            if (placedCount > 0)
+            placedCount++;
+            nextX = cell.CanvasX + cell.ColSpan * Constants.GridSize;
+        }
+
+        if (placedCount > 0)
+        {
+            MarkUnsaved();
+            SaveBoardData();
+            ShowToast($"📥 Dropped {placedCount} item(s)");
+            return;
+        }
+
+        // ── Pass 3: plain text ────────────────────────────────────────────
+        if (!string.IsNullOrWhiteSpace(payload.PlainText))
+        {
+            var space = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, 2, 2, collisionLayer: 1);
+            if (space != null)
             {
+                var cell = new CellViewModel
+                {
+                    CanvasX = space.Value.X,
+                    CanvasY = space.Value.Y,
+                    ColSpan = 2,
+                    RowSpan = 2
+                };
+                cell.SetText(payload.PlainText.Trim());
+                GridCells.Add(cell);
+                HighlightCell(cell);
                 MarkUnsaved();
                 SaveBoardData();
-                ShowToast($"📥 Dropped {placedCount} item(s)");
+                ShowToast("📥 Dropped text");
             }
             return;
         }
 
-        _draggingCell = null;
-        _isPointerDown = false;
-        _lastPressedEventArgs = null;
+        // ── Pass 4: HTML stripped to readable plain text ──────────────────
+        if (!string.IsNullOrWhiteSpace(payload.HtmlContent))
+        {
+            var stripped = Regex.Replace(payload.HtmlContent, "<[^>]+>", " ");
+            stripped = System.Net.WebUtility.HtmlDecode(stripped);
+            stripped = Regex.Replace(stripped, @"\s+", " ").Trim();
+            if (!string.IsNullOrEmpty(stripped))
+            {
+                var space = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, 2, 2, collisionLayer: 1);
+                if (space != null)
+                {
+                    var cell = new CellViewModel
+                    {
+                        CanvasX = space.Value.X,
+                        CanvasY = space.Value.Y,
+                        ColSpan = 2,
+                        RowSpan = 2
+                    };
+                    cell.SetText(stripped);
+                    GridCells.Add(cell);
+                    HighlightCell(cell);
+                    MarkUnsaved();
+                    SaveBoardData();
+                    ShowToast("📥 Dropped text");
+                }
+            }
+        }
     }
 
     #endregion
@@ -1140,95 +1596,109 @@ public partial class MainWindow
             var pastedFiles = await data.TryGetFilesAsync();
             if (pastedFiles != null && pastedFiles.Any())
             {
-                string filePath = pastedFiles.First().Path.LocalPath;
-                string ext = Path.GetExtension(filePath).ToLowerInvariant();
-                string[] imageExtensions = { ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp" };
-                string[] videoExtensions = { ".mp4", ".webm", ".avi", ".mov", ".mkv" };
-                string[] textExtensions = { ".txt", ".md", ".log", ".csv", ".json", ".xml" };
+                // Collect all file paths up-front so we can iterate them.
+                var filePaths = pastedFiles
+                    .Select(f => { try { return f.Path.LocalPath; } catch { return null; } })
+                    .Where(p => !string.IsNullOrEmpty(p))
+                    .Select(p => p!)
+                    .ToList();
 
-                bool isImage = imageExtensions.Contains(ext);
-                bool isVideo = videoExtensions.Contains(ext);
-                bool isText = textExtensions.Contains(ext);
+                double nextX = preferredX;
+                double nextY = preferredY;
+                var pastedCells = new List<CellViewModel>();
 
-                if (!isImage && !isVideo && !isText)
+                foreach (var filePath in filePaths)
                 {
-                    ShowToast("⚠️ Unsupported file format");
+                    string ext = Path.GetExtension(filePath).ToLowerInvariant();
+                    bool isImage = _imageExtensions.Contains(ext);
+                    bool isVideo = _videoExtensions.Contains(ext);
+                    bool isText = _textExtensions.Contains(ext);
+
+                    if (!isImage && !isVideo && !isText)
+                        continue; // skip unsupported — don't abort the whole batch
+
+                    try
+                    {
+                        int colSpan = 2, rowSpan = 2;
+                        if (isImage)
+                        {
+                            var dimensions = GridLayoutService.GetImageDimensions(filePath);
+                            if (dimensions != null)
+                                (colSpan, rowSpan) = GridLayoutService.CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height);
+                        }
+
+                        Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, colSpan, rowSpan, collisionLayer: 1);
+                        if (emptySpace == null)
+                            continue; // no room — skip this file
+
+                        var newCell = new CellViewModel
+                        {
+                            CanvasX = emptySpace.Value.X,
+                            CanvasY = emptySpace.Value.Y,
+                            ColSpan = colSpan,
+                            RowSpan = rowSpan
+                        };
+
+                        if (isVideo)
+                        {
+                            string destDir = Path.Combine(_workspaceDir, "videos");
+                            Directory.CreateDirectory(destDir);
+                            string destPath = Path.Combine(destDir, Path.GetFileName(filePath));
+                            if (filePath != destPath && !File.Exists(destPath))
+                                File.Copy(filePath, destPath);
+
+                            string thumbDir = Path.Combine(_workspaceDir, "images");
+                            string? thumbPath = await YtDlpService.ExtractThumbnailAsync(destPath, thumbDir);
+                            newCell.SetVideo(destPath, thumbPath ?? destPath);
+                        }
+                        else if (isText)
+                        {
+                            newCell.SetText(File.ReadAllText(filePath));
+                        }
+                        else
+                        {
+                            string destDir = Path.Combine(_workspaceDir, "images");
+                            Directory.CreateDirectory(destDir);
+                            string destPath = Path.Combine(destDir, Path.GetFileName(filePath));
+                            if (filePath != destPath && !File.Exists(destPath))
+                                File.Copy(filePath, destPath);
+                            newCell.SetImage(destPath);
+                        }
+
+                        if (!newCell.HasContent)
+                            continue; // corrupt / unreadable file
+
+                        GridCells.Add(newCell);
+                        HighlightCell(newCell);
+                        pastedCells.Add(newCell);
+
+                        // Advance the preferred origin so the next file lands to the right.
+                        nextX = emptySpace.Value.X + colSpan * Constants.GridSize;
+                    }
+                    catch { /* skip unreadable files silently */ }
+                }
+
+                if (pastedCells.Count == 0)
+                {
+                    ShowToast("⚠️ No supported files to paste");
                     return;
                 }
 
-                try
+                // Select all pasted cells and pan to the first one.
+                ClearSelection();
+                foreach (var c in pastedCells)
                 {
-                    int colSpan = 2, rowSpan = 2;
-                    if (isImage)
-                    {
-                        var dimensions = GridLayoutService.GetImageDimensions(filePath);
-                        if (dimensions != null)
-                            (colSpan, rowSpan) = GridLayoutService.CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height);
-                    }
-
-                    Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, preferredX, preferredY, colSpan, rowSpan, collisionLayer: 1);
-
-                    if (emptySpace == null)
-                    {
-                        ShakeScreen();
-                        return;
-                    }
-
-                    var newCell = new CellViewModel
-                    {
-                        CanvasX = emptySpace.Value.X,
-                        CanvasY = emptySpace.Value.Y,
-                        ColSpan = colSpan,
-                        RowSpan = rowSpan
-                    };
-
-                    if (isVideo)
-                    {
-                        string destDir = Path.Combine(_workspaceDir, "videos");
-                        if (!Directory.Exists(destDir))
-                            Directory.CreateDirectory(destDir);
-                        string destPath = Path.Combine(destDir, Path.GetFileName(filePath));
-                        if (filePath != destPath && !File.Exists(destPath))
-                            File.Copy(filePath, destPath);
-
-                        // Try to extract a thumbnail frame via ffmpeg
-                        string thumbDir = Path.Combine(_workspaceDir, "images");
-                        string? thumbPath = await YtDlpService.ExtractThumbnailAsync(destPath, thumbDir);
-                        newCell.SetVideo(destPath, thumbPath ?? destPath);
-                    }
-                    else if (isText)
-                    {
-                        newCell.SetText(File.ReadAllText(filePath));
-                    }
-                    else
-                    {
-                        string destDir = Path.Combine(_workspaceDir, "images");
-                        if (!Directory.Exists(destDir))
-                            Directory.CreateDirectory(destDir);
-                        string destPath = Path.Combine(destDir, Path.GetFileName(filePath));
-                        if (filePath != destPath && !File.Exists(destPath))
-                            File.Copy(filePath, destPath);
-                        newCell.SetImage(destPath);
-                    }
-
-                    // Verify the cell has content (SetImage/SetVideo may fail for corrupt files)
-                    if (!newCell.HasContent)
-                    {
-                        ShowToast("⚠️ Could not load file");
-                        return;
-                    }
-
-                    GridCells.Add(newCell);
-                    SelectAndPanToCell(newCell);
-                    HighlightCell(newCell);
-                    MarkUnsaved();
-                    SaveBoardData();
-                    ShowToast("📋 Pasted");
+                    c.IsSelected = true;
+                    _selectedCells.Add(c);
                 }
-                catch
-                {
-                    ShowToast("⚠️ Could not load file");
-                }
+                UpdateSelectionState();
+                PanToPosition(
+                    pastedCells[0].CanvasX + pastedCells[0].ColSpan * Constants.GridSize / 2.0,
+                    pastedCells[0].CanvasY + pastedCells[0].RowSpan * Constants.GridSize / 2.0);
+
+                MarkUnsaved();
+                SaveBoardData();
+                ShowToast(pastedCells.Count == 1 ? "📋 Pasted" : $"📋 Pasted {pastedCells.Count} items");
                 return;
             }
 

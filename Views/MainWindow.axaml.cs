@@ -615,9 +615,24 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             Canvas.SetTop(cursorIcon, -100);
         }
 
-        // Wire up drag-drop
-        AddHandler(DragDrop.DropEvent, OnDrop);
+        // Wire up drag-drop on both the Window and CanvasBorder directly.
+        // On Linux/Wayland the platform DnD protocol requires DragEnter to be
+        // explicitly handled with an accepted effect before the compositor will
+        // deliver any DragOver or Drop events. Registering on CanvasBorder (the
+        // actual hit-test surface) in addition to the Window ensures the events
+        // are received regardless of which routing layer the backend fires on.
+        AddHandler(DragDrop.DragEnterEvent, OnDragEnter);
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
+        AddHandler(DragDrop.DropEvent, OnDrop);
+
+        var canvasBorderDnd = this.FindControl<Border>("CanvasBorder");
+        if (canvasBorderDnd != null)
+        {
+            DragDrop.SetAllowDrop(canvasBorderDnd, true);
+            canvasBorderDnd.AddHandler(DragDrop.DragEnterEvent, OnDragEnter);
+            canvasBorderDnd.AddHandler(DragDrop.DragOverEvent, OnDragOver);
+            canvasBorderDnd.AddHandler(DragDrop.DropEvent, OnDrop);
+        }
 
         // Start the viewport LOD polling timer (recalculates image detail levels)
         InitViewportLodTimer();
