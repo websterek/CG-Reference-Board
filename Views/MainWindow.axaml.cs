@@ -1142,8 +1142,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         SaveBoardData();
     }
 
-    private async Task DownloadVideoToCell(CellViewModel cell, string url)
+private async Task DownloadVideoToCell(CellViewModel cell, string url)
     {
+        cell.SetText($"Checking availability...\n{url}");
+
+        if (!await YtDlpService.IsVideoAvailableAsync(url))
+        {
+            cell.SetText(url);
+            return;
+        }
+
         cell.SetText($"Downloading Video...\n{url}");
         cell.IsDownloading = true;
         cell.DownloadProgress = 0f;
@@ -1174,7 +1182,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
         else
         {
-            cell.SetText($"Download Failed: {result.ErrorMessage}");
+            cell.SetText(url);
         }
     }
 

@@ -20,6 +20,43 @@ public record VideoDownloadResult(bool Success, string? VideoPath, string? Thumb
 /// </summary>
 public static class YtDlpService
 {
+    public static async Task<bool> IsVideoAvailableAsync(string url, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            string ytdlpPath = ResolveYtDlpPath();
+
+            using var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = ytdlpPath,
+                    Arguments = $"--dump-json --no-download --no-playlist \"{url}\"",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+
+            process.Start();
+
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
+            var waitTask = process.WaitForExitAsync(linkedCts.Token);
+            var stdoutTask = process.StandardOutput.ReadToEndAsync();
+            var stderrTask = process.StandardError.ReadToEndAsync();
+
+            await Task.WhenAll(waitTask, stdoutTask, stderrTask);
+
+            return process.ExitCode == 0 && !string.IsNullOrWhiteSpace(stdoutTask.Result);
+        }
+        catch
+        {
+            return false;
+        }
+    }
     /// <summary>
     /// Downloads a video and its thumbnail from the given URL using yt-dlp via YoutubeDLSharp.
     /// </summary>
