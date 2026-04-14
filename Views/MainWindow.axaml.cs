@@ -464,6 +464,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     // Pan/Zoom
     private bool _isPanning;
+    private bool _isShiftPanPending;
     private Point _panStartPoint;
     private readonly TranslateTransform _translate = new(0, 0);
     private readonly ScaleTransform _scale = new(1, 1);
@@ -1223,7 +1224,9 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
 
     // Tunneled PointerPressed handler attached to CanvasBorder to prioritize panning gestures.
     // This runs in the tunneling phase (before child controls get the PointerPressed),
-    // allowing Shift+Left-click (or middle-click) to start panning even when over other objects.
+    // allowing middle-click to start panning even when over other objects.
+    // Note: Shift+Left-click is NOT handled here to allow Shift+double-click to work on cells.
+    // Shift+drag panning is handled in Canvas_PointerPressed/PointerMoved instead.
     private void CanvasBorder_Tunneled_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
         // If event already handled by something more important, do nothing.
@@ -1232,18 +1235,15 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
 
         var props = e.GetCurrentPoint(this).Properties;
 
-        // Prioritize panning when middle button is pressed OR left button with Shift modifier.
-        bool shouldStartPan = props.IsMiddleButtonPressed || (props.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Shift));
-        if (!shouldStartPan)
+        // Only handle middle-button for immediate panning in the tunneling phase.
+        // Shift+Left-click is handled via threshold-based approach in Canvas_PointerMoved.
+        if (!props.IsMiddleButtonPressed)
             return;
 
         // Start panning and capture pointer to the CanvasBorder to handle subsequent moves/releases.
         _isPanning = true;
         _panStartPoint = e.GetPosition(this);
-
-        // For middle-button we also prepare middle-zoom states as existing logic expects.
-        if (props.IsMiddleButtonPressed)
-            _middleZoomStartY = e.GetPosition(this).Y;
+        _middleZoomStartY = e.GetPosition(this).Y;
 
         // Apply pan cursor on canvas border
         try

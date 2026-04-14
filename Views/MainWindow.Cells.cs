@@ -31,6 +31,10 @@ public partial class MainWindow
         if (IsDrawMode || e.Handled || _isViewMode)
             return;
 
+        // Shift+Left: Let it pass through for panning (don't start cell drag)
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+            return;
+
         if (sender is not Border { DataContext: CellViewModel cell })
             return;
         var props = e.GetCurrentPoint(this).Properties;

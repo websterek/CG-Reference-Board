@@ -116,6 +116,44 @@ public partial class MainWindow
         if (IsMoveMode && sender is Control { DataContext: AnnotationViewModel annMove })
         {
             bool isCtrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+            bool isAlt = e.KeyModifiers.HasFlag(KeyModifiers.Alt);
+
+            // Alt+Drag: Duplicate annotation and start dragging the clone
+            if (isAlt)
+            {
+                var duplicate = new AnnotationViewModel
+                {
+                    CanvasX = annMove.CanvasX,
+                    CanvasY = annMove.CanvasY,
+                    Color = annMove.Color,
+                    Thickness = annMove.Thickness,
+                    Type = annMove.Type,
+                    Text = annMove.Text,
+                    IsSelected = true,
+                    IsInDrawMode = annMove.IsInDrawMode
+                };
+                foreach (var pt in annMove.Points)
+                    duplicate.Points.Add(pt);
+                duplicate.UpdateBoundsCache();
+
+                Annotations.Add(duplicate);
+
+                ClearSelection();
+                _selectedAnnotations.Add(duplicate);
+
+                foreach (var a in _selectedAnnotations.ToList())
+                {
+                    Annotations.Remove(a);
+                    Annotations.Add(a);
+                }
+
+                _isDraggingAnnotations = true;
+                _annotationDragCellOriginals = null;
+                _annotationDragStart = e.GetPosition(this.FindControl<Canvas>("MainCanvas"));
+                _isAltDuplicateDrag = true;
+                e.Handled = true;
+                return;
+            }
 
             if (isCtrl)
             {

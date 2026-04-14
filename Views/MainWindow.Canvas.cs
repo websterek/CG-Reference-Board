@@ -190,17 +190,22 @@ public partial class MainWindow
             return;
         }
 
-// Grid mode: Middle button or Shift+Left starts pan
-if (props.IsMiddleButtonPressed || (props.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Shift)))
+        // Grid mode: Middle button starts pan immediately, Shift+Left uses threshold-based approach
+        if (props.IsMiddleButtonPressed)
         {
             _isPanning = true;
+            _isShiftPanPending = false;
             _panStartPoint = e.GetPosition(this);
-            if (props.IsMiddleButtonPressed)
-                _middleZoomStartY = e.GetPosition(this).Y;
+            _middleZoomStartY = e.GetPosition(this).Y;
 
-            // Set pan cursor on the CanvasBorder and remember previous cursor via helper
             var canvasBorder = this.FindControl<Border>("CanvasBorder");
             ApplyPanCursor(canvasBorder);
+        }
+        else if (props.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+        {
+            // Shift+Left: prepare for potential pan, but don't start yet (allow double-click)
+            _isShiftPanPending = true;
+            _panStartPoint = e.GetPosition(this);
         }
         // Left-click on empty canvas space: start cell marquee selection
         else if (!e.Handled && props.IsLeftButtonPressed && !IsDrawMode)
@@ -469,6 +474,23 @@ if (props.IsMiddleButtonPressed || (props.IsLeftButtonPressed && e.KeyModifiers.
             _middleZoomStartY = screenPt.Y;
             _panStartPoint = screenPt;
         }
+        else if (_isShiftPanPending && currentProps.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+        {
+            // Check if mouse moved beyond threshold to start actual panning
+            var screenPt = e.GetPosition(this);
+            double dx = screenPt.X - _panStartPoint.X;
+            double dy = screenPt.Y - _panStartPoint.Y;
+            double distance = Math.Sqrt(dx * dx + dy * dy);
+            
+            // Use a 5-pixel threshold to distinguish from double-click
+            if (distance > 5)
+            {
+                _isShiftPanPending = false;
+                _isPanning = true;
+                var border = this.FindControl<Border>("CanvasBorder");
+                ApplyPanCursor(border);
+            }
+        }
         else if (_isPanning && (currentProps.IsMiddleButtonPressed || (currentProps.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Shift))))
         {
             var screenPt = e.GetPosition(this);
@@ -532,6 +554,15 @@ if (props.IsMiddleButtonPressed || (props.IsLeftButtonPressed && e.KeyModifiers.
         if (_isDraggingAnnotations)
         {
             _isDraggingAnnotations = false;
+
+            if (_isAltDuplicateDrag)
+            {
+                _isAltDuplicateDrag = false;
+                e.Pointer.Capture(null);
+                MarkUnsaved();
+                SaveBoardData();
+                return;
+            }
 
             if (!IsDrawMode && _annotationDragCellOriginals != null && _annotationDragCellOriginals.Count > 0)
             {
@@ -657,6 +688,7 @@ if (props.IsMiddleButtonPressed || (props.IsLeftButtonPressed && e.KeyModifiers.
         }
 
         _isPanning = false;
+        _isShiftPanPending = false;
         _middleZoomAnchorSet = false;
         _middleZoomActive = false;
 
