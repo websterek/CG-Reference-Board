@@ -35,7 +35,12 @@ Most reference tools hide your images in proprietary save files. This project is
 - **Customization:** Selectable backgrounds and annotation visual effects.
  
 <br>
+
+# 🚀 Getting Started
+[ TODO ]
  
+<br>
+
 # 🗺 Plans for the Future
 This is a personal project made in the "free time of free time," but I hope to eventually add:
 -   [ ] **Built-in Players:** Better handling for video playback within the grid.
@@ -47,7 +52,7 @@ This is a personal project made in the "free time of free time," but I hope to e
 <br>
  
 # 📝 A Note on Development
-This app is a labor of love and a work in progress. While I have implemented many optimizations to keep the experience smooth, the primary focus is on the logic of the grid and the reliability of the local file system.
+This app is a labor of love and a work in progress. While I have implemented many optimizations to keep the experience smooth, the primary focus is on the logic of the grid and the reliability of the local file system. It is also my first attempt to Coding Agents supported development and... it's kinda cool!  
 _I have a lot of plans... we will see... we will see..._
  
 <br>
