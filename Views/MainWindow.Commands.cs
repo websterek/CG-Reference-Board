@@ -145,8 +145,6 @@ public partial class MainWindow
             _currentBoardFile = dialog.BoardPath;
             _workspaceDir = Path.GetDirectoryName(_currentBoardFile)!;
             CurrentBoardName = Path.GetFileNameWithoutExtension(_currentBoardFile);
-            OnPropertyChanged(nameof(WindowTitle));
-            UpdateBoardDirectoryList();
 
             Directory.CreateDirectory(Path.Combine(_workspaceDir, "images"));
             Directory.CreateDirectory(Path.Combine(_workspaceDir, "videos"));
@@ -157,7 +155,17 @@ public partial class MainWindow
 
             GridCells.Clear();
             Annotations.Clear();
+            _selectedCells.Clear();
+            _selectedAnnotations.Clear();
+            _undoStack.Clear();
+            _redoStack.Clear();
             _hasUnsavedChanges = false;
+
+            UpdateBoardDirectoryList();
+            AddRecentBoard(_currentBoardFile);
+
+            Title = $"{Constants.AppName} - {Path.GetFileName(_currentBoardFile)}";
+            OnPropertyChanged(nameof(WindowTitle));
             SaveBoardData();
             ShowToast("💾 Database created");
         }
