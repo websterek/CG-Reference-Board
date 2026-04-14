@@ -12,6 +12,7 @@ public partial class CreateDatabaseWizardDialog : Window
 {
     private string? _selectedLocation;
     private bool _hasExistingBoards;
+    private bool _canClose;
 
     public string? DatabasePath { get; private set; }
     public string? BoardPath { get; private set; }
@@ -20,6 +21,14 @@ public partial class CreateDatabaseWizardDialog : Window
     {
         InitializeComponent();
         NameTextBox.TextChanged += ValidateForm;
+        BoardNameTextBox.TextChanged += ValidateForm;
+        Closing += OnClosing;
+    }
+
+    private void OnClosing(object? sender, WindowClosingEventArgs e)
+    {
+        if (!_canClose)
+            e.Cancel = true;
     }
 
     private async void BrowseLocation_Click(object? sender, RoutedEventArgs e)
@@ -78,6 +87,7 @@ public partial class CreateDatabaseWizardDialog : Window
 
     private void Cancel_Click(object? sender, RoutedEventArgs e)
     {
+        _canClose = true;
         Close();
     }
 
@@ -119,6 +129,7 @@ public partial class CreateDatabaseWizardDialog : Window
         BoardPath = Path.Combine(dbPath, boardFileName);
         DatabasePath = dbPath;
 
+        _canClose = true;
         Close(true);
     }
 }

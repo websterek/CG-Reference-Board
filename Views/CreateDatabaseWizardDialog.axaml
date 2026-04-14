@@ -4,7 +4,7 @@
     x:Class="CGReferenceBoard.Views.CreateDatabaseWizardDialog"
     Title="New Board Wizard"
     Width="480"
-    Height="400"
+    Height="480"
     WindowStartupLocation="CenterOwner"
     CanResize="False"
     Background="#1E1E1E"
@@ -30,8 +30,7 @@
             </StackPanel>
 
             <!-- Form -->
-            <ScrollViewer Grid.Row="1">
-                <StackPanel Spacing="20">
+            <StackPanel Grid.Row="1" Spacing="20">
                     <!-- Database Location -->
                     <StackPanel Spacing="8">
                         <TextBlock Text="Database Location" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}"/>
@@ -114,7 +113,6 @@
                         </StackPanel>
                     </Border>
                 </StackPanel>
-            </ScrollViewer>
 
             <!-- Footer buttons -->
             <StackPanel
