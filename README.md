@@ -104,11 +104,12 @@ Most reference tools hide your images in proprietary save files. This project is
 
 # 🗺 Plans for the Future
 This is a personal project made in the "free time of free time," but I hope to eventually add:
--   [ ] **Built-in Players:** Better handling for video playback within the grid.
--   [ ] **UI Modernization:** Introducing toolbars to complement the current right-click menu.
--   [ ] **Tablet Support:** Pressure sensitivity for smoother sketching/annotations.
--   [ ] **New Formats:** Support for PDFs, Audio files, and live Webpages.
--   [ ] **View Modes:** "View Only" and a specialized "Reference Mode."
+- [ ] **Built-in Players:** Better handling for video playback within the grid.
+- [ ] **UI Modernization:** Introducing toolbars to complement the current right-click menu.
+- [ ] **Tablet Support:** Pressure sensitivity for smoother sketching/annotations.
+- [ ] **New Formats:** Support for PDFs, Audio files, and live Webpages.
+- [ ] **View Modes:** "View Only" and a specialized "Reference Mode."
+- [ ] **Markdown Support:** For Items (Text, Label, Backdrop) and Annotation Text
  
 <br>
  
