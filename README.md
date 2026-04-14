@@ -1,11 +1,9 @@
-**The Precision Reference Organizer**
+**The Precision Reference Organizer**  
 A grid-based alternative to PureRef that keeps your files organized, local, and always accessible to your creative pipeline.
  
 <br>
 
 <center>
-<img width="128" height="128" alt="logo" src="https://github.com/user-attachments/assets/0f27f6bc-9a5f-4091-9808-1728946d0cad" />
-<br>
 <img width="1200" height="800" alt="image" src="https://github.com/user-attachments/assets/c8eef5f5-333a-432b-a823-fd8462fe774b" />
 </center>
 
