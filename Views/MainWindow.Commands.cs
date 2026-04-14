@@ -1946,21 +1946,6 @@ return new DropPayload(localPaths, webUrls, plainText, htmlContent);
             return;
         }
 
-        if (e.Key == Key.T && isCtrl)
-        {
-            if (_isViewMode)
-                return;
-            var cell = _hoveredCell ?? GetHighlightedCell();
-            // Push the pre-mutation state onto the undo stack before modifying the cell,
-            // so the user can undo this destructive action.
-            SaveBoardData();
-            cell.SetText("New Description...");
-            MarkUnsaved();
-            SaveBoardData();
-            ShowToast("📝 Converted to text");
-            return;
-        }
-
         if (e.Key == Key.Delete || e.Key == Key.Back)
         {
             if (_isViewMode)
