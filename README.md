@@ -18,7 +18,7 @@ Most reference tools hide your images in proprietary save files. This project is
 <br>
   
 # 👋 Getting Started
-### Basic Concept
+### 💡 Basic Concept
 - 🕹️ **Dual-Mode System:** The application is divided into two primary modes to keep the interface clean and focused:
     - **Grid Mode (Default):** For high-level board management, arranging items, and organizing your reference layout.
     - **Annotation Mode:** For freehand drawing, sketching, and taking notes directly on the board.
@@ -35,7 +35,7 @@ Most reference tools hide your images in proprietary save files. This project is
 - ✨ **Top Menu:** While shortcuts are available for power users, the Top Menu provides easy access to mode switching, board customization, and visual settings.
 - 💾 **Auto-Save:** Focus on your work without worry—every action is automatically saved to the board file in real-time.
 
-### Controls & Shortcuts
+### 🎮 Controls & Shortcuts
 - 🖱 Mouse & Navigation
     - **Pan:** Middle _`Click`_ + _`drag`_ or `Shift` + `Left Click` + _`drag`_.
     - **Zoom:** `Mouse Wheel` to zoom at pointer, or `Middle` + `Left Click` + _`drag up/down`_ (Nuke like).
