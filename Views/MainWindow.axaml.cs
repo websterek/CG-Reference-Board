@@ -443,6 +443,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private AnnotationViewModel? _currentAnnotation;
     private readonly List<AnnotationViewModel> _selectedAnnotations = new();
     private bool _isDraggingAnnotations;
+    private bool _isDraggingFromSystem;
     private bool _isSelectingAnnotations;
     private Point _annotationSelectionStart;
     private Point _annotationDragStart;
@@ -643,6 +644,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         // are received regardless of which routing layer the backend fires on.
         AddHandler(DragDrop.DragEnterEvent, OnDragEnter);
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
+        AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
         AddHandler(DragDrop.DropEvent, OnDrop);
 
         var canvasBorderDnd = this.FindControl<Border>("CanvasBorder");
@@ -651,6 +653,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             DragDrop.SetAllowDrop(canvasBorderDnd, true);
             canvasBorderDnd.AddHandler(DragDrop.DragEnterEvent, OnDragEnter);
             canvasBorderDnd.AddHandler(DragDrop.DragOverEvent, OnDragOver);
+            canvasBorderDnd.AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
             canvasBorderDnd.AddHandler(DragDrop.DropEvent, OnDrop);
         }
 

@@ -1214,11 +1214,73 @@ public partial class MainWindow
         // stops delivering DragOver and Drop events entirely.
         e.DragEffects = DragDropEffects.Copy | DragDropEffects.Move;
         e.Handled = true;
+
+        // Switch to grid mode when dragging files from system
+        if (IsDrawMode)
+            IsDrawMode = false;
+        _isDraggingFromSystem = true;
     }
 
     private void OnDragOver(object? sender, DragEventArgs e)
-    {e.DragEffects = DragDropEffects.Copy | DragDropEffects.Move;
+    {
+        e.DragEffects = DragDropEffects.Copy | DragDropEffects.Move;
         e.Handled = true;
+
+        if (!_isDraggingFromSystem || _isViewMode)
+            return;
+
+        var dropPt = e.GetPosition(CanvasGrid);
+        int gridX = (int)(Math.Floor(dropPt.X / Constants.GridSize) * Constants.GridSize);
+        int gridY = (int)(Math.Floor(dropPt.Y / Constants.GridSize) * Constants.GridSize);
+
+        // Get first file path to determine preview size
+        int colSpan = 2, rowSpan = 2;
+        var storageItems = e.DataTransfer.TryGetFiles();
+        if (storageItems != null)
+        {
+            try
+            {
+                var firstItem = storageItems.FirstOrDefault();
+                if (firstItem != null)
+                {
+                    var filePath = firstItem.Path.LocalPath;
+                    if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
+                    {
+                        var ext = Path.GetExtension(filePath).ToLowerInvariant();
+                        if (_imageExtensions.Contains(ext))
+                        {
+                            var dim = GridLayoutService.GetImageDimensions(filePath);
+                            if (dim.HasValue)
+                                (colSpan, rowSpan) = GridLayoutService.CalculateOptimalCellSize(dim.Value.Width, dim.Value.Height);
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        // Find snap position
+        var space = GridLayoutService.FindEmptySpace(GridCells, gridX, gridY, colSpan, rowSpan, collisionLayer: 1);
+        if (space == null)
+            return;
+
+        var preview = this.FindControl<Border>("DropPreview");
+        if (preview != null)
+        {
+            Canvas.SetLeft(preview, space.Value.X);
+            Canvas.SetTop(preview, space.Value.Y);
+            preview.Width = colSpan * Constants.GridSize;
+            preview.Height = rowSpan * Constants.GridSize;
+            preview.IsVisible = true;
+        }
+    }
+
+    private void OnDragLeave(object? sender, DragEventArgs e)
+    {
+        _isDraggingFromSystem = false;
+        var preview = this.FindControl<Border>("DropPreview");
+        if (preview != null)
+            preview.IsVisible = false;
     }
 
     private async void OnDrop(object? sender, DragEventArgs e)
@@ -1226,6 +1288,12 @@ public partial class MainWindow
         if (_isViewMode)
         { e.Handled = true; return; }
         e.Handled = true;
+
+        // Hide preview and reset flag
+        _isDraggingFromSystem = false;
+        var preview = this.FindControl<Border>("DropPreview");
+        if (preview != null)
+            preview.IsVisible = false;
 
         var dropPt = e.GetPosition(CanvasGrid);
         double nextX = Math.Floor(dropPt.X / Constants.GridSize) * Constants.GridSize;

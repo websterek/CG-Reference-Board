@@ -754,6 +754,19 @@
                             VerticalAlignment="Top"
                         />
 
+                        <!-- Drag & Drop preview -->
+                        <Border
+                            x:Name="DropPreview"
+                            BorderBrush="#44FF88"
+                            BorderThickness="3"
+                            Background="#3344FF88"
+                            IsHitTestVisible="False"
+                            IsVisible="False"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            ZIndex="105"
+                        />
+
                         <!-- ─────────────────────────────────────────── -->
                         <!-- Board Cells Layer                           -->
                         <!-- ─────────────────────────────────────────── -->
