@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.VisualTree;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
@@ -22,12 +23,41 @@ public partial class MainWindow
     #region Window Chrome Handlers
 
     private void TopBar_DoubleTapped(object? sender, TappedEventArgs e)
-        => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    {
+        // Ignore double-taps that originate from inside the menu bar so that
+        // double-clicking a menu header doesn't toggle the window state.
+        if (IsSourceInsideMenu(e))
+            return;
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    }
 
     private void TopBar_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
+        // Do not begin a window drag when the press came from inside the Menu.
+        // On Windows, BeginMoveDrag sends WM_NCLBUTTONDOWN/HTCAPTION to the OS
+        // window manager, which captures the mouse and swallows subsequent
+        // pointer events that should be delivered to the open menu popup.
+        if (IsSourceInsideMenu(e))
+            return;
         if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             this.BeginMoveDrag(e);
+    }
+
+    /// <summary>
+    /// Returns true when the event's source control is the <see cref="Menu"/>
+    /// itself or any visual descendant of it (e.g. a MenuItem, PathIcon, TextBlock
+    /// inside a menu header).
+    /// </summary>
+    private static bool IsSourceInsideMenu(RoutedEventArgs e)
+    {
+        var ctrl = e.Source as Visual;
+        while (ctrl != null)
+        {
+            if (ctrl is Menu)
+                return true;
+            ctrl = ctrl.GetVisualParent();
+        }
+        return false;
     }
 
     private void MinimizeWindow_Click(object? sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
