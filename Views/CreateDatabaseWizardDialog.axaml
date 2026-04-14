@@ -1,0 +1,147 @@
+<Window
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:Class="CGReferenceBoard.Views.CreateDatabaseWizardDialog"
+    Title="Create Database"
+    Width="480"
+    Height="400"
+    WindowStartupLocation="CenterOwner"
+    CanResize="False"
+    Background="#1E1E1E"
+    WindowDecorations="None"
+>
+    <Border CornerRadius="8" Background="#121212" BorderBrush="#3D3D3D" BorderThickness="1">
+        <Grid RowDefinitions="Auto,*,Auto" Margin="24">
+            <!-- Header -->
+            <StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,16">
+                <TextBlock
+                    Text="Create Database"
+                    FontSize="24"
+                    FontWeight="Bold"
+                    Foreground="White"
+                />
+                <Border Height="2" Width="60" Background="{StaticResource AccentBrush}" CornerRadius="1" HorizontalAlignment="Left"/>
+                <TextBlock
+                    Text="Create a new reference board database with organized folders for images and videos."
+                    FontSize="13"
+                    Foreground="{StaticResource TextMuted}"
+                    TextWrapping="Wrap"
+                />
+            </StackPanel>
+
+            <!-- Form -->
+            <ScrollViewer Grid.Row="1">
+                <StackPanel Spacing="20">
+                    <!-- Database Location -->
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Database Location" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBox
+                                x:Name="LocationTextBox"
+                                Grid.Column="0"
+                                IsReadOnly="True"
+                                Text=""
+                                PlaceholderText="Select a parent folder..."
+                                Background="#2D2D2D"
+                                BorderBrush="#3D3D3D"
+                                Foreground="White"
+                            />
+                            <Button
+                                Grid.Column="1"
+                                Content="Browse..."
+                                Click="BrowseLocation_Click"
+                                Background="{StaticResource SurfaceBrushLight}"
+                                Foreground="{StaticResource TextLight}"
+                                BorderBrush="{StaticResource BorderBrushMedium}"
+                                Margin="8,0,0,0"
+                                Padding="12,6"
+                            />
+                        </Grid>
+                        <TextBlock Text="Parent folder where the database folder will be created" FontSize="11" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
+                    </StackPanel>
+
+                    <!-- Database Name -->
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Database Name" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}"/>
+                        <TextBox
+                            x:Name="NameTextBox"
+                            PlaceholderText="MyReferenceBoard"
+                            Background="#2D2D2D"
+                            BorderBrush="#3D3D3D"
+                            Foreground="White"
+                            Text=""
+                        />
+                        <TextBlock Text="A folder with this name will be created in the location" FontSize="11" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
+                    </StackPanel>
+
+                    <!-- First Board Name -->
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="First Board Name" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBox
+                                x:Name="BoardNameTextBox"
+                                Grid.Column="0"
+                                PlaceholderText="Main"
+                                Background="#2D2D2D"
+                                BorderBrush="#3D3D3D"
+                                Foreground="White"
+                                Text=""
+                            />
+                            <TextBlock
+                                Grid.Column="1"
+                                Text=".cgrb"
+                                Foreground="{StaticResource TextMuted}"
+                                VerticalAlignment="Center"
+                                Margin="4,0,0,0"
+                            />
+                        </Grid>
+                        <TextBlock Text="The first board file inside your new database" FontSize="11" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
+                    </StackPanel>
+
+                    <!-- Warning for existing database -->
+                    <Border
+                        x:Name="ExistingDatabaseWarning"
+                        IsVisible="False"
+                        Background="#33FFA500"
+                        CornerRadius="4"
+                        Padding="12,8"
+                    >
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="⚠" FontSize="14"/>
+                            <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#FFFFA500">
+                                This folder already contains board files. A new board will be added to the existing database.
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Footer buttons -->
+            <StackPanel
+                Grid.Row="2"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="12"
+                Margin="0,16,0,0"
+            >
+                <Button
+                    Content="Cancel"
+                    Click="Cancel_Click"
+                    Background="Transparent"
+                    Foreground="{StaticResource TextSecondary}"
+                    BorderBrush="{StaticResource BorderBrushMedium}"
+                    Padding="16,8"
+                />
+                <Button
+                    x:Name="CreateButton"
+                    Content="Create Database"
+                    Click="Create_Click"
+                    Background="{StaticResource AccentBrush}"
+                    Foreground="White"
+                    IsEnabled="False"
+                    Padding="16,8"
+                />
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

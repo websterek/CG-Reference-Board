@@ -1460,6 +1460,19 @@
                             Foreground="White"
                         />
                     </StackPanel>
+                    
+                    <!-- Secondary action -->
+                    <Button
+                        Content="Create Database..."
+                        Click="CreateDatabaseWizard_Click"
+                        Background="Transparent"
+                        Foreground="{StaticResource TextSecondary}"
+                        FontSize="12"
+                        Margin="0,8,0,0"
+                        Padding="8,4"
+                        Cursor="Hand"
+                        BorderThickness="0"
+                    />
 
                     <!-- Recent boards -->
                     <TextBlock

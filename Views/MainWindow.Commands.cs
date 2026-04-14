@@ -132,6 +132,37 @@ public partial class MainWindow
         ShowToast("💾 Saved");
     }
 
+    private async void CreateDatabaseWizard_Click(object? sender, RoutedEventArgs e)
+    {
+        if (!await ConfirmDiscardChanges())
+            return;
+
+        var dialog = new CreateDatabaseWizardDialog();
+        var result = await dialog.ShowDialog<bool>(this);
+
+        if (result && !string.IsNullOrEmpty(dialog.BoardPath))
+        {
+            _currentBoardFile = dialog.BoardPath;
+            _workspaceDir = Path.GetDirectoryName(_currentBoardFile)!;
+            CurrentBoardName = Path.GetFileNameWithoutExtension(_currentBoardFile);
+            OnPropertyChanged(nameof(WindowTitle));
+            UpdateBoardDirectoryList();
+
+            Directory.CreateDirectory(Path.Combine(_workspaceDir, "images"));
+            Directory.CreateDirectory(Path.Combine(_workspaceDir, "videos"));
+
+            var startupOverlay = this.FindControl<Border>("StartupOverlay");
+            if (startupOverlay != null)
+                startupOverlay.IsVisible = false;
+
+            GridCells.Clear();
+            Annotations.Clear();
+            _hasUnsavedChanges = false;
+            SaveBoardData();
+            ShowToast("💾 Database created");
+        }
+    }
+
     private async void LoadBoard_Click(object? sender, RoutedEventArgs e)
     {
         // #17: Warn before discarding the current board.
