@@ -15,6 +15,8 @@ Most reference tools hide your images in proprietary save files. This project is
 - **The "Database" Dir:** Every item is automatically downloaded and organized into a local directory.
 - **Json File Format:** *.cgrb files are just JSONs!
 
+<br>
+  
 # 👋 Getting Started
 ### Basic Concept
 - 🕹️ **Dual-Mode System:** The application is divided into two primary modes to keep the interface clean and focused:
