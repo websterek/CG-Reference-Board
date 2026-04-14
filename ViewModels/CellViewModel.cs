@@ -455,7 +455,7 @@ public class CellViewModel : ViewModelBase, IDisposable
     public ImageLod CurrentLod
     {
         get => _currentLod;
-        private set => SetProperty(ref _currentLod, value);
+        internal set => SetProperty(ref _currentLod, value);
     }
 
     /// <summary>

@@ -65,6 +65,9 @@ public partial class MainWindow
                 duplicate.VideoPath = cell.VideoPath;
                 duplicate.PlaceholderColor = cell.PlaceholderColor;
                 duplicate.ThumbnailPath = cell.ThumbnailPath;
+                // Must reset LOD to Placeholder so the viewport timer triggers a bitmap load.
+                // Default is Full, but the duplicate has no bitmap loaded.
+                duplicate.CurrentLod = ImageLod.Placeholder;
             }
 
             GridCells.Add(duplicate);
