@@ -142,31 +142,16 @@ public partial class MainWindow
 
         if (result && !string.IsNullOrEmpty(dialog.BoardPath))
         {
-            _currentBoardFile = dialog.BoardPath;
-            _workspaceDir = Path.GetDirectoryName(_currentBoardFile)!;
-            CurrentBoardName = Path.GetFileNameWithoutExtension(_currentBoardFile);
+            var boardPath = dialog.BoardPath;
+            var workspaceDir = Path.GetDirectoryName(boardPath)!;
 
-            Directory.CreateDirectory(Path.Combine(_workspaceDir, "images"));
-            Directory.CreateDirectory(Path.Combine(_workspaceDir, "videos"));
+            Directory.CreateDirectory(Path.Combine(workspaceDir, "images"));
+            Directory.CreateDirectory(Path.Combine(workspaceDir, "videos"));
 
-            var startupOverlay = this.FindControl<Border>("StartupOverlay");
-            if (startupOverlay != null)
-                startupOverlay.IsVisible = false;
+            var emptyBoard = BoardSerializer.Serialize([], []);
+            await File.WriteAllTextAsync(boardPath, emptyBoard);
 
-            GridCells.Clear();
-            Annotations.Clear();
-            _selectedCells.Clear();
-            _selectedAnnotations.Clear();
-            _undoStack.Clear();
-            _redoStack.Clear();
-            _hasUnsavedChanges = false;
-
-            UpdateBoardDirectoryList();
-            AddRecentBoard(_currentBoardFile);
-
-            Title = $"{Constants.AppName} - {Path.GetFileName(_currentBoardFile)}";
-            OnPropertyChanged(nameof(WindowTitle));
-            SaveBoardData();
+            LoadBoardFromFile(boardPath);
             ShowToast("💾 Database created");
         }
     }
@@ -196,6 +181,49 @@ public partial class MainWindow
             LoadBoardFromFile(files[0].Path.LocalPath);
             ShowToast("📂 Opened");
         }
+    }
+
+    private async void NewBoardDialog_Click(object? sender, RoutedEventArgs e)
+    {
+        if (!await ConfirmDiscardChanges())
+            return;
+
+        if (string.IsNullOrEmpty(_workspaceDir) || !Directory.Exists(_workspaceDir))
+        {
+            ShowToast("⚠️ Open a board first to create new boards");
+            return;
+        }
+
+        var dialog = new TextInputDialog();
+        var result = await dialog.ShowDialog<string?>(this);
+
+        if (!string.IsNullOrEmpty(result))
+        {
+            var boardName = result;
+            if (!boardName.EndsWith(Constants.DefaultBoardExtension))
+                boardName += Constants.DefaultBoardExtension;
+
+            var boardPath = Path.Combine(_workspaceDir, boardName);
+
+            if (File.Exists(boardPath))
+            {
+                ShowToast("⚠️ Board already exists");
+                return;
+            }
+
+            var emptyBoard = BoardSerializer.Serialize([], []);
+            await File.WriteAllTextAsync(boardPath, emptyBoard);
+
+            LoadBoardFromFile(boardPath);
+            ShowToast("📄 Board created");
+        }
+    }
+
+    private void Home_Click(object? sender, RoutedEventArgs e)
+    {
+        var startupOverlay = this.FindControl<Border>("StartupOverlay");
+        if (startupOverlay != null)
+            startupOverlay.IsVisible = true;
     }
 
     private async void NewBoard_Click(object? sender, RoutedEventArgs e)
