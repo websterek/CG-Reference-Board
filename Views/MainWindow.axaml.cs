@@ -998,7 +998,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                      .OrderBy(Path.GetFileName)
                      .ToList());
 
-        BoardFilesInDirectory.Clear();
         foreach (var file in files)
         {
             BoardFilesInDirectory.Add(new BoardMenuItemViewModel

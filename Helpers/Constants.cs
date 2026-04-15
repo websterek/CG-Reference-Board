@@ -71,6 +71,9 @@ public static class Constants
     /// <summary>Minimum drag distance in pixels before initiating a drag operation.</summary>
     public const double DragThreshold = 3.0;
 
+    /// <summary>Maximum spiral search distance in grid units when auto-placing cells/backdrops.</summary>
+    public const int SpiralSearchMaxDistance = 20;
+
     // ───────── Annotation effect settings ─────────
 
     /// <summary>Shadow colour (ARGB hex). Semi-transparent black works on most backgrounds.</summary>

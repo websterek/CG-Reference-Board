@@ -415,7 +415,7 @@ public partial class MainWindow
         // - left button pressed while Ctrl is held
         // Do NOT show the hand cursor for Ctrl being held alone.
         // Save previous cursor from the CanvasBorder the first time we switch it so it can be restored later.
-        bool wantsPanCursor = currentProps.IsMiddleButtonPressed || (currentProps.IsLeftButtonPressed&& e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+        bool wantsPanCursor = currentProps.IsMiddleButtonPressed || (currentProps.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Shift));
         var canvasBorder = this.FindControl<Border>("CanvasBorder");
         if (wantsPanCursor)
         {

@@ -568,6 +568,7 @@ public partial class MainWindow
         {
             foreach (var cell in _selectedCells.ToList())
             {
+                cell.Dispose();
                 cell.Clear();
                 GridCells.Remove(cell);
             }
@@ -588,6 +589,7 @@ public partial class MainWindow
         // Fallback: if nothing was selected, delete the right-clicked cell
         if (!anyDeleted && sender is MenuItem { DataContext: CellViewModel clickedCell })
         {
+            clickedCell.Dispose();
             clickedCell.Clear();
             GridCells.Remove(clickedCell);
             anyDeleted = true;

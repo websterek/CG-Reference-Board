@@ -131,7 +131,7 @@ public static class GridLayoutService
         if (IsSpaceEmpty(cells, gridX, gridY, colSpan, rowSpan, collisionLayer, excludeCell))
             return new Point(gridX, gridY);
 
-        int maxDistance = 20;
+        int maxDistance = Constants.SpiralSearchMaxDistance;
         for (int distance = 1; distance <= maxDistance; distance++)
         {
             for (int dx = -distance; dx <= distance; dx++)

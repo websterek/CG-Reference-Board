@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
@@ -141,11 +142,7 @@ public partial class MainWindow
                 ClearSelection();
                 _selectedAnnotations.Add(duplicate);
 
-                foreach (var a in _selectedAnnotations.ToList())
-                {
-                    Annotations.Remove(a);
-                    Annotations.Add(a);
-                }
+                BringToFront(_selectedAnnotations);
 
                 _isDraggingAnnotations = true;
                 _annotationDragCellOriginals = null;
@@ -175,12 +172,7 @@ public partial class MainWindow
                 annMove.IsSelected = true;
             }
 
-            // Bring all selected annotations to front (end of collection = highest z-order)
-            foreach (var a in _selectedAnnotations.ToList())
-            {
-                Annotations.Remove(a);
-                Annotations.Add(a);
-            }
+            BringToFront(_selectedAnnotations);
 
             _isDraggingAnnotations = true;
             _annotationDragCellOriginals = null;
@@ -371,6 +363,23 @@ public partial class MainWindow
 
     private void GridBackgroundNone_Click(object? sender, RoutedEventArgs e)
         => GridBackgroundMode = "None";
+
+    #endregion
+
+    #region Helper Methods
+
+    /// <summary>
+    /// Brings the specified annotations to the front of the rendering order
+    /// by moving them to the end of the Annotations collection.
+    /// </summary>
+    private void BringToFront(IEnumerable<AnnotationViewModel> annotations)
+    {
+        foreach (var a in annotations.ToList())
+        {
+            Annotations.Remove(a);
+            Annotations.Add(a);
+        }
+    }
 
     #endregion
 }

@@ -754,7 +754,9 @@ public class CellViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// Resets the cell to an empty state.
+    /// Resets the cell to an empty state, clearing all content and properties.
+    /// Also disposes the bitmap. Use this when removing a cell from the board
+    /// or when resetting a cell to its default/empty state.
     /// </summary>
     public void Clear()
     {
@@ -772,8 +774,10 @@ public class CellViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// Releases the held bitmap. Call when removing a cell from the board to avoid
-    /// leaking unmanaged Skia pixel buffers when the VM is discarded without <see cref="Clear"/>.
+    /// Releases only the held bitmap without clearing other properties.
+    /// Use this when you want to unload the image to free memory but keep
+    /// the cell's position, type, and other properties intact (e.g., when
+    /// switching boards or before discarding the view-model without calling Clear).
     /// </summary>
     public void Dispose()
     {

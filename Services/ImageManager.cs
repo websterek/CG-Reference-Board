@@ -227,11 +227,11 @@ public static class ImageManager
         {
             using var codec = SKCodec.Create(path);
             if (codec == null)
-                return new Bitmap(path); // fallback if SkiaSharp can't read it
+                return LoadBitmapFallback(path, maxWidth);
 
             var info = codec.Info;
             if (info.Width <= maxWidth)
-                return new Bitmap(path); // already small enough
+                return LoadBitmapFallback(path, maxWidth);
 
             // Decode at reduced resolution via sample-size trick.
             // Use Bgra8888 — Avalonia's native pixel format — so no channel
@@ -246,7 +246,7 @@ public static class ImageManager
             using var skBitmap = new SKBitmap(scaledInfo);
             var result = codec.GetPixels(scaledInfo, skBitmap.GetPixels());
             if (result != SKCodecResult.Success && result != SKCodecResult.IncompleteInput)
-                return new Bitmap(path);
+                return LoadBitmapFallback(path, maxWidth);
 
             // Resize to exact target width for consistent quality
             double scale = (double)maxWidth / skBitmap.Width;
@@ -400,6 +400,82 @@ public static class ImageManager
             return ImageLod.Medium;
 
         return ImageLod.Full;
+    }
+
+    // ───────── fallback bitmap loading ─────────
+
+    /// <summary>
+    /// Fallback for loading a bitmap when SkiaSharp fails or image is small enough.
+    /// Applies size cap to prevent loading oversized images.
+    /// </summary>
+    private static Bitmap? LoadBitmapFallback(string path, int maxWidth)
+    {
+        try
+        {
+            using var codec = SKCodec.Create(path);
+            if (codec == null)
+                return new Bitmap(path);
+
+            var info = codec.Info;
+            if (info.Width <= maxWidth)
+                return new Bitmap(path);
+
+            // Scale down using SkiaSharp to respect maxWidth
+            int sampleSize = Math.Max(1, info.Width / maxWidth);
+            var scaledInfo = new SKImageInfo(
+                Math.Max(1, info.Width / sampleSize),
+                Math.Max(1, info.Height / sampleSize),
+                SKColorType.Bgra8888,
+                SKAlphaType.Premul);
+
+            using var skBitmap = new SKBitmap(scaledInfo);
+            var result = codec.GetPixels(scaledInfo, skBitmap.GetPixels());
+            if (result != SKCodecResult.Success && result != SKCodecResult.IncompleteInput)
+                return new Bitmap(path);
+
+            double scale = (double)maxWidth / skBitmap.Width;
+            int targetW = maxWidth;
+            int targetH = Math.Max(1, (int)(skBitmap.Height * scale));
+
+            using var resized = skBitmap.Resize(
+                new SKImageInfo(targetW, targetH, SKColorType.Bgra8888, SKAlphaType.Premul),
+                SKSamplingOptions.Default);
+            var source = resized ?? skBitmap;
+
+            var wb = new WriteableBitmap(
+                new Avalonia.PixelSize(source.Width, source.Height),
+                new Avalonia.Vector(96, 96),
+                PixelFormat.Bgra8888,
+                AlphaFormat.Premul);
+
+            using (var fb = wb.Lock())
+            {
+                unsafe
+                {
+                    int srcRowBytes = source.RowBytes;
+                    int dstRowBytes = fb.RowBytes;
+                    int copyRowBytes = Math.Min(srcRowBytes, dstRowBytes);
+                    nint srcBase = source.GetPixels();
+                    nint dstBase = fb.Address;
+
+                    for (int y = 0; y < source.Height; y++)
+                    {
+                        Buffer.MemoryCopy(
+                            (void*)(srcBase + y * srcRowBytes),
+                            (void*)(dstBase + y * dstRowBytes),
+                            dstRowBytes,
+                            copyRowBytes);
+                    }
+                }
+            }
+
+            return wb;
+        }
+        catch
+        {
+            try { return new Bitmap(path); }
+            catch { return null; }
+        }
     }
 
     // ───────── cleanup ─────────
