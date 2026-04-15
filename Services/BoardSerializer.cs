@@ -189,9 +189,16 @@ public static class BoardSerializer
 
     private static CellViewModel DeserializeCell(JsonElement element, string? basePath)
     {
-        double cx = element.GetProperty("CanvasX").GetDouble();
-        double cy = element.GetProperty("CanvasY").GetDouble();
-        int type = element.GetProperty("Type").GetInt32();
+        if (!element.TryGetProperty("CanvasX", out var cxProp) || cxProp.ValueKind != JsonValueKind.Number)
+            return new CellViewModel();
+        if (!element.TryGetProperty("CanvasY", out var cyProp) || cyProp.ValueKind != JsonValueKind.Number)
+            return new CellViewModel();
+        if (!element.TryGetProperty("Type", out var typeProp) || typeProp.ValueKind != JsonValueKind.Number)
+            return new CellViewModel();
+
+        double cx = cxProp.GetDouble();
+        double cy = cyProp.GetDouble();
+        int type = typeProp.GetInt32();
         int colSpan = element.TryGetProperty("ColSpan", out var col) ? col.GetInt32() : 1;
         int rowSpan = element.TryGetProperty("RowSpan", out var row) ? row.GetInt32() : 1;
 
@@ -235,12 +242,17 @@ public static class BoardSerializer
 
     private static AnnotationViewModel DeserializeAnnotation(JsonElement element)
     {
+        if (!element.TryGetProperty("CanvasX", out var cxProp) || cxProp.ValueKind != JsonValueKind.Number)
+            return new AnnotationViewModel();
+        if (!element.TryGetProperty("CanvasY", out var cyProp) || cyProp.ValueKind != JsonValueKind.Number)
+            return new AnnotationViewModel();
+
         var annotation = new AnnotationViewModel
         {
             Type = MapLegacyAnnotationType(element.TryGetProperty("Type", out var typeProp) ? typeProp.GetString() ?? "Brush" : "Brush"),
             Text = element.TryGetProperty("Text", out var textProp) ? textProp.GetString() ?? "" : "",
-            CanvasX = element.GetProperty("CanvasX").GetDouble(),
-            CanvasY = element.GetProperty("CanvasY").GetDouble(),
+            CanvasX = cxProp.GetDouble(),
+            CanvasY = cyProp.GetDouble(),
             Color = element.TryGetProperty("Color", out var colProp) ? colProp.GetString() ?? DefaultAnnotationColor : DefaultAnnotationColor,
             Thickness = element.TryGetProperty("Thickness", out var thickProp) ? thickProp.GetDouble() : DefaultAnnotationThickness
         };

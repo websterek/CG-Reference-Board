@@ -582,7 +582,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private double _lastViewportH = double.NaN;
     private int _lastViewportCellCount = -1;
     private int _lastAnnotationCount = -1;
-    private bool _lodUpdateInProgress;
+    
 
     // Batched zoom property notifications - debounce to reduce binding cascade
     private bool _zoomNotificationPending;
@@ -1671,7 +1671,6 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
     /// </summary>
     private async Task UpdateViewportLodAsync()
     {
-        _lodUpdateInProgress = true;
         try
         {
             double scale = _scale.ScaleX;
@@ -1831,7 +1830,6 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
         }
         finally
         {
-            _lodUpdateInProgress = false;
         }
     }
 
