@@ -53,6 +53,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly Stack<string> _undoStack = new();
     private readonly Stack<string> _redoStack = new();
     private bool _isRestoringState;
+    private string? _lastStateHash;
 
     // Serialises concurrent SaveBoardData calls so writes never interleave.
     private readonly System.Threading.SemaphoreSlim _saveSemaphore = new(1, 1);
@@ -98,36 +99,153 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     /// <summary>
     /// Replaces the current board contents with the state described by the given JSON string.
+    /// Updates cells/annotations in-place where possible to preserve image caches.
     /// </summary>
     private void RestoreBoardState(string json)
     {
-        // Dispose existing cell bitmaps before discarding the view-models
-        foreach (var c in GridCells)
-            c.UnloadImage();
+        var (newCells, newAnnotations) = BoardSerializer.Deserialize(json, _currentBoardFile);
 
-        // Deselect cells whose view-models are about to be discarded so stale
-        // references never linger in _selectedCells after the undo/redo swap.
-        foreach (var c in _selectedCells)
-            c.IsSelected = false;
+        UpdateCellsInPlace(newCells);
+        UpdateAnnotationsInPlace(newAnnotations);
+
         _selectedCells.Clear();
-
-        GridCells.Clear();
-        Annotations.Clear();
         _selectedAnnotations.Clear();
         _currentAnnotation = null;
         _editingTextAnnotation = null;
 
-        var (cells, annotations) = BoardSerializer.Deserialize(json, _currentBoardFile);
-        foreach (var cell in cells)
-            GridCells.Add(cell);
-        foreach (var ann in annotations)
+        UpdateSelectionState();
+    }
+
+    private void UpdateCellsInPlace(List<CellViewModel> newCells)
+    {
+        var toRemove = new List<CellViewModel>();
+
+        foreach (var existingCell in GridCells)
         {
-            ann.IsInDrawMode = IsDrawMode;
-            Annotations.Add(ann);
+            var match = FindMatchingCell(newCells, existingCell);
+            if (match == null)
+            {
+                toRemove.Add(existingCell);
+            }
+            else
+            {
+                UpdateCellProperties(existingCell, match);
+                newCells.Remove(match);
+            }
         }
 
-        // Sync SelectionCountText and related bindings after the VM swap.
-        UpdateSelectionState();
+        foreach (var cell in toRemove)
+        {
+            cell.UnloadImage();
+            GridCells.Remove(cell);
+        }
+
+        foreach (var newCell in newCells)
+        {
+            GridCells.Add(newCell);
+        }
+    }
+
+    private CellViewModel? FindMatchingCell(List<CellViewModel> cells, CellViewModel existing)
+    {
+        foreach (var c in cells)
+        {
+            if (Math.Abs(c.CanvasX - existing.CanvasX) < 0.1 &&
+                Math.Abs(c.CanvasY - existing.CanvasY) < 0.1 &&
+                c.Type == existing.Type)
+            {
+                return c;
+            }
+        }
+        return null;
+    }
+
+    private void UpdateCellProperties(CellViewModel target, CellViewModel source)
+    {
+        target.ColSpan = source.ColSpan;
+        target.RowSpan = source.RowSpan;
+        target.TextContent = source.TextContent;
+        target.BackgroundColor = source.BackgroundColor;
+        target.ForegroundColor = source.ForegroundColor;
+        target.FontSize = source.FontSize;
+        target.ImageStretch = source.ImageStretch;
+target.PlaceholderColor = source.PlaceholderColor;
+
+        string? oldFilePath = target.FilePath;
+        string? newFilePath = source.FilePath;
+        
+        if (oldFilePath != newFilePath && !string.IsNullOrEmpty(newFilePath))
+        {
+            target.SetImageDeferred(newFilePath);
+        }
+        
+        string? oldVideoPath = target.VideoPath;
+        string? newVideoPath = source.VideoPath;
+        string? oldVideoFilePath = target.FilePath;
+        string? newVideoFilePath = source.FilePath;
+        
+        if ((oldVideoPath != newVideoPath || oldVideoFilePath != newVideoFilePath) && !string.IsNullOrEmpty(newVideoPath) && !string.IsNullOrEmpty(newVideoFilePath))
+        {
+            target.SetVideoDeferred(newVideoPath, newVideoFilePath);
+        }
+    }
+
+    private void UpdateAnnotationsInPlace(List<AnnotationViewModel> newAnnotations)
+    {
+        var toRemove = new List<AnnotationViewModel>();
+
+        foreach (var existingAnn in Annotations)
+        {
+            var match = FindMatchingAnnotation(newAnnotations, existingAnn);
+            if (match == null)
+            {
+                toRemove.Add(existingAnn);
+            }
+            else
+            {
+                UpdateAnnotationProperties(existingAnn, match);
+                newAnnotations.Remove(match);
+            }
+        }
+
+        foreach (var ann in toRemove)
+        {
+            Annotations.Remove(ann);
+        }
+
+        foreach (var newAnn in newAnnotations)
+        {
+            newAnn.IsInDrawMode = IsDrawMode;
+            Annotations.Add(newAnn);
+        }
+    }
+
+    private AnnotationViewModel? FindMatchingAnnotation(List<AnnotationViewModel> annotations, AnnotationViewModel existing)
+    {
+        foreach (var a in annotations)
+        {
+            if (Math.Abs(a.CanvasX - existing.CanvasX) < 0.1 &&
+                Math.Abs(a.CanvasY - existing.CanvasY) < 0.1 &&
+                a.Type == existing.Type &&
+                a.Points.Count == existing.Points.Count)
+            {
+                return a;
+            }
+        }
+        return null;
+    }
+
+    private void UpdateAnnotationProperties(AnnotationViewModel target, AnnotationViewModel source)
+    {
+        target.Text = source.Text;
+        target.Color = source.Color;
+        target.Thickness = source.Thickness;
+        
+        target.Points.Clear();
+        foreach (var p in source.Points)
+        {
+            target.Points.Add(p);
+        }
     }
 
     #endregion
@@ -925,6 +1043,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         _undoStack.Clear();
         _redoStack.Clear();
+        _lastStateHash = null;
         SaveBoardData();
 
         // For cells loaded from older .cgrb files without a saved PlaceholderColor,
@@ -941,6 +1060,32 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             ShowAll_Click(null, null!);
             ScheduleViewportUpdate();
         });
+    }
+
+    private string ComputeStateHash(IEnumerable<CellViewModel> cells, IEnumerable<AnnotationViewModel> annotations)
+    {
+        unchecked
+        {
+            int hash = 19;
+            foreach (var c in cells)
+            {
+                hash = hash * 31 + c.CanvasX.GetHashCode();
+                hash = hash * 31 + c.CanvasY.GetHashCode();
+                hash = hash * 31 + c.ColSpan;
+                hash = hash * 31 + c.RowSpan;
+                hash = hash * 31 + c.Type.GetHashCode();
+                hash = hash * 31 + (c.TextContent?.GetHashCode() ?? 0);
+            }
+            foreach (var a in annotations)
+            {
+                hash = hash * 31 + (a.Type?.GetHashCode() ?? 0);
+                hash = hash * 31 + a.CanvasX.GetHashCode();
+                hash = hash * 31 + a.CanvasY.GetHashCode();
+                hash = hash * 31 + a.Points.Count;
+                hash = hash * 31 + (a.Text?.GetHashCode() ?? 0);
+            }
+            return hash.ToString("X8");
+        }
     }
 
     /// <summary>
@@ -960,9 +1105,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         // stack is consistent even if the write below fails.
         if (!_isRestoringState && !_isViewMode)
         {
-            if (_undoStack.Count == 0 || _undoStack.Peek() != json)
+            // Use hash for quick change detection - skip if state unchanged
+            string currentHash = ComputeStateHash(GridCells, Annotations);
+            bool stackIsEmpty = _undoStack.Count == 0;
+            bool jsonMatchesStack = !stackIsEmpty && _undoStack.Peek() == json;
+
+            if (!jsonMatchesStack)
             {
                 _undoStack.Push(json);
+                _lastStateHash = currentHash;
 
                 // Trim undo stack to prevent unbounded memory growth
                 if (_undoStack.Count > Constants.MaxUndoDepth)
@@ -975,6 +1126,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
                 _redoStack.Clear();
             }
+            else
+            {
+                // State hasn't changed from stack perspective - still update hash in case
+                _lastStateHash = currentHash;
+            }
+        }
+        else
+        {
+            // Restore mode - compute hash for future comparisons
+            _lastStateHash = ComputeStateHash(GridCells, Annotations);
         }
 
         // Serialise file I/O: only one write at a time, regardless of how many

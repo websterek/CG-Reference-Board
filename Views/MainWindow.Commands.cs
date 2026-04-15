@@ -246,6 +246,7 @@ public partial class MainWindow
         _editingTextAnnotation = null;
         _undoStack.Clear();
         _redoStack.Clear();
+        _lastStateHash = null;
 
         GridCells.Clear();
         Annotations.Clear();
