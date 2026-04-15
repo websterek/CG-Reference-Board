@@ -380,11 +380,14 @@ public static class YtDlpService
 
     /// <summary>
     /// Extracts a single frame from a video file as a JPEG thumbnail using ffmpeg.
-    /// Returns the path to the generated thumbnail, or null on failure.
+    /// Returns the path to the generated thumbnail, or null on failure. This method
+    /// accepts an optional cancellation token and will kill the ffmpeg process if
+    /// the operation is cancelled or times out.
     /// </summary>
     /// <param name="videoPath">Path to the video file.</param>
     /// <param name="outputDirectory">Directory where the thumbnail will be saved.</param>
-    public static Task<string?> ExtractThumbnailAsync(string videoPath, string outputDirectory)
+    /// <param name="cancellationToken">Optional cancellation token to cancel the operation.</param>
+    public static Task<string?> ExtractThumbnailAsync(string videoPath, string outputDirectory, CancellationToken cancellationToken = default)
     {
         return Task.Run(async () =>
         {
@@ -417,28 +420,59 @@ public static class YtDlpService
 
                 process.Start();
 
+                // Use a 30s timeout for ffmpeg, but allow caller cancellation as well.
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
+                // Ensure ffmpeg is killed if cancellation or timeout fires.
+                using var _reg = linkedCts.Token.Register(() =>
+                {
+                    try
+                    {
+                        if (!process.HasExited)
+                            process.Kill(entireProcessTree: true);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"ExtractThumbnailAsync: failed to kill ffmpeg on cancellation/timeout: {ex}");
+                    }
+                });
+
                 // Drain both pipes concurrently. Reading them sequentially can deadlock:
                 // if ffmpeg fills one pipe's OS buffer while we're blocked on the other,
                 // neither side makes progress.
                 var stdoutTask = process.StandardOutput.ReadToEndAsync();
                 var stderrTask = process.StandardError.ReadToEndAsync();
-                await Task.WhenAll(stdoutTask, stderrTask);
+                var waitTask = process.WaitForExitAsync(linkedCts.Token);
 
-                if (!process.WaitForExit(TimeSpan.FromSeconds(30)))
+                // Wait for process exit and pipe drains; if linked token cancels, WaitForExitAsync will throw.
+                await Task.WhenAll(waitTask, stdoutTask, stderrTask);
+
+                // If process exited with non-zero code, treat as failure but still check for thumbnail file.
+                if (process.ExitCode != 0)
                 {
-                    try
-                    { process.Kill(entireProcessTree: true); }
-                    catch (Exception ex) { Debug.WriteLine($"ExtractThumbnailAsync: failed to kill ffmpeg process: {ex}"); }
-                    return null;
+                    var stderr = stderrTask.IsCompleted ? stderrTask.Result : string.Empty;
+                    Debug.WriteLine($"ExtractThumbnailAsync: ffmpeg exited with code {process.ExitCode} for '{videoPath}': {stderr}");
                 }
 
                 return File.Exists(thumbPath) ? thumbPath : null;
             }
-            catch
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
+                Debug.WriteLine($"ExtractThumbnailAsync: cancelled by caller for '{videoPath}'");
                 return null;
             }
-        });
+            catch (OperationCanceledException)
+            {
+                Debug.WriteLine($"ExtractThumbnailAsync: timed out while extracting thumbnail for '{videoPath}'");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"ExtractThumbnailAsync: unexpected failure for '{videoPath}': {ex}");
+                return null;
+            }
+        }, cancellationToken);
     }
 
     /// <summary>
