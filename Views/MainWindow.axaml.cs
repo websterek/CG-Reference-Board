@@ -535,6 +535,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     // Viewport-aware LOD management (polls transform state to detect pan/zoom changes)
     private Avalonia.Threading.DispatcherTimer? _viewportLodTimer;
+    private Avalonia.Threading.DispatcherTimer? _lodDebounceTimer;
+    private bool _lodUpdatePending;
+    private bool _isLodUpdateScheduled;
     private double _lastViewportTx = double.NaN;
     private double _lastViewportTy = double.NaN;
     private double _lastViewportScale = double.NaN;
@@ -730,6 +733,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         base.OnClosed(e);
         _viewportLodTimer?.Stop();
+        _lodDebounceTimer?.Stop();
         _edgeScrollTimer?.Stop();
         _edgeScrollTimer?.Dispose();
         _saveSemaphore.Dispose();
@@ -1535,8 +1539,7 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
     /// <summary>
     /// Initialises a <see cref="Avalonia.Threading.DispatcherTimer"/> that polls the
     /// current pan/zoom transform every 200 ms and triggers an LOD recalculation
-    /// whenever the viewport changes. Polling avoids having to modify every
-    /// zoom/pan code-path in Canvas.cs.
+    /// whenever the viewport changes. Uses debouncing to avoid updating during active pan/zoom.
     /// </summary>
     private void InitViewportLodTimer()
     {
@@ -1546,9 +1549,28 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
         };
         _viewportLodTimer.Tick += ViewportLodTimer_Tick;
         _viewportLodTimer.Start();
+
+        _lodDebounceTimer = new Avalonia.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(400)
+        };
+        _lodDebounceTimer.Tick += LodDebounceTimer_Tick;
     }
 
-    /// <summary>Timer callback — fires on the UI thread.</summary>
+    /// <summary>Debounced timer - fires after user stops panning/zooming.</summary>
+    private void LodDebounceTimer_Tick(object? sender, EventArgs e)
+    {
+        _lodDebounceTimer?.Stop();
+        _isLodUpdateScheduled = false;
+
+        if (_lodUpdatePending)
+        {
+            _lodUpdatePending = false;
+            _ = UpdateViewportLodAsync();
+        }
+    }
+
+    /// <summary>Timer callback — fires on the UI thread. Schedules debounced update.</summary>
     private void ViewportLodTimer_Tick(object? sender, EventArgs e)
     {
         double tx = _translate.X;
@@ -1575,11 +1597,14 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
         _lastViewportH = vh;
         _lastAnnotationCount = annCount;
 
-        if (_lodUpdateInProgress)
-            return;
-        _ = UpdateViewportLodAsync();
+        // During active pan/zoom, just mark as pending without firing
+        _lodUpdatePending = true;
 
-
+        if (!_isLodUpdateScheduled)
+        {
+            _isLodUpdateScheduled = true;
+            _lodDebounceTimer?.Start();
+        }
     }
 
     /// <summary>
