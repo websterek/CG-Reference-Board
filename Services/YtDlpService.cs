@@ -36,7 +36,7 @@ public static class YtDlpService
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = ytdlpPath,
-                    Arguments = $"--dump-json --no-download --no-playlist \"{url}\"",
+                    Arguments = $"--dump-json --no-download --no-playlist {SanitizeArgument(url)}",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
@@ -410,7 +410,7 @@ public static class YtDlpService
                     {
                         FileName = ffmpegPath,
                         // Extract a frame at 1 second into the video, scale to 400px wide
-                        Arguments = $"-y -ss 1 -i \"{videoPath}\" -vframes 1 -vf scale=400:-1 \"{thumbPath}\"",
+                        Arguments = $"-y -ss 1 -i {SanitizeArgument(videoPath)} -vframes 1 -vf scale=400:-1 {SanitizeArgument(thumbPath)}",
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
                         UseShellExecute = false,
@@ -492,4 +492,15 @@ public static class YtDlpService
             windowsRelativePath: Path.Combine("Include", "yt-dlp-windows", "yt-dlp.exe"),
             linuxRelativePath: Path.Combine("Include", "yt-dlp-linux", "yt-dlp_linux"),
             fallbackName: "yt-dlp");
+
+    /// <summary>
+    /// Sanitizes an argument to prevent command injection attacks.
+    /// Wraps the argument in quotes and escapes any embedded quotes.
+    /// </summary>
+    private static string SanitizeArgument(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return "\"\"";
+        return $"\"{input.Replace("\"", "\\\"")}\"";
+    }
 }

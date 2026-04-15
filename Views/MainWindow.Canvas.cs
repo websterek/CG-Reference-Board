@@ -416,7 +416,7 @@ public partial class MainWindow
         if (hoverHighlight != null)
         {
             CellViewModel? existingContent = null;
-            if (_cellSpatialIndex.TryGetValue((gridX, gridY), out var cell))
+            if (_cellSpatialIndex.TryGetValue((gridX, gridY), out var cell) && cell != null)
             {
                 if (!cell.IsBoardElement && cell.HasContent
                     && cell.CanvasX <= gridPt.X && cell.CanvasX + cell.PixelWidth > gridPt.X

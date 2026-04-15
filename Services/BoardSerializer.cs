@@ -58,7 +58,13 @@ public static class BoardSerializer
         try
         {
             string baseDir = Path.GetDirectoryName(basePath) ?? basePath;
-            return Path.GetFullPath(Path.Combine(baseDir, relPath));
+            string fullPath = Path.GetFullPath(Path.Combine(baseDir, relPath));
+            
+            if (!fullPath.StartsWith(baseDir + Path.DirectorySeparatorChar) && 
+                !fullPath.Equals(baseDir, StringComparison.Ordinal))
+                return null;
+            
+            return fullPath;
         }
         catch
         {
@@ -189,12 +195,23 @@ public static class BoardSerializer
 
     private static CellViewModel DeserializeCell(JsonElement element, string? basePath)
     {
-        if (!element.TryGetProperty("CanvasX", out var cxProp) || cxProp.ValueKind != JsonValueKind.Number)
-            return new CellViewModel();
-        if (!element.TryGetProperty("CanvasY", out var cyProp) || cyProp.ValueKind != JsonValueKind.Number)
-            return new CellViewModel();
-        if (!element.TryGetProperty("Type", out var typeProp) || typeProp.ValueKind != JsonValueKind.Number)
-            return new CellViewModel();
+        try
+        {
+            if (!element.TryGetProperty("CanvasX", out var cxProp) || cxProp.ValueKind != JsonValueKind.Number)
+            {
+                System.Diagnostics.Debug.WriteLine("BoardSerializer: missing or invalid CanvasX");
+                return new CellViewModel();
+            }
+            if (!element.TryGetProperty("CanvasY", out var cyProp) || cyProp.ValueKind != JsonValueKind.Number)
+            {
+                System.Diagnostics.Debug.WriteLine("BoardSerializer: missing or invalid CanvasY");
+                return new CellViewModel();
+            }
+            if (!element.TryGetProperty("Type", out var typeProp) || typeProp.ValueKind != JsonValueKind.Number)
+            {
+                System.Diagnostics.Debug.WriteLine("BoardSerializer: missing or invalid Type");
+                return new CellViewModel();
+            }
 
         double cx = cxProp.GetDouble();
         double cy = cyProp.GetDouble();
@@ -207,20 +224,31 @@ public static class BoardSerializer
         switch ((CellType)type)
         {
             case CellType.Image:
-                cell.SetImageDeferred(GetAbsolutePath(element.GetProperty("FilePath").GetString(), basePath)!);
+                if (element.TryGetProperty("FilePath", out var imageFp) && imageFp.ValueKind == JsonValueKind.String)
+                {
+                    var imagePath = GetAbsolutePath(imageFp.GetString(), basePath);
+                    if (imagePath != null)
+                        cell.SetImageDeferred(imagePath);
+                }
                 break;
 
             case CellType.Text:
             case CellType.Label:
             case CellType.Backdrop:
-                cell.SetText(element.GetProperty("TextContent").GetString()!);
+                if (element.TryGetProperty("TextContent", out var textProp) && textProp.ValueKind == JsonValueKind.String)
+                    cell.SetText(textProp.GetString()!);
                 cell.Type = (CellType)type;
                 break;
 
             case CellType.Video:
-                cell.SetVideoDeferred(
-                    GetAbsolutePath(element.GetProperty("VideoPath").GetString(), basePath)!,
-                    GetAbsolutePath(element.GetProperty("FilePath").GetString(), basePath)!);
+                string? videoPath = null;
+                string? thumbPath = null;
+                if (element.TryGetProperty("VideoPath", out var vidProp) && vidProp.ValueKind == JsonValueKind.String)
+                    videoPath = GetAbsolutePath(vidProp.GetString(), basePath);
+                if (element.TryGetProperty("FilePath", out var thumbProp) && thumbProp.ValueKind == JsonValueKind.String)
+                    thumbPath = GetAbsolutePath(thumbProp.GetString(), basePath);
+                if (videoPath != null && thumbPath != null)
+                    cell.SetVideoDeferred(videoPath, thumbPath);
                 break;
         }
 
@@ -236,6 +264,12 @@ public static class BoardSerializer
             cell.PlaceholderColor = pc.GetString()!;
 
         return cell;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"BoardSerializer: failed to deserialize cell: {ex.Message}");
+            return new CellViewModel();
+        }
     }
 
     // ───────── Annotation deserialization ─────────
