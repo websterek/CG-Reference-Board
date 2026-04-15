@@ -394,10 +394,16 @@ public partial class MainWindow
         var hoverHighlight = this.FindControl<Border>("HoverHighlight");
         if (hoverHighlight != null)
         {
-            var existingContent = GridCells.FirstOrDefault(c =>
-                !c.IsBoardElement && c.HasContent
-                && c.CanvasX <= gridPt.X && c.CanvasX + c.PixelWidth > gridPt.X
-                && c.CanvasY <= gridPt.Y && c.CanvasY + c.PixelHeight > gridPt.Y);
+            CellViewModel? existingContent = null;
+            if (_cellSpatialIndex.TryGetValue((gridX, gridY), out var cell))
+            {
+                if (!cell.IsBoardElement && cell.HasContent
+                    && cell.CanvasX <= gridPt.X && cell.CanvasX + cell.PixelWidth > gridPt.X
+                    && cell.CanvasY <= gridPt.Y && cell.CanvasY + cell.PixelHeight > gridPt.Y)
+                {
+                    existingContent = cell;
+                }
+            }
 
             Canvas.SetLeft(hoverHighlight, gridX);
             Canvas.SetTop(hoverHighlight, gridY);

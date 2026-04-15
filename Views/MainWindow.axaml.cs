@@ -520,6 +520,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private bool _previewIsValid;
     private CellViewModel? _pendingBackdrop;
 
+    // Spatial index for O(1) grid-position lookups (replaces O(n) FirstOrDefault scans)
+    private readonly Dictionary<(int gridX, int gridY), CellViewModel> _cellSpatialIndex = new();
+
     // Auto-scroll when dragging near edges
     private const double EdgeScrollThreshold = 50.0; // pixels from edge
     private const double EdgeScrollSpeed = 25.0; // pixels per tick
@@ -615,7 +618,32 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (!Directory.Exists(_workspaceDir))
             Directory.CreateDirectory(_workspaceDir);
 
-        GridCells.CollectionChanged += (s, e) => UpdateSelectionState();
+        GridCells.CollectionChanged += GridCells_CollectionChanged;
+
+        void GridCells_CollectionChanged(object? s, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            UpdateSelectionState();
+
+            if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
+            {
+                _cellSpatialIndex.Clear();
+                foreach (var cell in GridCells)
+                    AddCellToSpatialIndex(cell);
+            }
+            else
+            {
+                if (e.OldItems != null)
+                {
+                    foreach (CellViewModel cell in e.OldItems)
+                        RemoveCellFromSpatialIndex(cell);
+                }
+                if (e.NewItems != null)
+                {
+                    foreach (CellViewModel cell in e.NewItems)
+                        AddCellToSpatialIndex(cell);
+                }
+            }
+        }
 
         OnPropertyChanged(nameof(WindowTitle));
         CanvasGrid.ItemsSource = GridCells;
@@ -1058,6 +1086,26 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     #region Grid Cell Helpers
 
     /// <summary>
+    /// Adds a cell to the spatial index for O(1) grid-position lookups.
+    /// </summary>
+    private void AddCellToSpatialIndex(CellViewModel cell)
+    {
+        int gridX = (int)cell.CanvasX;
+        int gridY = (int)cell.CanvasY;
+        _cellSpatialIndex[(gridX, gridY)] = cell;
+    }
+
+    /// <summary>
+    /// Removes a cell from the spatial index.
+    /// </summary>
+    private void RemoveCellFromSpatialIndex(CellViewModel cell)
+    {
+        int gridX = (int)cell.CanvasX;
+        int gridY = (int)cell.CanvasY;
+        _cellSpatialIndex.Remove((gridX, gridY));
+    }
+
+    /// <summary>
     /// Finds or creates a cell at the grid position nearest to the given canvas point.
     /// </summary>
     private CellViewModel GetOrCreateCellAt(Point canvasPoint)
@@ -1065,8 +1113,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         int gridX = (int)(Math.Floor(canvasPoint.X / Constants.GridSize) * Constants.GridSize);
         int gridY = (int)(Math.Floor(canvasPoint.Y / Constants.GridSize) * Constants.GridSize);
 
-        var existing = GridCells.FirstOrDefault(c => (int)c.CanvasX == gridX && (int)c.CanvasY == gridY);
-        if (existing != null)
+        if (_cellSpatialIndex.TryGetValue((gridX, gridY), out var existing))
             return existing;
 
         var newCell = new CellViewModel { CanvasX = gridX, CanvasY = gridY };
@@ -1084,9 +1131,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         int gridX = (int)(Math.Floor(canvasPoint.X / Constants.GridSize) * Constants.GridSize);
         int gridY = (int)(Math.Floor(canvasPoint.Y / Constants.GridSize) * Constants.GridSize);
 
-        var existing = GridCells.FirstOrDefault(c =>
-            (int)c.CanvasX == gridX && (int)c.CanvasY == gridY && !c.IsBoardElement);
-        if (existing != null)
+        if (_cellSpatialIndex.TryGetValue((gridX, gridY), out var existing) && !existing.IsBoardElement)
             return existing;
 
         var newCell = new CellViewModel { CanvasX = gridX, CanvasY = gridY };
