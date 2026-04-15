@@ -35,51 +35,49 @@ Most reference tools hide your images in proprietary save files. This project is
 - ✨ **Top Menu:** While shortcuts are available for power users, the Top Menu provides easy access to mode switching, board customization, and visual settings.
 - 💾 **Auto-Save:** Focus on your work without worry—every action is automatically saved to the board file in real-time.
 
-### 🎮 Controls & Shortcuts
-- 🖱 Mouse & Navigation
-    - **Pan:** Middle _`Click`_ + _`drag`_ or `Shift` + `Left Click` + _`drag`_.
-    - **Zoom:** `Mouse Wheel` to zoom at pointer, or `Middle` + `Left Click` + _`drag up/down`_ (Nuke like).
-    - **Reset View:** Press `Home` to reset zoom and center.
-    - **Board View:** Press `F` to show every item on the board. 
-    - **Focus Item:** `Double-click` an image, video, or text cell to fill the screen.
-    - **Focus Selection:** `Shift` + `F` with selected item(s)
-    - **External Open:** `Shift` + `Double-click` to open the file in your system’s default application.
-- 🔲 Grid & Cell Selection
-    - **Select:** `Left Click` on empty canvas for marquee selection.
-    - **Multi-select:** `Hold Ctrl` while clicking to add/remove items.
-    - **Duplicate:** `Alt` + `Left Click` + _`drag`_ on an item/draw to clone it instantly.
-    - **Delete:** `Delete` or `Backspace` removes selected (or hovered) items/draw.
-    - **Clear:** `Escape` clears selection or cancels the current operation.
-📋 Clipboard & I/O
-    - **Copy Path/Text:** `Ctrl` + `C` copies the file path (image/video) or the raw text.
-    - **Copy Bitmap:** `Ctrl` + `Shift` + `C` copies the actual image to your clipboard.
-    - **Smart Paste:** `Ctrl` + `V` handles everything:
-        - **URLs:** Links (like YouTube) trigger automatic video downloads to your HDD.
-        - **Files (supported):** Pasting files from your OS copies them into your local database.
-        - **Images:** Pasted bitmap data is saved as a new image file automatically.
-    - **Import:** `Ctrl` + `I` to manually browse and import media.
-- 🎨 Annotation & Drawing
-    - **Mode Switch:**
-        - `Ctrl` + `1` for Grid/View mode.
-        - `Ctrl` + `2` for Draw/Annotation mode.
-    - **Visibility:** `Shift` + `A` to toggle all annotations on/off.
-    - **Tools:**
-        - `V` - Move / Select
-        - `B` - Brush
-        - `E` - Eraser
-        - `T` - Text (Press Enter to commit text, Esc to cancel)
-        - `L` - Arrow
-        - `U` - Rectangle
-        - `O` - Ellipse
-- 💾 General Commands
-    - **File:**
-        - `Ctrl` + `N` - New Board
-        - `Ctrl` + `O` - Open Board
-        - `Ctrl` + `S` - Save (As) Board
-    - **History:**
-        - `Ctrl` + `Z` - Undo
-        - `Ctrl` + `Y` or `Ctrl` + `Shift` + `Z` - Redo
-    - **Always on Top:** `Ctrl` + `Shift` + `T`.
+### 🖱 Mouse & Navigation
+| Action | Shortcut | Description |
+| :--- | :--- | :--- |
+| **Pan** | `Mid Click` / `Shift+LMB` | Middle Click + drag or Shift + Left Click + drag. |
+| **Zoom** | `Wheel` / `Mid+LMB` | Scroll to zoom at pointer; or Mid + LMB drag up/down (Nuke style). |
+| **Reset View** | `Home` | Reset zoom level and center the board. |
+| **Board View** | `F` | Show every item currently on the board. |
+| **Focus Item** | `Double-click` | Fill the screen with selected image, video, or text cell. |
+| **Focus Select** | `Shift + F` | Zoom into current selection. |
+| **Open Ext.** | `Shift + Dbl-Click` | Open file in your system’s default application. |
+
+### 🔲 Grid & Selection
+| Action | Shortcut | Description |
+| :--- | :--- | :--- |
+| **Select** | `LMB Drag` | Left Click on empty canvas for marquee selection. |
+| **Multi-select** | `Ctrl + Click` | Hold Ctrl while clicking to add/remove items. |
+| **Duplicate** | `Alt + LMB Drag` | Drag an item or drawing to clone it instantly. |
+| **Delete** | `Del` / `Backspace` | Removes selected or hovered items/drawings. |
+| **Clear** | `Esc` | Clears selection or cancels current operation. |
+
+### 📋 Clipboard & I/O
+| Action | Shortcut | Description |
+| :--- | :--- | :--- |
+| **Copy Path** | `Ctrl + C` | Copies the file path (media) or raw text. |
+| **Copy Bitmap** | `Ctrl + Shift + C` | Copies the actual image data to clipboard. |
+| **Smart Paste** | `Ctrl + V` | **URLs:** Auto-download video; **Files:** Copy to DB; **Images:** Auto-save. |
+| **Import** | `Ctrl + I` | Manually browse and import media files. |
+
+### 🎨 Annotation & Drawing
+| Action | Shortcut | Description |
+| :--- | :--- | :--- |
+| **Modes** | `Ctrl + 1` / `2` | Switch between Grid/View mode and Draw/Annotation mode. |
+| **Visibility** | `Shift + A` | Toggle all annotations on/off. |
+| **Text Tool** | `T` | Press `Enter` to commit text, `Esc` to cancel. |
+| **Tools** | `V` / `B` / `E` | Select (V), Brush (B), Eraser (E). |
+| **Shapes** | `L` / `U` / `O` | Arrow (L), Rectangle (U), Ellipse (O). |
+
+### 💾 General Commands
+| Action | Shortcut | Description |
+| :--- | :--- | :--- |
+| **File** | `Ctrl + N` / `O` / `S` | New Board, Open Board, or Save (As) Board. |
+| **History** | `Ctrl + Z` / `Y` | Undo or Redo (also `Ctrl + Shift + Z`). |
+| **Stay on Top** | `Ctrl + Shift + T` | Toggles "Always on Top" window state. |
  
 <br>
  
