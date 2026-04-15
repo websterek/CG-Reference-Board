@@ -49,6 +49,20 @@ public static class YtDlpService
             using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
+            // Ensure the external process is killed if the linked cancellation token fires.
+            using var reg = linkedCts.Token.Register(() =>
+            {
+                try
+                {
+                    if (!process.HasExited)
+                        process.Kill(entireProcessTree: true);
+                }
+                catch
+                {
+                    // Best-effort kill; swallow any exceptions here to avoid throwing from the registration callback.
+                }
+            });
+
             var waitTask = process.WaitForExitAsync(linkedCts.Token);
             var stdoutTask = process.StandardOutput.ReadToEndAsync();
             var stderrTask = process.StandardError.ReadToEndAsync();
@@ -56,6 +70,11 @@ public static class YtDlpService
             await Task.WhenAll(waitTask, stdoutTask, stderrTask);
 
             return process.ExitCode == 0 && !string.IsNullOrWhiteSpace(stdoutTask.Result);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Explicit cancellation by the caller — treat as unavailable.
+            return false;
         }
         catch
         {

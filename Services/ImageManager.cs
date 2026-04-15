@@ -80,14 +80,17 @@ public static class ImageManager
 
             using var codec = SKCodec.Create(imagePath);
             if (codec == null)
-                return null;
+            {
+                // If Skia cannot create a codec, attempt to copy the source image as a fallback,
+                // writing atomically to avoid races.
+                return AtomicCopyAsThumbnail(imagePath, thumbPath);
+            }
 
             var info = codec.Info;
             if (info.Width <= ThumbnailMaxWidth)
             {
-                // Image is already small — just copy it
-                File.Copy(imagePath, thumbPath, true);
-                return thumbPath;
+                // Image is already small — copy it atomically to the thumb path.
+                return AtomicCopyAsThumbnail(imagePath, thumbPath);
             }
 
             // Decode at reduced size using sample-size trick
@@ -114,10 +117,90 @@ public static class ImageManager
 
             using var image = SKImage.FromBitmap(resized);
             using var data = image.Encode(SKEncodedImageFormat.Jpeg, 80);
-            using var stream = File.Create(thumbPath);
-            data.SaveTo(stream);
 
-            return thumbPath;
+            // Write to a temporary file first then move atomically.
+            string tempPath = thumbPath + ".tmp";
+            try
+            {
+                using (var stream = File.Create(tempPath))
+                    data.SaveTo(stream);
+
+                // Try atomic move/replace. File.Move with overwrite is available on modern runtimes;
+                // fall back to delete+move if necessary.
+                try
+                {
+#if NET6_0_OR_GREATER
+                    File.Move(tempPath, thumbPath, overwrite: true);
+#else
+                    if (File.Exists(thumbPath))
+                        File.Delete(thumbPath);
+                    File.Move(tempPath, thumbPath);
+#endif
+                }
+                catch
+                {
+                    // Best-effort: if move fails, delete temp and return null.
+                    try
+                    { File.Delete(tempPath); }
+                    catch { }
+                    return null;
+                }
+
+                return thumbPath;
+            }
+            catch
+            {
+                // Ensure we don't leave a temp file lying around.
+                try
+                { if (File.Exists(tempPath)) File.Delete(tempPath); }
+                catch { }
+                return null;
+            }
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string? AtomicCopyAsThumbnail(string sourcePath, string thumbPath)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(thumbPath)!);
+            string tempPath = thumbPath + ".tmp";
+            try
+            {
+                // Use File.Copy to write to temp, then move into place atomically.
+                File.Copy(sourcePath, tempPath, overwrite: true);
+
+                try
+                {
+#if NET6_0_OR_GREATER
+                    File.Move(tempPath, thumbPath, overwrite: true);
+#else
+                    if (File.Exists(thumbPath))
+                        File.Delete(thumbPath);
+                    File.Move(tempPath, thumbPath);
+#endif
+                }
+                catch
+                {
+                    try
+                    { File.Delete(tempPath); }
+                    catch { }
+                    return null;
+                }
+
+                return thumbPath;
+            }
+            catch
+            {
+                try
+                { if (File.Exists(tempPath)) File.Delete(tempPath); }
+                catch { }
+                return null;
+            }
         }
         catch
         {
@@ -274,8 +357,16 @@ public static class ImageManager
                     int srcRowBytes = source.RowBytes;
                     int dstRowBytes = fb.RowBytes;
                     int copyRowBytes = Math.Min(srcRowBytes, dstRowBytes);
+
+                    // Defensive checks to avoid unsafe memory copy when strides or pointers are invalid.
+                    if (srcRowBytes <= 0 || dstRowBytes <= 0 || copyRowBytes <= 0)
+                        throw new InvalidOperationException("Invalid row byte sizes during pixel copy.");
+
                     nint srcBase = source.GetPixels();
                     nint dstBase = fb.Address;
+
+                    if (srcBase == 0 || dstBase == 0)
+                        throw new InvalidOperationException("Null pixel buffer during pixel copy.");
 
                     for (int y = 0; y < source.Height; y++)
                     {
@@ -455,8 +546,16 @@ public static class ImageManager
                     int srcRowBytes = source.RowBytes;
                     int dstRowBytes = fb.RowBytes;
                     int copyRowBytes = Math.Min(srcRowBytes, dstRowBytes);
+
+                    // Defensive checks to avoid unsafe memory copy when strides or pointers are invalid.
+                    if (srcRowBytes <= 0 || dstRowBytes <= 0 || copyRowBytes <= 0)
+                        throw new InvalidOperationException("Invalid row byte sizes during pixel copy.");
+
                     nint srcBase = source.GetPixels();
                     nint dstBase = fb.Address;
+
+                    if (srcBase == 0 || dstBase == 0)
+                        throw new InvalidOperationException("Null pixel buffer during pixel copy.");
 
                     for (int y = 0; y < source.Height; y++)
                     {
@@ -473,7 +572,8 @@ public static class ImageManager
         }
         catch
         {
-            try { return new Bitmap(path); }
+            try
+            { return new Bitmap(path); }
             catch { return null; }
         }
     }
