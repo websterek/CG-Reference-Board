@@ -353,19 +353,39 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     /// <summary>Hide the dot/grid background below 25 % zoom — VisualBrush tile count explodes at low scale.</summary>
     public bool IsCanvasBackgroundVisible => _scale.ScaleX >= 0.25;
 
-    /// <summary>Notifies the UI that all zoom-dependent properties have changed.</summary>
+    /// <summary>Notifies the UI that all zoom-dependent properties have changed. Batched to reduce binding cascade.</summary>
     private void NotifyZoomChanged()
     {
+        if (_zoomNotificationPending)
+            return;
+
+        _zoomNotificationPending = true;
+
+        if (_zoomNotificationTimer == null)
+        {
+            _zoomNotificationTimer = new Avalonia.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(16) // ~60fps, batch multiple zoom changes
+            };
+            _zoomNotificationTimer.Tick += ZoomNotificationTimer_Tick;
+        }
+
+        _zoomNotificationTimer.Start();
+    }
+
+    private void ZoomNotificationTimer_Tick(object? sender, EventArgs e)
+    {
+        _zoomNotificationTimer?.Stop();
+        _zoomNotificationPending = false;
+
         OnPropertyChanged(nameof(ZoomLevelText));
         OnPropertyChanged(nameof(ZoomInverseFactor));
         OnPropertyChanged(nameof(ZoomIndependentBorderThickness));
         OnPropertyChanged(nameof(ZoomIndependentCornerRadius));
         OnPropertyChanged(nameof(IsCanvasBackgroundVisible));
 
-        // Push current scale to AnnotationShape so it can LOD-decimate brush geometry
         CGReferenceBoard.Controls.AnnotationShape.SetScale(_scale.ScaleX);
 
-        // Lower bitmap interpolation quality when zoomed out — Skia renders faster
         var canvas = this.FindControl<Avalonia.Controls.Canvas>("MainCanvas");
         if (canvas != null)
         {
@@ -546,6 +566,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private int _lastViewportCellCount = -1;
     private int _lastAnnotationCount = -1;
     private bool _lodUpdateInProgress;
+
+    // Batched zoom property notifications - debounce to reduce binding cascade
+    private bool _zoomNotificationPending;
+    private Avalonia.Threading.DispatcherTimer? _zoomNotificationTimer;
 
     #endregion
 
@@ -734,6 +758,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         base.OnClosed(e);
         _viewportLodTimer?.Stop();
         _lodDebounceTimer?.Stop();
+        _zoomNotificationTimer?.Stop();
         _edgeScrollTimer?.Stop();
         _edgeScrollTimer?.Dispose();
         _saveSemaphore.Dispose();
