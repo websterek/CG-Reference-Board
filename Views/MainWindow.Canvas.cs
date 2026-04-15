@@ -20,6 +20,26 @@ public partial class MainWindow
     // Helper saved cursor for restoring
     private Cursor? _savedCanvasCursor;
 
+    // Cached controls for hot paths (PointerMoved, etc.)
+    private Border? _cachedCanvasBorder;
+    private Border? _cachedHoverHighlight;
+    private Border? _cachedSelectionMarquee;
+    private Border? _cachedCellSelectionMarquee;
+    private Border? _cachedCursorIconContainer;
+    private Ellipse? _cachedBrushCursorCircle;
+    private Canvas? _cachedMainCanvas;
+
+    private void CacheCanvasControls()
+    {
+        _cachedCanvasBorder = this.FindControl<Border>("CanvasBorder");
+        _cachedHoverHighlight = this.FindControl<Border>("HoverHighlight");
+        _cachedSelectionMarquee = this.FindControl<Border>("SelectionMarquee");
+        _cachedCellSelectionMarquee = this.FindControl<Border>("CellSelectionMarquee");
+        _cachedCursorIconContainer = this.FindControl<Border>("CursorIconContainer");
+        _cachedBrushCursorCircle = this.FindControl<Ellipse>("BrushCursorCircle");
+        _cachedMainCanvas = this.FindControl<Canvas>("MainCanvas");
+    }
+
     private void ApplyPanCursor(Border? canvasBorder)
     {
         if (canvasBorder == null)
@@ -76,13 +96,13 @@ public partial class MainWindow
     private void Canvas_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
         var props = e.GetCurrentPoint(this).Properties;
-        var mainCanvas = this.FindControl<Canvas>("MainCanvas");
+        var mainCanvas = _cachedMainCanvas ?? this.FindControl<Canvas>("MainCanvas");
 
         // Update custom cursor icon position
-        var cursorIcon = this.FindControl<Border>("CursorIconContainer");
+        var cursorIcon = _cachedCursorIconContainer ?? this.FindControl<Border>("CursorIconContainer");
         if (cursorIcon != null)
         {
-            var ptScreen = e.GetPosition(this.FindControl<Border>("CanvasBorder"));
+            var ptScreen = e.GetPosition(_cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder"));
             Canvas.SetLeft(cursorIcon, ptScreen.X + 15);
             Canvas.SetTop(cursorIcon, ptScreen.Y + 15);
         }
@@ -239,7 +259,7 @@ public partial class MainWindow
         _lastPointerPosition = e.GetPosition(CanvasBorder);
 
         // Update custom cursor icon position
-        var cursorIcon = this.FindControl<Border>("CursorIconContainer");
+        var cursorIcon = _cachedCursorIconContainer ?? this.FindControl<Border>("CursorIconContainer");
         if (cursorIcon != null)
         {
             Canvas.SetLeft(cursorIcon, _lastPointerPosition.X + 15);
@@ -247,7 +267,7 @@ public partial class MainWindow
         }
 
         // Update brush size cursor circle (screen-space size = brush thickness × zoom)
-        var brushCircle = this.FindControl<Ellipse>("BrushCursorCircle");
+        var brushCircle = _cachedBrushCursorCircle ?? this.FindControl<Ellipse>("BrushCursorCircle");
         if (brushCircle != null)
         {
             bool showCircle = IsDrawMode && (CurrentTool == "Brush" || CurrentTool == "Arrow" || CurrentTool == "Rectangle" || CurrentTool == "Ellipse");
@@ -281,7 +301,7 @@ public partial class MainWindow
         // Marquee selection drag
         if (_isSelectingAnnotations)
         {
-            var marquee = this.FindControl<Border>("SelectionMarquee");
+            var marquee = _cachedSelectionMarquee ?? this.FindControl<Border>("SelectionMarquee");
             if (marquee != null)
             {
                 double left = Math.Min(_annotationSelectionStart.X, pt.X);
@@ -373,7 +393,7 @@ public partial class MainWindow
         {
             StartEdgeScrollIfNeeded(_lastPointerPosition);
 
-            var cellMarquee = this.FindControl<Border>("CellSelectionMarquee");
+            var cellMarquee = _cachedCellSelectionMarquee ?? this.FindControl<Border>("CellSelectionMarquee");
             if (cellMarquee != null)
             {
                 double left = Math.Min(_cellSelectionStart.X, pt.X);
@@ -391,7 +411,7 @@ public partial class MainWindow
         int gridX = (int)(Math.Floor(gridPt.X / Constants.GridSize) * Constants.GridSize);
         int gridY = (int)(Math.Floor(gridPt.Y / Constants.GridSize) * Constants.GridSize);
 
-        var hoverHighlight = this.FindControl<Border>("HoverHighlight");
+        var hoverHighlight = _cachedHoverHighlight ?? this.FindControl<Border>("HoverHighlight");
         if (hoverHighlight != null)
         {
             CellViewModel? existingContent = null;
@@ -521,7 +541,7 @@ public partial class MainWindow
             _isSelectingAnnotations = false;
             e.Pointer.Capture(null);
 
-            var marquee = this.FindControl<Border>("SelectionMarquee");
+            var marquee = _cachedSelectionMarquee ?? this.FindControl<Border>("SelectionMarquee");
             if (marquee != null)
             {
                 marquee.IsVisible = false;
@@ -632,7 +652,7 @@ public partial class MainWindow
             _isSelectingCells = false;
             e.Pointer.Capture(null);
 
-            var cellMarquee = this.FindControl<Border>("CellSelectionMarquee");
+            var cellMarquee = _cachedCellSelectionMarquee ?? this.FindControl<Border>("CellSelectionMarquee");
             if (cellMarquee != null)
             {
                 cellMarquee.IsVisible = false;

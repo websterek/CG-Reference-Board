@@ -619,6 +619,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _isViewMode = isViewMode;
         InitializeComponent();
 
+        // Cache frequently accessed controls for hot paths
+        CacheCanvasControls();
+
         // Attach a tunneled PointerPressed handler to CanvasBorder so Ctrl+Left-click
         // or Middle-click will start panning even when the pointer is over child elements.
         try
@@ -1462,10 +1465,11 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
     /// <summary>Starts edge scrolling if the pointer is near the viewport edge.</summary>
     private void StartEdgeScrollIfNeeded(Point screenPoint)
     {
-        if (CanvasBorder == null)
+        var canvasBorder = _cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder");
+        if (canvasBorder == null)
             return;
 
-        var bounds = CanvasBorder.Bounds;
+        var bounds = canvasBorder.Bounds;
         bool nearEdge = screenPoint.X < EdgeScrollThreshold ||
                         screenPoint.Y < EdgeScrollThreshold ||
                         screenPoint.X > bounds.Width - EdgeScrollThreshold ||
@@ -1499,10 +1503,11 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
     {
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
-            if (!_isEdgeScrolling || CanvasBorder == null)
+            var canvasBorder = _cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder");
+            if (!_isEdgeScrolling || canvasBorder == null)
                 return;
 
-            var bounds = CanvasBorder.Bounds;
+            var bounds = canvasBorder.Bounds;
             double dx = 0, dy = 0;
 
             if (_lastPointerPosition.X < EdgeScrollThreshold)
