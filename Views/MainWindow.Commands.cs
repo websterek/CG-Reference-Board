@@ -1015,7 +1015,10 @@ public partial class MainWindow
                     if (!string.IsNullOrEmpty(lp))
                         localPaths.Add(lp);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"CollectDropPayloadAsync: failed to read storage item path: {ex}");
+                }
             }
         }
 
@@ -1048,7 +1051,10 @@ public partial class MainWindow
                             webUrls.Add(line);
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"CollectDropPayloadAsync: URI-list processing error: {ex}");
+                }
             }
         }
 
@@ -1080,7 +1086,10 @@ public partial class MainWindow
                             webUrls.Add(firstLine);
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"CollectDropPayloadAsync: moz-url processing error: {ex}");
+                }
             }
         }
 
@@ -1143,7 +1152,10 @@ public partial class MainWindow
                     if (!string.IsNullOrEmpty(lp))
                         localPaths.Add(lp);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"CollectDropPayload: failed to read storage item path: {ex}");
+                }
             }
         }
 
@@ -1167,7 +1179,10 @@ public partial class MainWindow
                         else if (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
                             webUrls.Add(line);
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"CollectDropPayload: failed to parse URI '{line}': {ex}");
+                    }
                 }
             }
         }
@@ -1269,7 +1284,10 @@ public partial class MainWindow
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"OnDragOver: failed to probe first storage item for dimensions: {ex}");
+            }
         }
 
         // Find snap position
@@ -1584,7 +1602,10 @@ public partial class MainWindow
                         await clipboard.SetDataAsync(dt);
                     ShowToast("📋 Image copied");
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Window_KeyDown: failed to copy image to clipboard: {ex}");
+                }
             }
             return;
         }
@@ -1694,7 +1715,10 @@ public partial class MainWindow
                                     filePaths.Add(lp);
                             }
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"Window_KeyDown: failed to parse URI '{line}': {ex}");
+                        }
                     }
                     else
                     {
@@ -1703,7 +1727,10 @@ public partial class MainWindow
                             if (Path.IsPathRooted(line) && File.Exists(line))
                                 filePaths.Add(line);
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"Window_KeyDown: failed to handle file path '{line}': {ex}");
+                        }
                     }
                 }
 

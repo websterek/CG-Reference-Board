@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -89,8 +90,34 @@ public static class ImageManager
             var info = codec.Info;
             if (info.Width <= ThumbnailMaxWidth)
             {
-                // Image is already small — copy it atomically to the thumb path.
-                return AtomicCopyAsThumbnail(imagePath, thumbPath);
+                // Image is already small — copy to a temp file then atomically move into place
+                string tempPath = Path.Combine(thumbDir, Guid.NewGuid().ToString() + ".tmp");
+                try
+                {
+                    File.Copy(imagePath, tempPath, overwrite: true);
+                    // Another thread may have created the final file; ensure move is safe
+#if NET6_0_OR_GREATER
+                    File.Move(tempPath, thumbPath, overwrite: true);
+#else
+                    if (File.Exists(thumbPath))
+                    {
+                        try { File.Delete(tempPath); } catch (Exception ex) { Debug.WriteLine($"EnsureThumbnail: failed to delete temp '{tempPath}': {ex}"); }
+                    }
+                    else
+                    {
+                        File.Move(tempPath, thumbPath);
+                    }
+#endif
+                    return thumbPath;
+                }
+                catch (Exception ex)
+                {
+                    try
+                    { if (File.Exists(tempPath)) File.Delete(tempPath); }
+                    catch (Exception delEx) { Debug.WriteLine($"EnsureThumbnail: failed to delete temp '{tempPath}' after error: {delEx} (original: {ex})"); }
+                    Debug.WriteLine($"EnsureThumbnail: failed to copy small image to temp '{tempPath}': {ex}");
+                    return null;
+                }
             }
 
             // Decode at reduced size using sample-size trick
@@ -118,11 +145,11 @@ public static class ImageManager
             using var image = SKImage.FromBitmap(resized);
             using var data = image.Encode(SKEncodedImageFormat.Jpeg, 80);
 
-            // Write to a temporary file first then move atomically.
-            string tempPath = thumbPath + ".tmp";
+            // Save to a temp file then move into place atomically to avoid races/corrupt thumbs
+            string tempThumb = Path.Combine(thumbDir, Guid.NewGuid().ToString() + ".tmp");
             try
             {
-                using (var stream = File.Create(tempPath))
+                using (var stream = File.Create(tempThumb))
                     data.SaveTo(stream);
 
                 // Try atomic move/replace. File.Move with overwrite is available on modern runtimes;
@@ -130,75 +157,33 @@ public static class ImageManager
                 try
                 {
 #if NET6_0_OR_GREATER
-                    File.Move(tempPath, thumbPath, overwrite: true);
+                    File.Move(tempThumb, thumbPath, overwrite: true);
 #else
                     if (File.Exists(thumbPath))
-                        File.Delete(thumbPath);
-                    File.Move(tempPath, thumbPath);
+                        File.Delete(tempThumb);
+                    else
+                        File.Move(tempThumb, thumbPath);
 #endif
                 }
-                catch
+                catch (Exception moveEx)
                 {
                     // Best-effort: if move fails, delete temp and return null.
                     try
-                    { File.Delete(tempPath); }
-                    catch { }
+                    { File.Delete(tempThumb); }
+                    catch (Exception delEx) { Debug.WriteLine($"EnsureThumbnail: failed to delete temp thumb '{tempThumb}' after move failure: {delEx} (move error: {moveEx})"); }
+                    Debug.WriteLine($"EnsureThumbnail: failed to move temp thumb '{tempThumb}' to '{thumbPath}': {moveEx}");
                     return null;
                 }
 
                 return thumbPath;
             }
-            catch
+            catch (Exception ex)
             {
                 // Ensure we don't leave a temp file lying around.
                 try
-                { if (File.Exists(tempPath)) File.Delete(tempPath); }
-                catch { }
-                return null;
-            }
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private static string? AtomicCopyAsThumbnail(string sourcePath, string thumbPath)
-    {
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(thumbPath)!);
-            string tempPath = thumbPath + ".tmp";
-            try
-            {
-                // Use File.Copy to write to temp, then move into place atomically.
-                File.Copy(sourcePath, tempPath, overwrite: true);
-
-                try
-                {
-#if NET6_0_OR_GREATER
-                    File.Move(tempPath, thumbPath, overwrite: true);
-#else
-                    if (File.Exists(thumbPath))
-                        File.Delete(thumbPath);
-                    File.Move(tempPath, thumbPath);
-#endif
-                }
-                catch
-                {
-                    try
-                    { File.Delete(tempPath); }
-                    catch { }
-                    return null;
-                }
-
-                return thumbPath;
-            }
-            catch
-            {
-                try
-                { if (File.Exists(tempPath)) File.Delete(tempPath); }
-                catch { }
+                { if (File.Exists(tempThumb)) File.Delete(tempThumb); }
+                catch (Exception delEx) { Debug.WriteLine($"EnsureThumbnail: failed to delete temp '{tempThumb}': {delEx} (original: {ex})"); }
+                Debug.WriteLine($"EnsureThumbnail: failed to write thumbnail to temp '{tempThumb}': {ex}");
                 return null;
             }
         }
@@ -358,7 +343,6 @@ public static class ImageManager
                     int dstRowBytes = fb.RowBytes;
                     int copyRowBytes = Math.Min(srcRowBytes, dstRowBytes);
 
-                    // Defensive checks to avoid unsafe memory copy when strides or pointers are invalid.
                     if (srcRowBytes <= 0 || dstRowBytes <= 0 || copyRowBytes <= 0)
                         throw new InvalidOperationException("Invalid row byte sizes during pixel copy.");
 
@@ -547,7 +531,6 @@ public static class ImageManager
                     int dstRowBytes = fb.RowBytes;
                     int copyRowBytes = Math.Min(srcRowBytes, dstRowBytes);
 
-                    // Defensive checks to avoid unsafe memory copy when strides or pointers are invalid.
                     if (srcRowBytes <= 0 || dstRowBytes <= 0 || copyRowBytes <= 0)
                         throw new InvalidOperationException("Invalid row byte sizes during pixel copy.");
 
@@ -586,5 +569,56 @@ public static class ImageManager
     public static void ClearCaches()
     {
         _colorCache.Clear();
+    }
+
+    // ───────── helpers ─────────
+
+    private static string? AtomicCopyAsThumbnail(string sourcePath, string thumbPath)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(thumbPath)!);
+            string tempPath = thumbPath + ".tmp";
+            try
+            {
+                // Use File.Copy to write to temp, then move into place atomically.
+                File.Copy(sourcePath, tempPath, overwrite: true);
+
+                try
+                {
+#if NET6_0_OR_GREATER
+                    File.Move(tempPath, thumbPath, overwrite: true);
+#else
+                    if (File.Exists(thumbPath))
+                        File.Delete(tempPath);
+                    else
+                        File.Move(tempPath, thumbPath);
+#endif
+                }
+                catch (Exception moveEx)
+                {
+                    try
+                    { File.Delete(tempPath); }
+                    catch (Exception delEx) { Debug.WriteLine($"AtomicCopyAsThumbnail: failed to delete temp '{tempPath}' after move failure: {delEx} (move error: {moveEx})"); }
+                    Debug.WriteLine($"AtomicCopyAsThumbnail: failed to move temp '{tempPath}' to '{thumbPath}': {moveEx}");
+                    return null;
+                }
+
+                return thumbPath;
+            }
+            catch (Exception ex)
+            {
+                try
+                { if (File.Exists(tempPath)) File.Delete(tempPath); }
+                catch (Exception delEx) { Debug.WriteLine($"AtomicCopyAsThumbnail: failed to delete temp '{tempPath}': {delEx} (original: {ex})"); }
+                Debug.WriteLine($"AtomicCopyAsThumbnail: failed to copy '{sourcePath}' to temp '{tempPath}': {ex}");
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"AtomicCopyAsThumbnail: failed creating thumbnail directory or writing files: {ex}");
+            return null;
+        }
     }
 }

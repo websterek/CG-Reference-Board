@@ -336,7 +336,10 @@ public static class YtDlpService
             if (validImageExts.Contains(urlExt))
                 return urlExt;
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"TryDetectImageExtension: failed to parse URL '{originalUrl}': {ex}");
+        }
 
         // Try to detect from file header
         try
@@ -367,7 +370,10 @@ public static class YtDlpService
             if (buffer[0] == 0x42 && buffer[1] == 0x4D)
                 return ".bmp";
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"TryDetectImageExtension: failed to inspect file header '{filePath}': {ex}");
+        }
 
         return null;
     }
@@ -422,7 +428,7 @@ public static class YtDlpService
                 {
                     try
                     { process.Kill(entireProcessTree: true); }
-                    catch { }
+                    catch (Exception ex) { Debug.WriteLine($"ExtractThumbnailAsync: failed to kill ffmpeg process: {ex}"); }
                     return null;
                 }
 
