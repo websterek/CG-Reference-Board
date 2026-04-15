@@ -1685,6 +1685,16 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
                 // when the cell is large enough on screen to be legible.
                 bool showDetail = isInViewport && cellScreenWidth >= 50.0;
 
+                // Early exit if viewport state unchanged and LOD unchanged (optimization)
+                if (cell.IsInViewport == isInViewport && cell.IsDetailVisible == showDetail)
+                {
+                    if (!cell.NeedsImage)
+                        continue;
+                    var currentTargetLod = ImageManager.DetermineLod(cellScreenWidth, isInViewport);
+                    if (currentTargetLod == cell.CurrentLod)
+                        continue;
+                }
+
                 cell.IsInViewport = isInViewport;
                 cell.IsDetailVisible = showDetail;
 
@@ -1764,6 +1774,10 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
                          && ann.AbsBoundsLeft <= annVpRight
                          && ann.AbsBoundsBottom >= annVpTop
                          && ann.AbsBoundsTop <= annVpBottom;
+
+                // Early exit if viewport state unchanged
+                if (ann.IsInViewport == inVp)
+                    continue;
 
                 ann.IsInViewport = inVp;
             }
