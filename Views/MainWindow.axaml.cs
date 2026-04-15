@@ -543,6 +543,23 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     // Spatial index for O(1) grid-position lookups (replaces O(n) FirstOrDefault scans)
     private readonly Dictionary<(int gridX, int gridY), CellViewModel> _cellSpatialIndex = new();
 
+    // Performance: disable hit testing during pan/drag for faster event processing
+    private void DisableCellHitTesting()
+    {
+        foreach (var cell in GridCells)
+            cell.IsHitTestEnabled = false;
+        foreach (var ann in Annotations)
+            ann.IsHitTestEnabled = false;
+    }
+
+    private void EnableCellHitTesting()
+    {
+        foreach (var cell in GridCells)
+            cell.IsHitTestEnabled = true;
+        foreach (var ann in Annotations)
+            ann.IsHitTestEnabled = true;
+    }
+
     // Auto-scroll when dragging near edges
     private const double EdgeScrollThreshold = 50.0; // pixels from edge
     private const double EdgeScrollSpeed = 25.0; // pixels per tick

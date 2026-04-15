@@ -827,6 +827,7 @@
                                         Width="{Binding PixelWidth}"
                                         Height="{Binding PixelHeight}"
                                         IsVisible="{Binding IsInViewport}"
+                                        IsHitTestVisible="{Binding IsHitTestEnabled}"
                                         BorderThickness="{Binding ZoomIndependentBorderThickness, RelativeSource={RelativeSource AncestorType=views:MainWindow}}"
                                         Cursor="Hand"
                                         PointerEntered="Cell_PointerEntered"

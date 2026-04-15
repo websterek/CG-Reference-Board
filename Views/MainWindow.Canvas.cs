@@ -217,6 +217,7 @@ public partial class MainWindow
             _isShiftPanPending = false;
             _panStartPoint = e.GetPosition(this);
             _middleZoomStartY = e.GetPosition(this).Y;
+            DisableCellHitTesting();
 
             var canvasBorder = this.FindControl<Border>("CanvasBorder");
             ApplyPanCursor(canvasBorder);
@@ -717,6 +718,7 @@ public partial class MainWindow
         _isShiftPanPending = false;
         _middleZoomAnchorSet = false;
         _middleZoomActive = false;
+        EnableCellHitTesting();
 
         // Restore previous cursor on the CanvasBorder when panning stops
         try

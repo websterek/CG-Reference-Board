@@ -69,6 +69,13 @@ public class AnnotationViewModel : ViewModelBase
         set => SetProperty(ref _isInViewport, value);
     }
 
+    private bool _isHitTestEnabled = true;
+    public bool IsHitTestEnabled
+    {
+        get => _isHitTestEnabled;
+        set => SetProperty(ref _isHitTestEnabled, value);
+    }
+
     private double _canvasX;
     /// <summary>Canvas X offset for the entire annotation group.</summary>
     public double CanvasX

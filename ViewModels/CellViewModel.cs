@@ -245,6 +245,13 @@ public class CellViewModel : ViewModelBase, IDisposable
     public bool HasTextOptions => HasTextContent;
     public bool HasClipboardOptions => IsImage || IsFile || HasTextContent;
 
+    private bool _isHitTestEnabled = true;
+    public bool IsHitTestEnabled
+    {
+        get => _isHitTestEnabled;
+        set => SetProperty(ref _isHitTestEnabled, value);
+    }
+
     #endregion
 
     #region Derived Type Flags

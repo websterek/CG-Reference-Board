@@ -89,6 +89,7 @@ public partial class MainWindow
             _groupDragStarts = null;
             _groupAnnotationDragStarts = null;
             _isAltDuplicateDrag = true;
+            DisableCellHitTesting();
 
             duplicate.IsDragging = true;
 
@@ -206,6 +207,7 @@ public partial class MainWindow
             {
                 _isDraggingCell = true;
                 _draggingCell = cell;
+                DisableCellHitTesting();
 
                 var cellsToMove = new List<CellViewModel>(_selectedCells);
                 var annotationsToMove = new List<AnnotationViewModel>();
@@ -446,6 +448,7 @@ public partial class MainWindow
             _groupDragStarts = null;
             _groupAnnotationDragStarts = null;
             _isAltDuplicateDrag = false;
+            EnableCellHitTesting();
             MarkUnsaved();
             SaveBoardData();
         }
