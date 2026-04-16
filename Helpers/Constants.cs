@@ -51,6 +51,14 @@ public static class Constants
     public const double ZoomStep = 0.1;
 
     /// <summary>
+    /// Sensitivity for wheel zoom. When using multiplicative (exponential) zoom,
+    /// this value is used as the per-wheel-delta scale in exp(delta * WheelZoomSensitivity).
+    /// Smaller values make wheel zoom slower; larger values make it faster.
+    /// Typical starting value: 0.0025.
+    /// </summary>
+    public const double WheelZoomSensitivity = 0.0025;
+
+    /// <summary>
     /// Sensitivity for middle-button drag-to-zoom (Nuke-style).
     /// Higher values make the zoom respond faster to vertical mouse movement.
     /// </summary>

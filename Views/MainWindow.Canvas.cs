@@ -482,11 +482,15 @@ public partial class MainWindow
             double deltaY = _middleZoomStartY - screenPt.Y;
 
             double oldScale = _scale.ScaleX;
-            double zoomAmount = Math.Clamp(
+            // Convert pointer vertical movement into a multiplicative scale change by
+            // applying the delta in log-space. This makes zoom feel consistent at all distances.
+            // Clamp the log-space delta to avoid large jumps per-frame.
+            double deltaLog = Math.Clamp(
                 deltaY * Constants.MiddleZoomSensitivity,
                 -Constants.MiddleZoomMaxDelta,
                 Constants.MiddleZoomMaxDelta);
-            double newScale = Math.Clamp(oldScale + zoomAmount, Constants.MinZoom, Constants.MaxZoom);
+            double factor = Math.Exp(deltaLog);
+            double newScale = Math.Clamp(oldScale * factor, Constants.MinZoom, Constants.MaxZoom);
 
             if (Math.Abs(newScale - oldScale) > 0.0001)
             {
@@ -508,7 +512,7 @@ public partial class MainWindow
             double dx = screenPt.X - _panStartPoint.X;
             double dy = screenPt.Y - _panStartPoint.Y;
             double distance = Math.Sqrt(dx * dx + dy * dy);
-            
+
             // Use a 5-pixel threshold to distinguish from double-click
             if (distance > 5)
             {
@@ -757,17 +761,23 @@ public partial class MainWindow
         if (e.Handled)
             return;
 
+        // Treat wheel deltas multiplicatively in log-space so zoom feels linear across scales.
         double oldScale = _scale.ScaleX;
-        double newScale = oldScale;
 
-        if (e.Delta.Y > 0)
-            newScale += Constants.ZoomStep;
-        else if (e.Delta.Y < 0)
-            newScale = Math.Max(Constants.MinZoom, oldScale - Constants.ZoomStep);
+        // The wheel delta is typically ±1 per step on most platforms, but can be larger.
+        // sensitivity controls how aggressive each wheel step is; tune if needed.
+        const double wheelSensitivity = 0.09; // smaller => slower zoom per wheel step
+        double deltaSteps = e.Delta.Y;
+        if (Math.Abs(deltaSteps) < 1e-9)
+            return;
+
+        // Compute a log-space delta and clamp to avoid huge jumps
+        double deltaLog = Math.Clamp(deltaSteps * wheelSensitivity, -0.5, 0.5);
+        double factor = Math.Exp(deltaLog);
+        double newScale = Math.Clamp(oldScale * factor, Constants.MinZoom, Constants.MaxZoom);
 
         if (Math.Abs(newScale - oldScale) < 0.001)
             return;
-        newScale = Math.Clamp(newScale, Constants.MinZoom, Constants.MaxZoom);
 
         if (sender is Visual visual)
         {
