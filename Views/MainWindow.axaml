@@ -43,6 +43,7 @@
                         Background="Transparent"
                         VerticalAlignment="Center"
                         Margin="4,0,0,0"
+                        WindowDecorationProperties.ElementRole="User"
                     >
                         <!-- File Menu -->
                         <MenuItem Header="_File">

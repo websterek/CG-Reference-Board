@@ -47,15 +47,17 @@ public partial class MainWindow
 
     /// <summary>
     /// Returns true when the event's source control is the <see cref="Menu"/>
-    /// itself or any visual descendant of it (e.g. a MenuItem, PathIcon, TextBlock
-    /// inside a menu header).
+    /// itself, any visual descendant of it (e.g. a MenuItem, PathIcon, TextBlock
+    /// inside a menu header), or any MenuItem in a popup submenu. Popup content
+    /// lives in a separate visual tree (PopupRoot) that does not contain the
+    /// parent <see cref="Menu"/>, so we also match on <c>MenuItem</c> directly.
     /// </summary>
     private static bool IsSourceInsideMenu(RoutedEventArgs e)
     {
         var ctrl = e.Source as Visual;
         while (ctrl != null)
         {
-            if (ctrl is Menu)
+            if (ctrl is Menu or MenuItem)
                 return true;
             ctrl = ctrl.GetVisualParent();
         }
