@@ -216,8 +216,34 @@ public class CellViewModel : ViewModelBase, IDisposable
     public bool IsInViewport
     {
         get => _isInViewport;
-        set => SetProperty(ref _isInViewport, value);
+        set
+        {
+            if (SetProperty(ref _isInViewport, value))
+                OnPropertyChanged(nameof(IsEffectivelyVisible));
+        }
     }
+
+    private bool _isLayerVisible = true;
+    /// <summary>
+    /// Reflects the owning layer's <c>IsVisible</c> state. Set by <see cref="Views.MainWindow"/>
+    /// when a layer visibility toggle changes. Combined with <see cref="IsInViewport"/>
+    /// to produce <see cref="IsEffectivelyVisible"/>.
+    /// </summary>
+    public bool IsLayerVisible
+    {
+        get => _isLayerVisible;
+        set
+        {
+            if (SetProperty(ref _isLayerVisible, value))
+                OnPropertyChanged(nameof(IsEffectivelyVisible));
+        }
+    }
+
+    /// <summary>
+    /// Combined visibility: the cell is only rendered when it is both inside the
+    /// viewport AND its owning layer is visible. Bound by the cell root Border.
+    /// </summary>
+    public bool IsEffectivelyVisible => _isInViewport && _isLayerVisible;
 
     private bool _isDetailVisible = true;
     /// <summary>
@@ -291,17 +317,6 @@ public class CellViewModel : ViewModelBase, IDisposable
 
     /// <summary>True when the placeholder color rect should be shown instead of an image.</summary>
     public bool ShowPlaceholder => NeedsImage && _image == null;
-
-    /// <summary>
-    /// Collision layer for overlap prevention. Cells only block each other within the same layer.
-    /// Layer 0 = Backdrops, Layer 1 = Content (Image/Video/Text), Layer 2 = Labels.
-    /// </summary>
-    public int CollisionLayer => Type switch
-    {
-        CellType.Backdrop => 0,
-        CellType.Label => 2,
-        _ => 1   // Image, Video, Text
-    };
 
     /// <summary>
     /// Z-index for rendering order with proper layering:

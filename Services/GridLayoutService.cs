@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using Avalonia;
 using CGReferenceBoard.Helpers;
+using CGReferenceBoard.Layers.Abstractions;
+using CGReferenceBoard.Layers.Infrastructure;
 using CGReferenceBoard.Models;
 using CGReferenceBoard.ViewModels;
 using SkiaSharp;
@@ -21,7 +23,8 @@ public static class GridLayoutService
     /// Checks whether a rectangle on a given collision layer overlaps any existing cell
     /// on that same layer, optionally excluding one cell (the one being moved/resized).
     /// </summary>
-    public static bool HasLayerCollision(IEnumerable<CellViewModel> cells, int layer, CellViewModel? exclude,
+    /// <param name="owningLayer">The content layer whose <see cref="IContentLayer.CollisionLayerId"/> defines the collision domain.</param>
+    public static bool HasLayerCollision(IEnumerable<CellViewModel> cells, IContentLayer owningLayer, CellViewModel? exclude,
         double x, double y, int cols, int rows)
     {
         double right = x + cols * Constants.GridSize;
@@ -29,7 +32,7 @@ public static class GridLayoutService
 
         return cells.Any(c =>
         {
-            if (c == exclude || !c.HasContent || c.CollisionLayer != layer)
+            if (c == exclude || !c.HasContent || !owningLayer.SupportsCellType(c.Type))
                 return false;
 
             double margin = c.IsBackdrop ? Constants.GridSize / 2.0 : 0;
@@ -45,7 +48,8 @@ public static class GridLayoutService
     /// <summary>
     /// Overload that excludes a set of cells (for group-move collision checks).
     /// </summary>
-    public static bool HasLayerCollision(IEnumerable<CellViewModel> cells, int layer, IEnumerable<CellViewModel> excludeSet,
+    /// <param name="owningLayer">The content layer whose <see cref="IContentLayer.CollisionLayerId"/> defines the collision domain.</param>
+    public static bool HasLayerCollision(IEnumerable<CellViewModel> cells, IContentLayer owningLayer, IEnumerable<CellViewModel> excludeSet,
         double x, double y, int cols, int rows)
     {
         double right = x + cols * Constants.GridSize;
@@ -53,7 +57,7 @@ public static class GridLayoutService
 
         return cells.Any(c =>
         {
-            if (excludeSet.Contains(c) || !c.HasContent || c.CollisionLayer != layer)
+            if (excludeSet.Contains(c) || !c.HasContent || !owningLayer.SupportsCellType(c.Type))
                 return false;
 
             double margin = c.IsBackdrop ? Constants.GridSize / 2.0 : 0;
@@ -67,13 +71,18 @@ public static class GridLayoutService
     }
 
     /// <summary>Checks if moving an entire group by (dx, dy) grid-pixels causes any same-layer collision.</summary>
-    public static bool HasGroupCollision(IEnumerable<CellViewModel> allCells, IReadOnlyList<CellViewModel> group, double dx, double dy)
+    public static bool HasGroupCollision(IEnumerable<CellViewModel> allCells, IReadOnlyList<CellViewModel> group,
+        LayerManager layerManager, double dx, double dy)
     {
         foreach (var cell in group)
         {
+            var owningLayer = layerManager.ResolveLayer(cell);
+            if (owningLayer == null)
+                continue;
+
             double newX = cell.CanvasX + dx;
             double newY = cell.CanvasY + dy;
-            if (HasLayerCollision(allCells, cell.CollisionLayer, group, newX, newY, cell.ColSpan, cell.RowSpan))
+            if (HasLayerCollision(allCells, owningLayer, group, newX, newY, cell.ColSpan, cell.RowSpan))
                 return true;
         }
         return false;
@@ -82,8 +91,9 @@ public static class GridLayoutService
     /// <summary>
     /// Checks if a rectangular area is free (no collision with existing cells on the same layer).
     /// </summary>
+    /// <param name="owningLayer">The content layer whose <see cref="IContentLayer.CollisionLayerId"/> defines the collision domain.</param>
     public static bool IsSpaceEmpty(IEnumerable<CellViewModel> cells, double x, double y,
-        int colSpan, int rowSpan, int collisionLayer, CellViewModel? excludeCell = null)
+        int colSpan, int rowSpan, IContentLayer owningLayer, CellViewModel? excludeCell = null)
     {
         var rect = new Rect(x, y, colSpan * Constants.GridSize, rowSpan * Constants.GridSize);
 
@@ -91,7 +101,7 @@ public static class GridLayoutService
         {
             if (cell == excludeCell)
                 continue;
-            if (cell.CollisionLayer != collisionLayer)
+            if (!owningLayer.SupportsCellType(cell.Type))
                 continue;
 
             Rect cellRect;
@@ -121,14 +131,15 @@ public static class GridLayoutService
     /// Finds the nearest empty grid position that can fit the specified size.
     /// Uses spiral search outward from the preferred position.
     /// </summary>
+    /// <param name="owningLayer">The content layer whose <see cref="IContentLayer.CollisionLayerId"/> defines the collision domain.</param>
     public static Point? FindEmptySpace(IEnumerable<CellViewModel> cells,
         double preferredX, double preferredY, int colSpan, int rowSpan,
-        int collisionLayer, CellViewModel? excludeCell = null)
+        IContentLayer owningLayer, CellViewModel? excludeCell = null)
     {
         int gridX = (int)(Math.Floor(preferredX / Constants.GridSize) * Constants.GridSize);
         int gridY = (int)(Math.Floor(preferredY / Constants.GridSize) * Constants.GridSize);
 
-        if (IsSpaceEmpty(cells, gridX, gridY, colSpan, rowSpan, collisionLayer, excludeCell))
+        if (IsSpaceEmpty(cells, gridX, gridY, colSpan, rowSpan, owningLayer, excludeCell))
             return new Point(gridX, gridY);
 
         int maxDistance = Constants.SpiralSearchMaxDistance;
@@ -144,7 +155,7 @@ public static class GridLayoutService
                     int testX = gridX + dx * (int)Constants.GridSize;
                     int testY = gridY + dy * (int)Constants.GridSize;
 
-                    if (IsSpaceEmpty(cells, testX, testY, colSpan, rowSpan, collisionLayer, excludeCell))
+                    if (IsSpaceEmpty(cells, testX, testY, colSpan, rowSpan, owningLayer, excludeCell))
                         return new Point(testX, testY);
                 }
             }

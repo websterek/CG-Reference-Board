@@ -14,6 +14,7 @@ using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using CGReferenceBoard.Helpers;
+using CGReferenceBoard.Layers.Infrastructure;
 using CGReferenceBoard.Models;
 using CGReferenceBoard.Services;
 using CGReferenceBoard.ViewModels;
@@ -546,7 +547,7 @@ public partial class MainWindow
 
         var (newColSpan, newRowSpan) = GridLayoutService.CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height);
 
-        if (!GridLayoutService.IsSpaceEmpty(GridCells, cell.CanvasX, cell.CanvasY, newColSpan, newRowSpan, cell.CollisionLayer, excludeCell: cell))
+        if (!GridLayoutService.IsSpaceEmpty(GridCells, cell.CanvasX, cell.CanvasY, newColSpan, newRowSpan, LayerManager.ResolveLayer(cell)!, excludeCell: cell))
         {
             ShakeScreen();
             return;
@@ -623,9 +624,9 @@ public partial class MainWindow
         double y = Canvas.GetTop(hoverHighlight);
 
         // Check for collisions and find an empty slot, just like AddBackdrop does.
-        Point? pos = GridLayoutService.IsSpaceEmpty(GridCells, x, y, 2, 2, collisionLayer: 1)
+        Point? pos = GridLayoutService.IsSpaceEmpty(GridCells, x, y, 2, 2, LayerManager.Items)
             ? new Point(x, y)
-            : GridLayoutService.FindEmptySpace(GridCells, x, y, 2, 2, collisionLayer: 1);
+            : GridLayoutService.FindEmptySpace(GridCells, x, y, 2, 2, LayerManager.Items);
 
         if (pos == null)
         {
@@ -654,10 +655,10 @@ public partial class MainWindow
         double x = Canvas.GetLeft(hoverHighlight);
         double y = Canvas.GetTop(hoverHighlight);
 
-        // Labels use collision layer 2; check for space before placing.
-        Point? pos = GridLayoutService.IsSpaceEmpty(GridCells, x, y, 4, 2, collisionLayer: 2)
+        // Labels use the Labels layer; check for space before placing.
+        Point? pos = GridLayoutService.IsSpaceEmpty(GridCells, x, y, 4, 2, LayerManager.Labels)
             ? new Point(x, y)
-            : GridLayoutService.FindEmptySpace(GridCells, x, y, 4, 2, collisionLayer: 2);
+            : GridLayoutService.FindEmptySpace(GridCells, x, y, 4, 2, LayerManager.Labels);
 
         if (pos == null)
         {
@@ -714,14 +715,14 @@ public partial class MainWindow
 
             // Check for collision and find empty space if needed
             Point? finalPosition = null;
-            if (GridLayoutService.IsSpaceEmpty(GridCells, gridX, gridY, colSpan, rowSpan, collisionLayer: 0))
+            if (GridLayoutService.IsSpaceEmpty(GridCells, gridX, gridY, colSpan, rowSpan, LayerManager.Backdrops))
             {
                 finalPosition = new Point(gridX, gridY);
             }
             else
             {
                 // Try to find nearby empty space
-                finalPosition = GridLayoutService.FindEmptySpace(GridCells, gridX, gridY, colSpan, rowSpan, collisionLayer: 0);
+                finalPosition = GridLayoutService.FindEmptySpace(GridCells, gridX, gridY, colSpan, rowSpan, LayerManager.Backdrops);
             }
 
             if (finalPosition == null)
@@ -786,7 +787,7 @@ public partial class MainWindow
             };
 
             // Show placement preview
-            ShowPlacementPreview(gridX, gridY, _pendingBackdrop.ColSpan, _pendingBackdrop.RowSpan, collisionLayer: 0);
+            ShowPlacementPreview(gridX, gridY, _pendingBackdrop.ColSpan, _pendingBackdrop.RowSpan, LayerManager.Backdrops);
         }
     }
 
@@ -863,7 +864,7 @@ public partial class MainWindow
 
         foreach (var cell in sortedCells)
         {
-            var emptySpace = GridLayoutService.FindEmptySpace(cellsToAvoid, currentX, currentY, cell.ColSpan, cell.RowSpan, cell.CollisionLayer);
+            var emptySpace = GridLayoutService.FindEmptySpace(cellsToAvoid, currentX, currentY, cell.ColSpan, cell.RowSpan, LayerManager.ResolveLayer(cell)!);
 
             if (emptySpace != null)
             {
@@ -909,7 +910,7 @@ public partial class MainWindow
 
         foreach (var cell in sortedCells)
         {
-            var emptySpace = GridLayoutService.FindEmptySpace(cellsToAvoid, currentX, minY, cell.ColSpan, cell.RowSpan, cell.CollisionLayer);
+            var emptySpace = GridLayoutService.FindEmptySpace(cellsToAvoid, currentX, minY, cell.ColSpan, cell.RowSpan, LayerManager.ResolveLayer(cell)!);
 
             if (emptySpace != null)
             {
@@ -945,7 +946,7 @@ public partial class MainWindow
 
         foreach (var cell in sortedCells)
         {
-            var emptySpace = GridLayoutService.FindEmptySpace(cellsToAvoid, minX, currentY, cell.ColSpan, cell.RowSpan, cell.CollisionLayer);
+            var emptySpace = GridLayoutService.FindEmptySpace(cellsToAvoid, minX, currentY, cell.ColSpan, cell.RowSpan, LayerManager.ResolveLayer(cell)!);
 
             if (emptySpace != null)
             {
@@ -1294,7 +1295,7 @@ public partial class MainWindow
         }
 
         // Find snap position
-        var space = GridLayoutService.FindEmptySpace(GridCells, gridX, gridY, colSpan, rowSpan, collisionLayer: 1);
+        var space = GridLayoutService.FindEmptySpace(GridCells, gridX, gridY, colSpan, rowSpan, LayerManager.Items);
         if (space == null)
             return;
 
@@ -1363,7 +1364,7 @@ public partial class MainWindow
                     (colSpan, rowSpan) = GridLayoutService.CalculateOptimalCellSize(dim.Value.Width, dim.Value.Height);
             }
 
-            var space = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, colSpan, rowSpan, collisionLayer: 1);
+            var space = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, colSpan, rowSpan, LayerManager.Items);
             if (space == null)
                 continue;
 
@@ -1442,7 +1443,7 @@ public partial class MainWindow
                              || url.Contains("vimeo.com", StringComparison.OrdinalIgnoreCase);
 
             // Reserve a 2×2 slot; resized after image dimensions become known.
-            var space = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, 2, 2, collisionLayer: 1);
+            var space = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, 2, 2, LayerManager.Items);
             if (space == null)
                 continue;
 
@@ -1482,7 +1483,7 @@ public partial class MainWindow
         // ── Pass 3: plain text ────────────────────────────────────────────
         if (!string.IsNullOrWhiteSpace(payload.PlainText))
         {
-            var space = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, 2, 2, collisionLayer: 1);
+            var space = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, 2, 2, LayerManager.Items);
             if (space != null)
             {
                 var cell = new CellViewModel
@@ -1510,7 +1511,7 @@ public partial class MainWindow
             stripped = Regex.Replace(stripped, @"\s+", " ").Trim();
             if (!string.IsNullOrEmpty(stripped))
             {
-                var space = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, 2, 2, collisionLayer: 1);
+                var space = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, 2, 2, LayerManager.Items);
                 if (space != null)
                 {
                     var cell = new CellViewModel
@@ -1763,7 +1764,7 @@ public partial class MainWindow
                                     (colSpan, rowSpan) = GridLayoutService.CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height);
                             }
 
-                            Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, colSpan, rowSpan, collisionLayer: 1);
+                            Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, colSpan, rowSpan, LayerManager.Items);
                             if (emptySpace == null)
                                 continue; // no room — skip this file
 
@@ -1842,7 +1843,7 @@ public partial class MainWindow
                 var single = text.Trim();
                 if (single.Contains("youtube.com") || single.Contains("youtu.be") || single.StartsWith("http", StringComparison.OrdinalIgnoreCase))
                 {
-                    Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, preferredX, preferredY, 2, 2, collisionLayer: 1);
+                    Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, preferredX, preferredY, 2, 2, LayerManager.Items);
                     if (emptySpace == null)
                     {
                         ShakeScreen();
@@ -1869,7 +1870,7 @@ public partial class MainWindow
                 }
                 else
                 {
-                    Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, preferredX, preferredY, 2, 2, collisionLayer: 1);
+                    Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, preferredX, preferredY, 2, 2, LayerManager.Items);
                     if (emptySpace == null)
                     {
                         ShakeScreen();
@@ -1930,7 +1931,7 @@ public partial class MainWindow
                                 (colSpan, rowSpan) = GridLayoutService.CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height);
                         }
 
-                        Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, colSpan, rowSpan, collisionLayer: 1);
+                        Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, colSpan, rowSpan, LayerManager.Items);
                         if (emptySpace == null)
                             continue; // no room — skip this file
 
@@ -2021,7 +2022,7 @@ public partial class MainWindow
                     ? GridLayoutService.CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height)
                     : (2, 2);
 
-                Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, preferredX, preferredY, colSpan, rowSpan, collisionLayer: 1);
+                Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, preferredX, preferredY, colSpan, rowSpan, LayerManager.Items);
 
                 if (emptySpace == null)
                 {
@@ -2129,7 +2130,7 @@ public partial class MainWindow
 
                     var (newColSpan, newRowSpan) = GridLayoutService.CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height);
 
-                    if (GridLayoutService.IsSpaceEmpty(GridCells, cell.CanvasX, cell.CanvasY, newColSpan, newRowSpan, cell.CollisionLayer, excludeCell: cell))
+                    if (GridLayoutService.IsSpaceEmpty(GridCells, cell.CanvasX, cell.CanvasY, newColSpan, newRowSpan, LayerManager.ResolveLayer(cell)!, excludeCell: cell))
                     {
                         cell.ColSpan = newColSpan;
                         cell.RowSpan = newRowSpan;

@@ -7,6 +7,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using CGReferenceBoard.Helpers;
+using CGReferenceBoard.Layers.Infrastructure;
 using CGReferenceBoard.Services;
 using CGReferenceBoard.ViewModels;
 
@@ -347,7 +348,7 @@ public partial class MainWindow
                     if (_annotationDragCellOriginals != null && _annotationDragCellOriginals.Count > 0)
                     {
                         var cellsToMove = _annotationDragCellOriginals.Select(x => x.Cell).ToList();
-                        collision = GridLayoutService.HasGroupCollision(GridCells, cellsToMove, dx, dy);
+                        collision = GridLayoutService.HasGroupCollision(GridCells, cellsToMove, LayerManager, dx, dy);
                         foreach (var (c, _, _) in _annotationDragCellOriginals)
                         {
                             c.IsDragInvalid = collision;
@@ -601,7 +602,7 @@ public partial class MainWindow
 
                 foreach (var (c, startX, startY) in _annotationDragCellOriginals)
                 {
-                    if (GridLayoutService.HasLayerCollision(GridCells, c.CollisionLayer, c, c.CanvasX, c.CanvasY, c.ColSpan, c.RowSpan))
+                    if (GridLayoutService.HasLayerCollision(GridCells, LayerManager.ResolveLayer(c)!, c, c.CanvasX, c.CanvasY, c.ColSpan, c.RowSpan))
                     {
                         hasCollision = true;
                         break;

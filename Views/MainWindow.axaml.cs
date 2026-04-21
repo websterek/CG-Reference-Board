@@ -14,6 +14,9 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using CGReferenceBoard.Controls;
 using CGReferenceBoard.Helpers;
+using CGReferenceBoard.Layers;
+using CGReferenceBoard.Layers.Abstractions;
+using CGReferenceBoard.Layers.Infrastructure;
 using CGReferenceBoard.Models;
 using CGReferenceBoard.Services;
 using CGReferenceBoard.ViewModels;
@@ -259,6 +262,25 @@ target.PlaceholderColor = source.PlaceholderColor;
 
     #endregion
 
+    #region Layer Management
+
+    public LayerManager LayerManager { get; } = new();
+
+    /// <summary>
+    /// Responds to content-layer property changes (visibility) by updating
+    /// the visual state of all cells in the affected layer.
+    /// </summary>
+    private void OnLayerPropertyChanged(IContentLayer layer, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(IContentLayer.IsVisible))
+            return;
+
+        foreach (var cell in layer.Cells)
+            cell.IsLayerVisible = layer.IsVisible;
+    }
+
+    #endregion
+
     #region Bindable Properties
 
     private bool _isDrawMode;
@@ -305,7 +327,14 @@ target.PlaceholderColor = source.PlaceholderColor;
     public bool IsAnnotationsVisible
     {
         get => _isAnnotationsVisible;
-        set { _isAnnotationsVisible = value; OnPropertyChanged(nameof(IsAnnotationsVisible)); }
+        set
+        {
+            if (_isAnnotationsVisible == value)
+                return;
+            _isAnnotationsVisible = value;
+            LayerManager.Annotations.IsVisible = value;
+            OnPropertyChanged(nameof(IsAnnotationsVisible));
+        }
     }
 
 
@@ -792,26 +821,68 @@ target.PlaceholderColor = source.PlaceholderColor;
             if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
             {
                 _cellSpatialIndex.Clear();
+                LayerManager.Clear();
                 foreach (var cell in GridCells)
+                {
                     AddCellToSpatialIndex(cell);
+                    LayerManager.AddCell(cell);
+                }
             }
             else
             {
                 if (e.OldItems != null)
                 {
                     foreach (CellViewModel cell in e.OldItems)
+                    {
                         RemoveCellFromSpatialIndex(cell);
+                        LayerManager.RemoveCell(cell);
+                    }
                 }
                 if (e.NewItems != null)
                 {
                     foreach (CellViewModel cell in e.NewItems)
+                    {
                         AddCellToSpatialIndex(cell);
+                        LayerManager.AddCell(cell);
+                    }
+                }
+            }
+        }
+
+        Annotations.CollectionChanged += Annotations_CollectionChanged;
+
+        void Annotations_CollectionChanged(object? s, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
+            {
+                LayerManager.Annotations.Items.Clear();
+                foreach (var ann in Annotations)
+                    LayerManager.Annotations.Items.Add(ann);
+            }
+            else
+            {
+                if (e.OldItems != null)
+                {
+                    foreach (AnnotationViewModel ann in e.OldItems)
+                        LayerManager.Annotations.Items.Remove(ann);
+                }
+                if (e.NewItems != null)
+                {
+                    foreach (AnnotationViewModel ann in e.NewItems)
+                        LayerManager.Annotations.Items.Add(ann);
                 }
             }
         }
 
         OnPropertyChanged(nameof(WindowTitle));
-        CanvasGrid.ItemsSource = GridCells;
+        // ItemsSource is now bound via XAML to LayerManager.{Layer}.Cells
+
+        // Wire layer visibility changes to cell visual state
+        foreach (var layer in LayerManager.ContentLayers)
+        {
+            if (layer is INotifyPropertyChanged inpc)
+                inpc.PropertyChanged += (_, e) => OnLayerPropertyChanged(layer, e);
+        }
 
         // Set up pan/zoom transform
         var tg = new TransformGroup();
@@ -1566,7 +1637,7 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
     #region Placement Preview Helpers
 
     /// <summary>Shows the placement preview rectangle at the specified grid-aligned position.</summary>
-    private void ShowPlacementPreview(double x, double y, int colSpan, int rowSpan, int collisionLayer)
+    private void ShowPlacementPreview(double x, double y, int colSpan, int rowSpan, IContentLayer owningLayer)
     {
         var previewBorder = this.FindControl<Border>("PlacementPreviewBorder");
         if (previewBorder == null)
@@ -1579,7 +1650,7 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
         _previewRowSpan = rowSpan;
 
         // Check if placement is valid (no collision)
-        _previewIsValid = GridLayoutService.IsSpaceEmpty(GridCells, x, y, colSpan, rowSpan, collisionLayer);
+        _previewIsValid = GridLayoutService.IsSpaceEmpty(GridCells, x, y, colSpan, rowSpan, owningLayer);
 
         // Update visual appearance based on validity
         previewBorder.BorderBrush = _previewIsValid
@@ -1618,7 +1689,7 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
         int gridX = (int)(Math.Floor(canvasPoint.X / Constants.GridSize) * Constants.GridSize);
         int gridY = (int)(Math.Floor(canvasPoint.Y / Constants.GridSize) * Constants.GridSize);
 
-        ShowPlacementPreview(gridX, gridY, _previewColSpan, _previewRowSpan, _pendingBackdrop.CollisionLayer);
+        ShowPlacementPreview(gridX, gridY, _previewColSpan, _previewRowSpan, LayerManager.Backdrops);
     }
 
     /// <summary>Attempts to place the pending backdrop at the preview location if valid.</summary>

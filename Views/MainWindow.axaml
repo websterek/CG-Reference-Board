@@ -18,6 +18,467 @@
     DragDrop.AllowDrop="True"
 >
 
+    <Window.Resources>
+        <!-- Shared cell DataTemplate used by all three layer ItemsControls -->
+        <DataTemplate x:Key="CellTemplate" DataType="vm:CellViewModel">
+            <Border
+                Classes="CellRoot"
+                Width="{Binding PixelWidth}"
+                Height="{Binding PixelHeight}"
+                IsVisible="{Binding IsEffectivelyVisible}"
+                IsHitTestVisible="{Binding IsHitTestEnabled}"
+                BorderThickness="{Binding ZoomIndependentBorderThickness, RelativeSource={RelativeSource AncestorType=views:MainWindow}}"
+                Cursor="Hand"
+                PointerEntered="Cell_PointerEntered"
+                PointerExited="Cell_PointerExited"
+                PointerPressed="Cell_PointerPressed"
+                PointerMoved="Cell_PointerMoved"
+                PointerReleased="Cell_PointerReleased"
+                DragDrop.AllowDrop="True"
+            >
+                <!-- Cell Context Menu -->
+                <Border.ContextMenu>
+                    <ContextMenu>
+                        <!-- Category 1: Clipboard & File -->
+                        <MenuItem
+                            Header="Copy Image"
+                            Click="CopyImage_Click"
+                            IsVisible="{Binding IsImage}"
+                        >
+                            <MenuItem.Icon>
+                                <PathIcon Data="M16 1H4C2.9 1 2 1.9 2 3V17H4V3H16V1M19 5H8C6.9 5 6 5.9 6 7V21C6 22.1 6.9 23 8 23H19C20.1 23 21 22.1 21 21V7C21 5.9 20.1 5 19 5M19 21H8V7H19V21Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem
+                            Header="Copy Path"
+                            Click="CopyPath_Click"
+                            IsVisible="{Binding IsFile}"
+                        >
+                            <MenuItem.Icon>
+                                <PathIcon Data="M16 1H4C2.9 1 2 1.9 2 3V17H4V3H16V1M19 5H8C6.9 5 6 5.9 6 7V21C6 22.1 6.9 23 8 23H19C20.1 23 21 22.1 21 21V7C21 5.9 20.1 5 19 5M19 21H8V7H19V21Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem
+                            Header="Copy Text"
+                            Click="CopyText_Click"
+                            IsVisible="{Binding HasTextContent}"
+                        >
+                            <MenuItem.Icon>
+                                <PathIcon Data="M16 1H4C2.9 1 2 1.9 2 3V17H4V3H16V1M19 5H8C6.9 5 6 5.9 6 7V21C6 22.1 6.9 23 8 23H19C20.1 23 21 22.1 21 21V7C21 5.9 20.1 5 19 5M19 21H8V7H19V21Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem
+                            Header="Show in File Explorer"
+                            Click="ShowInExplorer_Click"
+                            IsVisible="{Binding IsFile}"
+                        >
+                            <MenuItem.Icon>
+                                <PathIcon Data="M10 4H4C2.89 4 2 4.89 2 6V18C2 19.1 2.89 20 4 20H20C21.1 20 22 19.1 22 18V8C22 6.89 21.1 6 20 6H12L10 4Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem
+                            Header="Open Native"
+                            Click="OpenNative_Click"
+                            IsVisible="{Binding IsFile}"
+                        >
+                            <MenuItem.Icon>
+                                <PathIcon Data="M14 3V5H17.59L7.76 14.83L9.17 16.24L19 6.41V10H21V3M19 19H5V5H12V3H5C3.89 3 3 3.9 3 5V19C3 20.1 3.89 21 5 21H19C20.1 21 21 20.1 21 19V12H19V19Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem
+                            Header="Edit"
+                            Click="EditText_Click"
+                            IsVisible="{Binding HasTextContent}"
+                        >
+                            <MenuItem.Icon>
+                                <PathIcon Data="M20.71 7.04C21.1 6.65 21.1 6 20.71 5.63L18.37 3.29C18 2.9 17.35 2.9 16.96 3.29L15.12 5.12L18.87 8.87M3 17.25V21H6.75L17.81 9.93L14.06 6.18L3 17.25Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+
+                        <Separator
+                            IsVisible="{Binding HasClipboardOptions}"
+                            Background="{StaticResource BorderBrushSubtle}"
+                        />
+
+                        <!-- Category 2: Appearance & Resizing -->
+                        <MenuItem
+                            Header="Fit to Content"
+                            Click="FitToContent_Click"
+                            HotKey="Ctrl+Shift+F"
+                            IsVisible="{Binding IsFile}"
+                            IsEnabled="{Binding !HasMultipleSelection}"
+                        >
+                            <MenuItem.Icon>
+                                <PathIcon Data="M19 12H22L18 16L14 12H17V8H19M2 14V16H12V14M2 8V10H9V8M2 2V4H12V2M10 18V20H2V18" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem
+                            Header="Toggle Image Fit"
+                            Click="ToggleImageFit_Click"
+                            IsVisible="{Binding IsImage}"
+                        >
+                            <MenuItem.Icon>
+                                <PathIcon Data="M21 3H3C2 3 1 4 1 5V19C1 20 2 21 3 21H21C22 21 23 20 23 19V5C23 4 22 3 21 3M5 17L8.5 12.5L11 15.5L14.5 11L19 17H5Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem
+                            Header="Change Color"
+                            Click="ChangeColor_Click"
+                            IsVisible="{Binding IsBoardElement}"
+                        >
+                            <MenuItem.Icon>
+                                <PathIcon Data="M17.5 12C17.5 15 15 17.5 12 17.5S6.5 15 6.5 12 9 6.5 12 6.5 17.5 9 17.5 12M12 2C17.52 2 22 6.48 22 12S17.52 22 12 22 2 17.52 2 12 6.48 2 12 2Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem
+                            Header="Increase Font Size"
+                            Click="IncreaseFontSize_Click"
+                            IsVisible="{Binding IsLabel}"
+                        >
+                            <MenuItem.Icon>
+                                <PathIcon Data="M9 4V8H14V20H18V8H23V4H9Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem
+                            Header="Decrease Font Size"
+                            Click="DecreaseFontSize_Click"
+                            IsVisible="{Binding IsLabel}"
+                        >
+                            <MenuItem.Icon>
+                                <PathIcon Data="M5 4V8H10V20H14V8H19V4H5Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+
+                        <Separator
+                            IsVisible="{Binding HasAppearanceOptions}"
+                            Background="{StaticResource BorderBrushSubtle}"
+                        />
+
+                        <!-- Category 3: Arrangements & Grouping -->
+                        <MenuItem
+                            Header="Select Content"
+                            Click="SelectContent_Click"
+                            IsVisible="{Binding IsBackdrop}"
+                        >
+                            <MenuItem.Icon>
+                                <PathIcon Data="M4 4H20V20H4V4M6 6V18H18V6H6M8 8H16V16H8V8Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem
+                            Header="Arrange Horizontal"
+                            Click="ArrangeHorizontal_Click"
+                            IsVisible="{Binding !IsBackdrop}"
+                            IsEnabled="{Binding HasMultipleSelection}"
+                        >
+                            <MenuItem.Icon>
+                                <PathIcon Data="M4 11V13H16V11H4M4 6V8H20V6H4M4 18H12V16H4V18Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem
+                            Header="Arrange Vertical"
+                            Click="ArrangeVertical_Click"
+                            IsVisible="{Binding !IsBackdrop}"
+                            IsEnabled="{Binding HasMultipleSelection}"
+                        >
+                            <MenuItem.Icon>
+                                <PathIcon Data="M4 11V13H16V11H4M4 6V8H20V6H4M4 18H12V16H4V18Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem
+                            Header="Arrange Grid"
+                            Click="ArrangeSelected_Click"
+                            IsVisible="{Binding !IsBackdrop}"
+                            IsEnabled="{Binding HasMultipleSelection}"
+                        >
+                            <MenuItem.Icon>
+                                <PathIcon Data="M3 11H11V3H3M13 3V11H21V3M3 21H11V13H3M13 13V21H21V13Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+
+                        <Separator Background="{StaticResource BorderBrushSubtle}" />
+
+                        <!-- Category 4: Destructive Actions -->
+                        <MenuItem
+                            Header="Delete"
+                            Click="DeleteCell_Click"
+                            Foreground="{StaticResource TextDanger}"
+                        >
+                            <MenuItem.Icon>
+                                <PathIcon Data="M19 4H15.5L14.5 3H9.5L8.5 4H5V6H19M6 19C6 20.1 6.9 21 8 21H16C17.1 21 18 20.1 18 19V7H6V19Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+                    </ContextMenu>
+                </Border.ContextMenu>
+
+                <Grid Background="Transparent">
+                    <!-- Selection highlight -->
+                    <Border
+                        Classes="SelectionHighlight"
+                        IsVisible="{Binding IsSelected}"
+                        ZIndex="8"
+                        BorderThickness="{Binding ZoomIndependentBorderThickness, RelativeSource={RelativeSource AncestorType=views:MainWindow}}"
+                        CornerRadius="{Binding ZoomIndependentCornerRadius, RelativeSource={RelativeSource AncestorType=views:MainWindow}}"
+                    />
+
+                    <!-- Paste/New highlight -->
+                    <Border
+                        Background="#40FFFFFF"
+                        BorderBrush="#80FFFFFF"
+                        BorderThickness="2"
+                        CornerRadius="0"
+                        IsVisible="{Binding IsHighlighted}"
+                        ZIndex="7"
+                        IsHitTestVisible="False"
+                    >
+                        <Border.Transitions>
+                            <Transitions>
+                                <DoubleTransition Property="Opacity" Duration="0:0:0.3" />
+                            </Transitions>
+                        </Border.Transitions>
+                    </Border>
+
+                    <!-- Invalid Drag Position Indicator -->
+                    <Border
+                        Background="#60FF4444"
+                        BorderBrush="#AAFF4444"
+                        BorderThickness="3"
+                        CornerRadius="0"
+                        IsVisible="{Binding IsDragInvalid}"
+                        ZIndex="9"
+                        IsHitTestVisible="False"
+                    >
+                        <Border.Effect>
+                            <DropShadowEffect
+                                BlurRadius="8"
+                                OffsetX="0"
+                                OffsetY="0"
+                                Color="Red"
+                                Opacity="0.6" />
+                        </Border.Effect>
+                    </Border>
+
+                    <!-- Placeholder color rect (shown when image bitmap is not loaded) -->
+                    <Border
+                        IsVisible="{Binding ShowPlaceholder}"
+                        Background="{Binding PlaceholderColor}"
+                        CornerRadius="2"
+                        IsHitTestVisible="False"
+                    />
+
+                    <!-- Image Content -->
+                    <Border
+                        IsVisible="{Binding IsImage}"
+                        Background="#80000000"
+                    >
+                        <Image
+                            Source="{Binding Image}"
+                            Stretch="{Binding ImageStretch}"
+                            DoubleTapped="CanvasImage_DoubleTapped"
+                            RenderOptions.BitmapInterpolationMode="MediumQuality"
+                        />
+                    </Border>
+
+                    <!-- Video Thumbnail with Play Icon -->
+                    <Panel IsVisible="{Binding IsVideo}">
+                        <Image
+                            Source="{Binding Image}"
+                            Stretch="UniformToFill"
+                            DoubleTapped="CanvasImage_DoubleTapped"
+                            RenderOptions.BitmapInterpolationMode="MediumQuality"
+                        />
+                        <!-- Play icon overlay (shown on hover via style) -->
+                        <Border
+                            Classes="VideoPlayOverlay"
+                            Background="#60000000"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            CornerRadius="50"
+                            Padding="20"
+                            IsHitTestVisible="False"
+                        >
+                            <PathIcon
+                                Data="M8 5.14V19.14L19 12.14L8 5.14Z"
+                                Width="32"
+                                Height="32"
+                                Foreground="White"
+                            />
+                        </Border>
+                    </Panel>
+
+                    <!-- Text Content -->
+                    <Border
+                        Background="{StaticResource SurfaceBrushLight}"
+                        IsVisible="{Binding IsText}"
+                        Padding="10"
+                        DoubleTapped="CanvasText_DoubleTapped"
+                    >
+                        <ScrollViewer
+                            Classes="TextCellScroll"
+                            HorizontalScrollBarVisibility="Disabled"
+                            VerticalScrollBarVisibility="Auto"
+                            AllowAutoHide="True"
+                            PointerWheelChanged="TextScroll_PointerWheelChanged"
+                        >
+                            <TextBlock
+                                local:TextBlockLinkify.Text="{Binding TextContent}"
+                                TextWrapping="Wrap"
+                                Background="Transparent"
+                                Foreground="White"
+                            />
+                        </ScrollViewer>
+                    </Border>
+
+                    <!-- Label Content -->
+                    <Border
+                        Background="Transparent"
+                        IsVisible="{Binding IsLabel}"
+                        Padding="10"
+                        DoubleTapped="CanvasText_DoubleTapped"
+                        ZIndex="5"
+                    >
+                        <TextBlock
+                            local:TextBlockLinkify.Text="{Binding TextContent}"
+                            TextWrapping="Wrap"
+                            Background="Transparent"
+                            Foreground="{Binding ForegroundColor}"
+                            FontSize="{Binding FontSize}"
+                            FontWeight="Bold"
+                            TextAlignment="Center"
+                            VerticalAlignment="Center"
+                        />
+                    </Border>
+
+                    <!-- Backdrop Content -->
+                    <Border
+                        Background="{Binding BackgroundColor}"
+                        IsVisible="{Binding IsBackdrop}"
+                        Padding="20"
+                        DoubleTapped="CanvasText_DoubleTapped"
+                        CornerRadius="0"
+                    >
+                        <TextBlock
+                            local:TextBlockLinkify.Text="{Binding TextContent}"
+                            TextWrapping="Wrap"
+                            Background="Transparent"
+                            Foreground="{Binding ForegroundColor}"
+                            FontSize="36"
+                            FontWeight="Bold"
+                            VerticalAlignment="Top"
+                            HorizontalAlignment="Left"
+                        />
+                    </Border>
+
+                    <!-- Download Progress Indicator -->
+                    <Border
+                        Background="{StaticResource ChromeBrush}"
+                        IsVisible="{Binding IsDownloading}"
+                    >
+                        <StackPanel
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Center"
+                            Orientation="Vertical"
+                            Spacing="8"
+                            Margin="16"
+                        >
+                            <!-- Status row: pulsing dot + status text -->
+                            <StackPanel
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                Spacing="8"
+                            >
+                                <Ellipse
+                                    Classes="PulsingDot"
+                                    Width="8"
+                                    Height="8"
+                                    Fill="{StaticResource AccentBrush}"
+                                    VerticalAlignment="Center"
+                                />
+                                <TextBlock
+                                    Text="{Binding DownloadStatusText}"
+                                    Foreground="#DDDDDD"
+                                    FontSize="11"
+                                    FontWeight="SemiBold"
+                                    VerticalAlignment="Center"
+                                    TextTrimming="CharacterEllipsis"
+                                    MaxWidth="200"
+                                />
+                            </StackPanel>
+
+                            <!-- Progress bar -->
+                            <ProgressBar
+                                Minimum="0"
+                                Maximum="100"
+                                Value="{Binding DownloadProgress}"
+                                Height="4"
+                                MinWidth="120"
+                                Foreground="{StaticResource AccentBrush}"
+                                Background="#44FFFFFF"
+                                CornerRadius="2"
+                            />
+
+                            <!-- Percentage label -->
+                            <TextBlock
+                                HorizontalAlignment="Center"
+                                Foreground="#88FFFFFF"
+                                FontSize="10"
+                                FontWeight="SemiBold"
+                            >
+                                <TextBlock.Text>
+                                    <MultiBinding StringFormat="{}{0:F0}%">
+                                        <Binding Path="DownloadProgress" />
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Type Icon Badge (top-right corner) -->
+                    <Border
+                        Background="#99000000"
+                        CornerRadius="4"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Margin="5"
+                        Padding="4,2"
+                        IsVisible="{Binding ShowIcon}"
+                    >
+                        <PathIcon
+                            Data="{Binding TypeIcon}"
+                            Width="16"
+                            Height="16"
+                            Foreground="White"
+                        />
+                    </Border>
+
+                    <!-- Resize Thumb (edit mode only) -->
+                    <Panel
+                        IsVisible="{Binding !IsViewMode, RelativeSource={RelativeSource AncestorType=views:MainWindow}}"
+                        ZIndex="10"
+                    >
+                        <Border
+                            x:Name="ResizeThumb"
+                            Background="#AA000000"
+                            BorderBrush="#88AAFF"
+                            BorderThickness="2.5"
+                            Width="24"
+                            Height="24"
+                            CornerRadius="12"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Bottom"
+                            Margin="6"
+                            Cursor="BottomRightCorner"
+                            ZIndex="10"
+                            PointerPressed="ResizeThumb_PointerPressed"
+                            PointerMoved="ResizeThumb_PointerMoved"
+                            PointerReleased="ResizeThumb_PointerReleased"
+                            IsVisible="{Binding HasContent}"
+                        />
+                    </Panel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </Window.Resources>
+
     <Grid>
         <Grid RowDefinitions="Auto, *, Auto">
 
@@ -178,6 +639,51 @@
                                     <TextBlock Text="{Binding FileName}" />
                                 </DataTemplate>
                             </MenuItem.ItemTemplate>
+                        </MenuItem>
+
+                        <!-- Layers Menu -->
+                        <MenuItem Header="_Layers" IsEnabled="{Binding !#StartupOverlay.IsVisible}">
+                            <!-- Backdrops -->
+                            <MenuItem
+                                Header="Show Backdrops"
+                                ToggleType="CheckBox"
+                                IsChecked="{Binding LayerManager.Backdrops.IsVisible, Mode=TwoWay}"
+                            >
+                                <MenuItem.Icon>
+                                    <PathIcon Data="M12 9C10.34 9 9 10.34 9 12S10.34 15 12 15 15 13.66 15 12 13.66 9 12 9M12 17C9.24 17 7 14.76 7 12S9.24 7 12 7 17 9.24 17 12 14.76 17 12 17M12 4.5C7 4.5 2.73 7.61 1 12C2.73 16.39 7 19.5 12 19.5S21.27 16.39 23 12C21.27 7.61 17 4.5 12 4.5Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <!-- Items -->
+                            <MenuItem
+                                Header="Show Items"
+                                ToggleType="CheckBox"
+                                IsChecked="{Binding LayerManager.Items.IsVisible, Mode=TwoWay}"
+                            >
+                                <MenuItem.Icon>
+                                    <PathIcon Data="M12 9C10.34 9 9 10.34 9 12S10.34 15 12 15 15 13.66 15 12 13.66 9 12 9M12 17C9.24 17 7 14.76 7 12S9.24 7 12 7 17 9.24 17 12 14.76 17 12 17M12 4.5C7 4.5 2.73 7.61 1 12C2.73 16.39 7 19.5 12 19.5S21.27 16.39 23 12C21.27 7.61 17 4.5 12 4.5Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <!-- Labels -->
+                            <MenuItem
+                                Header="Show Labels"
+                                ToggleType="CheckBox"
+                                IsChecked="{Binding LayerManager.Labels.IsVisible, Mode=TwoWay}"
+                            >
+                                <MenuItem.Icon>
+                                    <PathIcon Data="M12 9C10.34 9 9 10.34 9 12S10.34 15 12 15 15 13.66 15 12 13.66 9 12 9M12 17C9.24 17 7 14.76 7 12S9.24 7 12 7 17 9.24 17 12 14.76 17 12 17M12 4.5C7 4.5 2.73 7.61 1 12C2.73 16.39 7 19.5 12 19.5S21.27 16.39 23 12C21.27 7.61 17 4.5 12 4.5Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <!-- Annotations -->
+                            <MenuItem
+                                Header="Show Annotations"
+                                ToggleType="CheckBox"
+                                IsChecked="{Binding IsAnnotationsVisible, Mode=TwoWay}"
+                                InputGesture="Shift+A"
+                            >
+                                <MenuItem.Icon>
+                                    <PathIcon Data="M12 9C10.34 9 9 10.34 9 12S10.34 15 12 15 15 13.66 15 12 13.66 9 12 9M12 17C9.24 17 7 14.76 7 12S9.24 7 12 7 17 9.24 17 12 14.76 17 12 17M12 4.5C7 4.5 2.73 7.61 1 12C2.73 16.39 7 19.5 12 19.5S21.27 16.39 23 12C21.27 7.61 17 4.5 12 4.5Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
                         </MenuItem>
 
                         <!-- Mode Menu -->
@@ -779,14 +1285,16 @@
                         />
 
                         <!-- ─────────────────────────────────────────── -->
-                        <!-- Board Cells Layer                           -->
+                        <!-- Board Cells Layer (all cell types)          -->
+                        <!-- Visual layering via CellViewModel.ZIndex:   -->
+                        <!--   Backdrops: -10  Items: 0  Labels: 10     -->
                         <!-- ─────────────────────────────────────────── -->
                         <ItemsControl
                             x:Name="CanvasGrid"
+                            ItemsSource="{Binding LayerManager.AllCells}"
                             HorizontalAlignment="Stretch"
                             VerticalAlignment="Stretch"
                             ClipToBounds="False"
-                            RenderTransformOrigin="0,0"
                             IsHitTestVisible="{Binding !IsDrawMode}"
                         >
                             <ItemsControl.ItemsPanel>
@@ -796,7 +1304,6 @@
                                         VerticalAlignment="Stretch"
                                         ClipToBounds="False"
                                         DragDrop.AllowDrop="True"
-                                        Background="Transparent"
                                     />
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
@@ -822,463 +1329,7 @@
                             </ItemsControl.ItemContainerTheme>
 
                             <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="vm:CellViewModel">
-                                    <Border
-                                        Classes="CellRoot"
-                                        Width="{Binding PixelWidth}"
-                                        Height="{Binding PixelHeight}"
-                                        IsVisible="{Binding IsInViewport}"
-                                        IsHitTestVisible="{Binding IsHitTestEnabled}"
-                                        BorderThickness="{Binding ZoomIndependentBorderThickness, RelativeSource={RelativeSource AncestorType=views:MainWindow}}"
-                                        Cursor="Hand"
-                                        PointerEntered="Cell_PointerEntered"
-                                        PointerExited="Cell_PointerExited"
-                                        PointerPressed="Cell_PointerPressed"
-                                        PointerMoved="Cell_PointerMoved"
-                                        PointerReleased="Cell_PointerReleased"
-                                        DragDrop.AllowDrop="True"
-                                    >
-                                        <!-- Cell Context Menu -->
-                                        <Border.ContextMenu>
-                                            <ContextMenu>
-                                                <!-- Category 1: Clipboard & File -->
-                                                <MenuItem
-                                                    Header="Copy Image"
-                                                    Click="CopyImage_Click"
-                                                    IsVisible="{Binding IsImage}"
-                                                >
-                                                    <MenuItem.Icon>
-                                                        <PathIcon Data="M16 1H4C2.9 1 2 1.9 2 3V17H4V3H16V1M19 5H8C6.9 5 6 5.9 6 7V21C6 22.1 6.9 23 8 23H19C20.1 23 21 22.1 21 21V7C21 5.9 20.1 5 19 5M19 21H8V7H19V21Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
-                                                    </MenuItem.Icon>
-                                                </MenuItem>
-                                                <MenuItem
-                                                    Header="Copy Path"
-                                                    Click="CopyPath_Click"
-                                                    IsVisible="{Binding IsFile}"
-                                                >
-                                                    <MenuItem.Icon>
-                                                        <PathIcon Data="M16 1H4C2.9 1 2 1.9 2 3V17H4V3H16V1M19 5H8C6.9 5 6 5.9 6 7V21C6 22.1 6.9 23 8 23H19C20.1 23 21 22.1 21 21V7C21 5.9 20.1 5 19 5M19 21H8V7H19V21Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
-                                                    </MenuItem.Icon>
-                                                </MenuItem>
-                                                <MenuItem
-                                                    Header="Copy Text"
-                                                    Click="CopyText_Click"
-                                                    IsVisible="{Binding HasTextContent}"
-                                                >
-                                                    <MenuItem.Icon>
-                                                        <PathIcon Data="M16 1H4C2.9 1 2 1.9 2 3V17H4V3H16V1M19 5H8C6.9 5 6 5.9 6 7V21C6 22.1 6.9 23 8 23H19C20.1 23 21 22.1 21 21V7C21 5.9 20.1 5 19 5M19 21H8V7H19V21Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
-                                                    </MenuItem.Icon>
-                                                </MenuItem>
-                                                <MenuItem
-                                                    Header="Show in File Explorer"
-                                                    Click="ShowInExplorer_Click"
-                                                    IsVisible="{Binding IsFile}"
-                                                >
-                                                    <MenuItem.Icon>
-                                                        <PathIcon Data="M10 4H4C2.89 4 2 4.89 2 6V18C2 19.1 2.89 20 4 20H20C21.1 20 22 19.1 22 18V8C22 6.89 21.1 6 20 6H12L10 4Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
-                                                    </MenuItem.Icon>
-                                                </MenuItem>
-                                                <MenuItem
-                                                    Header="Open Native"
-                                                    Click="OpenNative_Click"
-                                                    IsVisible="{Binding IsFile}"
-                                                >
-                                                    <MenuItem.Icon>
-                                                        <PathIcon Data="M14 3V5H17.59L7.76 14.83L9.17 16.24L19 6.41V10H21V3M19 19H5V5H12V3H5C3.89 3 3 3.9 3 5V19C3 20.1 3.89 21 5 21H19C20.1 21 21 20.1 21 19V12H19V19Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
-                                                    </MenuItem.Icon>
-                                                </MenuItem>
-                                                <MenuItem
-                                                    Header="Edit"
-                                                    Click="EditText_Click"
-                                                    IsVisible="{Binding HasTextContent}"
-                                                >
-                                                    <MenuItem.Icon>
-                                                        <PathIcon Data="M20.71 7.04C21.1 6.65 21.1 6 20.71 5.63L18.37 3.29C18 2.9 17.35 2.9 16.96 3.29L15.12 5.12L18.87 8.87M3 17.25V21H6.75L17.81 9.93L14.06 6.18L3 17.25Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
-                                                    </MenuItem.Icon>
-                                                </MenuItem>
-
-                                                <Separator
-                                                    IsVisible="{Binding HasClipboardOptions}"
-                                                    Background="{StaticResource BorderBrushSubtle}"
-                                                />
-
-                                                <!-- Category 2: Appearance & Resizing -->
-                                                <MenuItem
-                                                    Header="Fit to Content"
-                                                    Click="FitToContent_Click"
-                                                    HotKey="Ctrl+Shift+F"
-                                                    IsVisible="{Binding IsFile}"
-                                                    IsEnabled="{Binding !HasMultipleSelection}"
-                                                >
-                                                    <MenuItem.Icon>
-                                                        <PathIcon Data="M19 12H22L18 16L14 12H17V8H19M2 14V16H12V14M2 8V10H9V8M2 2V4H12V2M10 18V20H2V18" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
-                                                    </MenuItem.Icon>
-                                                </MenuItem>
-                                                <MenuItem
-                                                    Header="Toggle Image Fit"
-                                                    Click="ToggleImageFit_Click"
-                                                    IsVisible="{Binding IsImage}"
-                                                >
-                                                    <MenuItem.Icon>
-                                                        <PathIcon Data="M21 3H3C2 3 1 4 1 5V19C1 20 2 21 3 21H21C22 21 23 20 23 19V5C23 4 22 3 21 3M5 17L8.5 12.5L11 15.5L14.5 11L19 17H5Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
-                                                    </MenuItem.Icon>
-                                                </MenuItem>
-                                                <MenuItem
-                                                    Header="Change Color"
-                                                    Click="ChangeColor_Click"
-                                                    IsVisible="{Binding IsBoardElement}"
-                                                >
-                                                    <MenuItem.Icon>
-                                                        <PathIcon Data="M17.5 12C17.5 15 15 17.5 12 17.5S6.5 15 6.5 12 9 6.5 12 6.5 17.5 9 17.5 12M12 2C17.52 2 22 6.48 22 12S17.52 22 12 22 2 17.52 2 12 6.48 2 12 2Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
-                                                    </MenuItem.Icon>
-                                                </MenuItem>
-                                                <MenuItem
-                                                    Header="Increase Font Size"
-                                                    Click="IncreaseFontSize_Click"
-                                                    IsVisible="{Binding IsLabel}"
-                                                >
-                                                    <MenuItem.Icon>
-                                                        <PathIcon Data="M9 4V8H14V20H18V8H23V4H9Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
-                                                    </MenuItem.Icon>
-                                                </MenuItem>
-                                                <MenuItem
-                                                    Header="Decrease Font Size"
-                                                    Click="DecreaseFontSize_Click"
-                                                    IsVisible="{Binding IsLabel}"
-                                                >
-                                                    <MenuItem.Icon>
-                                                        <PathIcon Data="M5 4V8H10V20H14V8H19V4H5Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
-                                                    </MenuItem.Icon>
-                                                </MenuItem>
-
-                                                <Separator
-                                                    IsVisible="{Binding HasAppearanceOptions}"
-                                                    Background="{StaticResource BorderBrushSubtle}"
-                                                />
-
-                                                <!-- Category 3: Arrangements & Grouping -->
-                                                <MenuItem
-                                                    Header="Select Content"
-                                                    Click="SelectContent_Click"
-                                                    IsVisible="{Binding IsBackdrop}"
-                                                >
-                                                    <MenuItem.Icon>
-                                                        <PathIcon Data="M4 4H20V20H4V4M6 6V18H18V6H6M8 8H16V16H8V8Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
-                                                    </MenuItem.Icon>
-                                                </MenuItem>
-                                                <MenuItem
-                                                    Header="Arrange Horizontal"
-                                                    Click="ArrangeHorizontal_Click"
-                                                    IsVisible="{Binding !IsBackdrop}"
-                                                    IsEnabled="{Binding HasMultipleSelection}"
-                                                >
-                                                    <MenuItem.Icon>
-                                                        <PathIcon Data="M4 11V13H16V11H4M4 6V8H20V6H4M4 18H12V16H4V18Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
-                                                    </MenuItem.Icon>
-                                                </MenuItem>
-                                                <MenuItem
-                                                    Header="Arrange Vertical"
-                                                    Click="ArrangeVertical_Click"
-                                                    IsVisible="{Binding !IsBackdrop}"
-                                                    IsEnabled="{Binding HasMultipleSelection}"
-                                                >
-                                                    <MenuItem.Icon>
-                                                        <PathIcon Data="M4 11V13H16V11H4M4 6V8H20V6H4M4 18H12V16H4V18Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
-                                                    </MenuItem.Icon>
-                                                </MenuItem>
-                                                <MenuItem
-                                                    Header="Arrange Grid"
-                                                    Click="ArrangeSelected_Click"
-                                                    IsVisible="{Binding !IsBackdrop}"
-                                                    IsEnabled="{Binding HasMultipleSelection}"
-                                                >
-                                                    <MenuItem.Icon>
-                                                        <PathIcon Data="M3 11H11V3H3M13 3V11H21V3M3 21H11V13H3M13 13V21H21V13Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
-                                                    </MenuItem.Icon>
-                                                </MenuItem>
-
-                                                <Separator Background="{StaticResource BorderBrushSubtle}" />
-
-                                                <!-- Category 4: Destructive Actions -->
-                                                <MenuItem
-                                                    Header="Delete"
-                                                    Click="DeleteCell_Click"
-                                                    Foreground="{StaticResource TextDanger}"
-                                                >
-                                                    <MenuItem.Icon>
-                                                        <PathIcon Data="M19 4H15.5L14.5 3H9.5L8.5 4H5V6H19M6 19C6 20.1 6.9 21 8 21H16C17.1 21 18 20.1 18 19V7H6V19Z" Width="16" Height="16" Foreground="{DynamicResource TextSecondary}" />
-                                                    </MenuItem.Icon>
-                                                </MenuItem>
-                                            </ContextMenu>
-                                        </Border.ContextMenu>
-
-                                        <Grid Background="Transparent">
-                                            <!-- Selection highlight -->
-                                            <Border
-                                                Classes="SelectionHighlight"
-                                                IsVisible="{Binding IsSelected}"
-                                                ZIndex="8"
-                                                BorderThickness="{Binding ZoomIndependentBorderThickness, RelativeSource={RelativeSource AncestorType=views:MainWindow}}"
-                                                CornerRadius="{Binding ZoomIndependentCornerRadius, RelativeSource={RelativeSource AncestorType=views:MainWindow}}"
-                                            />
-
-                                            <!-- Paste/New highlight -->
-                                            <Border
-                                                Background="#40FFFFFF"
-                                                BorderBrush="#80FFFFFF"
-                                                BorderThickness="2"
-                                                CornerRadius="0"
-                                                IsVisible="{Binding IsHighlighted}"
-                                                ZIndex="7"
-                                                IsHitTestVisible="False"
-                                            >
-                                                <Border.Transitions>
-                                                    <Transitions>
-                                                        <DoubleTransition Property="Opacity" Duration="0:0:0.3" />
-                                                    </Transitions>
-                                                </Border.Transitions>
-                                            </Border>
-
-                                            <!-- Invalid Drag Position Indicator -->
-                                            <Border
-                                                Background="#60FF4444"
-                                                BorderBrush="#AAFF4444"
-                                                BorderThickness="3"
-                                                CornerRadius="0"
-                                                IsVisible="{Binding IsDragInvalid}"
-                                                ZIndex="9"
-                                                IsHitTestVisible="False"
-                                            >
-                                                <Border.Effect>
-                                                    <DropShadowEffect
-                                                        BlurRadius="8"
-                                                        OffsetX="0"
-                                                        OffsetY="0"
-                                                        Color="Red"
-                                                        Opacity="0.6" />
-                                                </Border.Effect>
-                                            </Border>
-
-                                            <!-- Placeholder color rect (shown when image bitmap is not loaded) -->
-                                            <Border
-                                                IsVisible="{Binding ShowPlaceholder}"
-                                                Background="{Binding PlaceholderColor}"
-                                                CornerRadius="2"
-                                                IsHitTestVisible="False"
-                                            />
-
-                                            <!-- Image Content -->
-                                            <Border
-                                                IsVisible="{Binding IsImage}"
-                                                Background="#80000000"
-                                            >
-                                                <Image
-                                                    Source="{Binding Image}"
-                                                    Stretch="{Binding ImageStretch}"
-                                                    DoubleTapped="CanvasImage_DoubleTapped"
-                                                    RenderOptions.BitmapInterpolationMode="MediumQuality"
-                                                />
-                                            </Border>
-
-                                            <!-- Video Thumbnail with Play Icon -->
-                                            <Panel IsVisible="{Binding IsVideo}">
-                                                <Image
-                                                    Source="{Binding Image}"
-                                                    Stretch="UniformToFill"
-                                                    DoubleTapped="CanvasImage_DoubleTapped"
-                                                    RenderOptions.BitmapInterpolationMode="MediumQuality"
-                                                />
-                                                <!-- Play icon overlay (shown on hover via style) -->
-                                                <Border
-                                                    Classes="VideoPlayOverlay"
-                                                    Background="#60000000"
-                                                    HorizontalAlignment="Center"
-                                                    VerticalAlignment="Center"
-                                                    CornerRadius="50"
-                                                    Padding="20"
-                                                    IsHitTestVisible="False"
-                                                >
-                                                    <PathIcon
-                                                        Data="M8 5.14V19.14L19 12.14L8 5.14Z"
-                                                        Width="32"
-                                                        Height="32"
-                                                        Foreground="White"
-                                                    />
-                                                </Border>
-                                            </Panel>
-
-                                            <!-- Text Content -->
-                                            <Border
-                                                Background="{StaticResource SurfaceBrushLight}"
-                                                IsVisible="{Binding IsText}"
-                                                Padding="10"
-                                                DoubleTapped="CanvasText_DoubleTapped"
-                                            >
-                                                <ScrollViewer
-                                                    Classes="TextCellScroll"
-                                                    HorizontalScrollBarVisibility="Disabled"
-                                                    VerticalScrollBarVisibility="Auto"
-                                                    AllowAutoHide="True"
-                                                    PointerWheelChanged="TextScroll_PointerWheelChanged"
-                                                >
-                                                    <TextBlock
-                                                        local:TextBlockLinkify.Text="{Binding TextContent}"
-                                                        TextWrapping="Wrap"
-                                                        Background="Transparent"
-                                                        Foreground="White"
-                                                    />
-                                                </ScrollViewer>
-                                            </Border>
-
-                                            <!-- Label Content -->
-                                            <Border
-                                                Background="Transparent"
-                                                IsVisible="{Binding IsLabel}"
-                                                Padding="10"
-                                                DoubleTapped="CanvasText_DoubleTapped"
-                                                ZIndex="5"
-                                            >
-                                                <TextBlock
-                                                    local:TextBlockLinkify.Text="{Binding TextContent}"
-                                                    TextWrapping="Wrap"
-                                                    Background="Transparent"
-                                                    Foreground="{Binding ForegroundColor}"
-                                                    FontSize="{Binding FontSize}"
-                                                    FontWeight="Bold"
-                                                    TextAlignment="Center"
-                                                    VerticalAlignment="Center"
-                                                />
-                                            </Border>
-
-                                            <!-- Backdrop Content -->
-                                            <Border
-                                                Background="{Binding BackgroundColor}"
-                                                IsVisible="{Binding IsBackdrop}"
-                                                Padding="20"
-                                                DoubleTapped="CanvasText_DoubleTapped"
-                                                CornerRadius="0"
-                                            >
-                                                <TextBlock
-                                                    local:TextBlockLinkify.Text="{Binding TextContent}"
-                                                    TextWrapping="Wrap"
-                                                    Background="Transparent"
-                                                    Foreground="{Binding ForegroundColor}"
-                                                    FontSize="36"
-                                                    FontWeight="Bold"
-                                                    VerticalAlignment="Top"
-                                                    HorizontalAlignment="Left"
-                                                />
-                                            </Border>
-
-                                            <!-- Download Progress Indicator -->
-                                            <Border
-                                                Background="{StaticResource ChromeBrush}"
-                                                IsVisible="{Binding IsDownloading}"
-                                            >
-                                                <StackPanel
-                                                    VerticalAlignment="Center"
-                                                    HorizontalAlignment="Center"
-                                                    Orientation="Vertical"
-                                                    Spacing="8"
-                                                    Margin="16"
-                                                >
-                                                    <!-- Status row: pulsing dot + status text -->
-                                                    <StackPanel
-                                                        Orientation="Horizontal"
-                                                        HorizontalAlignment="Center"
-                                                        Spacing="8"
-                                                    >
-                                                        <Ellipse
-                                                            Classes="PulsingDot"
-                                                            Width="8"
-                                                            Height="8"
-                                                            Fill="{StaticResource AccentBrush}"
-                                                            VerticalAlignment="Center"
-                                                        />
-                                                        <TextBlock
-                                                            Text="{Binding DownloadStatusText}"
-                                                            Foreground="#DDDDDD"
-                                                            FontSize="11"
-                                                            FontWeight="SemiBold"
-                                                            VerticalAlignment="Center"
-                                                            TextTrimming="CharacterEllipsis"
-                                                            MaxWidth="200"
-                                                        />
-                                                    </StackPanel>
-
-                                                    <!-- Progress bar -->
-                                                    <ProgressBar
-                                                        Minimum="0"
-                                                        Maximum="100"
-                                                        Value="{Binding DownloadProgress}"
-                                                        Height="4"
-                                                        MinWidth="120"
-                                                        Foreground="{StaticResource AccentBrush}"
-                                                        Background="#44FFFFFF"
-                                                        CornerRadius="2"
-                                                    />
-
-                                                    <!-- Percentage label -->
-                                                    <TextBlock
-                                                        HorizontalAlignment="Center"
-                                                        Foreground="#88FFFFFF"
-                                                        FontSize="10"
-                                                        FontWeight="SemiBold"
-                                                    >
-                                                        <TextBlock.Text>
-                                                            <MultiBinding StringFormat="{}{0:F0}%">
-                                                                <Binding Path="DownloadProgress" />
-                                                            </MultiBinding>
-                                                        </TextBlock.Text>
-                                                    </TextBlock>
-                                                </StackPanel>
-                                            </Border>
-
-                                            <!-- Type Icon Badge (top-right corner) -->
-                                            <Border
-                                                Background="#99000000"
-                                                CornerRadius="4"
-                                                HorizontalAlignment="Right"
-                                                VerticalAlignment="Top"
-                                                Margin="5"
-                                                Padding="4,2"
-                                                IsVisible="{Binding ShowIcon}"
-                                            >
-                                                <PathIcon
-                                                    Data="{Binding TypeIcon}"
-                                                    Width="16"
-                                                    Height="16"
-                                                    Foreground="White"
-                                                />
-                                            </Border>
-
-                                            <!-- Resize Thumb (edit mode only) -->
-                                            <Panel
-                                                IsVisible="{Binding !IsViewMode, RelativeSource={RelativeSource AncestorType=views:MainWindow}}"
-                                                ZIndex="10"
-                                            >
-                                                <Border
-                                                    x:Name="ResizeThumb"
-                                                    Background="#AA000000"
-                                                    BorderBrush="#88AAFF"
-                                                    BorderThickness="2.5"
-                                                    Width="24"
-                                                    Height="24"
-                                                    CornerRadius="12"
-                                                    HorizontalAlignment="Right"
-                                                    VerticalAlignment="Bottom"
-                                                    Margin="6"
-                                                    Cursor="BottomRightCorner"
-                                                    ZIndex="10"
-                                                    PointerPressed="ResizeThumb_PointerPressed"
-                                                    PointerMoved="ResizeThumb_PointerMoved"
-                                                    PointerReleased="ResizeThumb_PointerReleased"
-                                                    IsVisible="{Binding HasContent}"
-                                                />
-                                            </Panel>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
+                                <StaticResource ResourceKey="CellTemplate" />
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 

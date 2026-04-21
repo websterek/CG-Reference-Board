@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using CGReferenceBoard.Helpers;
+using CGReferenceBoard.Layers.Infrastructure;
 using CGReferenceBoard.Services;
 using CGReferenceBoard.ViewModels;
 
@@ -319,7 +320,7 @@ public partial class MainWindow
             if (Math.Abs(dx) > 0.1 || Math.Abs(dy) > 0.1)
             {
                 var cellsToMove = _groupDragStarts.Select(s => s.Cell).ToList();
-                bool collision = GridLayoutService.HasGroupCollision(GridCells, cellsToMove, dx, dy);
+                bool collision = GridLayoutService.HasGroupCollision(GridCells, cellsToMove, LayerManager, dx, dy);
 
                 // Update visual state and allow movement
                 foreach (var (c, _, _) in _groupDragStarts)
@@ -352,7 +353,7 @@ public partial class MainWindow
             double newX = Math.Round((canvasPt.X - _dragOffsetX) / Constants.GridSize) * Constants.GridSize;
             double newY = Math.Round((canvasPt.Y - _dragOffsetY) / Constants.GridSize) * Constants.GridSize;
 
-            bool collision = GridLayoutService.HasLayerCollision(GridCells, dragTarget.CollisionLayer, dragTarget, newX, newY, dragTarget.ColSpan, dragTarget.RowSpan);
+            bool collision = GridLayoutService.HasLayerCollision(GridCells, LayerManager.ResolveLayer(dragTarget)!, dragTarget, newX, newY, dragTarget.ColSpan, dragTarget.RowSpan);
             dragTarget.IsDragInvalid = collision;
             dragTarget.CanvasX = newX;
             dragTarget.CanvasY = newY;
@@ -376,7 +377,7 @@ public partial class MainWindow
 
                 foreach (var (c, startX, startY) in _groupDragStarts)
                 {
-                    if (GridLayoutService.HasLayerCollision(GridCells, c.CollisionLayer, c, c.CanvasX, c.CanvasY, c.ColSpan, c.RowSpan))
+                    if (GridLayoutService.HasLayerCollision(GridCells, LayerManager.ResolveLayer(c)!, c, c.CanvasX, c.CanvasY, c.ColSpan, c.RowSpan))
                     {
                         hasCollision = true;
                         break;
@@ -412,7 +413,7 @@ public partial class MainWindow
             // Handle single cell drag
             else if (_draggingCell != null)
             {
-                bool hasCollision = GridLayoutService.HasLayerCollision(GridCells, _draggingCell.CollisionLayer, _draggingCell,
+                bool hasCollision = GridLayoutService.HasLayerCollision(GridCells, LayerManager.ResolveLayer(_draggingCell)!, _draggingCell,
                         _draggingCell.CanvasX, _draggingCell.CanvasY,
                         _draggingCell.ColSpan, _draggingCell.RowSpan);
                 if (hasCollision)
@@ -484,7 +485,7 @@ public partial class MainWindow
         int newCols = Math.Max(1, (int)Math.Round((pt.X - _resizingCell.CanvasX) / Constants.GridSize));
         int newRows = Math.Max(1, (int)Math.Round((pt.Y - _resizingCell.CanvasY) / Constants.GridSize));
 
-        bool collision = GridLayoutService.HasLayerCollision(GridCells, _resizingCell.CollisionLayer, _resizingCell,
+        bool collision = GridLayoutService.HasLayerCollision(GridCells, LayerManager.ResolveLayer(_resizingCell)!, _resizingCell,
             _resizingCell.CanvasX, _resizingCell.CanvasY, newCols, newRows);
 
         _resizingCell.IsDragInvalid = collision;
@@ -497,7 +498,7 @@ public partial class MainWindow
         if (_isResizing && sender is Control && _resizingCell != null)
         {
             // Check for collision and revert if needed
-            bool collision = GridLayoutService.HasLayerCollision(GridCells, _resizingCell.CollisionLayer, _resizingCell,
+            bool collision = GridLayoutService.HasLayerCollision(GridCells, LayerManager.ResolveLayer(_resizingCell)!, _resizingCell,
                 _resizingCell.CanvasX, _resizingCell.CanvasY, _resizingCell.ColSpan, _resizingCell.RowSpan);
 
             if (collision)
