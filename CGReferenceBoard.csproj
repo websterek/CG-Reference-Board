@@ -9,11 +9,6 @@
     <ApplicationIcon>Images/icon.ico</ApplicationIcon>
   </PropertyGroup>
 
-  <!-- Avalonia preview feed for XDND fix (PR #20926) -->
-  <ItemGroup>
-    <PackageSource Include="https://nuget-feed-all.avaloniaui.net/v3/index.json" />
-  </ItemGroup>
-
   <ItemGroup>
     <AvaloniaResource Include="Images\**\*" />
   </ItemGroup>
@@ -27,12 +22,6 @@
     <PackageReference Include="YoutubeDLSharp" Version="1.2.0" />
     <!-- MVVM infrastructure -->
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-    <!--
-      TODO (SukiUI): SukiUI 6.0.3 declares a hard dependency on Avalonia 11.3.4 and is NOT
-      compatible with this project's Avalonia 12.0.999-cibuild0064469-alpha build.
-      Re-evaluate when SukiUI publishes an Avalonia 12-compatible release.
-      Track: https://github.com/kikipoulet/SukiUI/releases
-    -->
   </ItemGroup>
 
   <!-- No RID specified (dotnet run / IDE debug): include all binaries so both platforms work locally -->

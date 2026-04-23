@@ -66,7 +66,7 @@
     <!-- ═══════════════════════════════════════════════════════════ -->
     <!-- Window Control Buttons                                     -->
     <!-- ═══════════════════════════════════════════════════════════ -->
-    <Style Selector="Button.windowBtn">
+    <Style Selector="Button.windowBtn, Button.windowBtnClose">
         <Setter Property="Width" Value="46" />
         <Setter Property="Height" Value="32" />
         <Setter Property="Background" Value="Transparent" />
@@ -83,22 +83,6 @@
     </Style>
     <Style Selector="Button.windowBtn:pointerover">
         <Setter Property="Background" Value="#33FFFFFF" />
-    </Style>
-
-    <Style Selector="Button.windowBtnClose">
-        <Setter Property="Width" Value="46" />
-        <Setter Property="Height" Value="32" />
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="Foreground" Value="{StaticResource TextDimmed}" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="CornerRadius" Value="0" />
-        <Setter Property="HorizontalContentAlignment" Value="Center" />
-        <Setter Property="VerticalContentAlignment" Value="Center" />
-        <Setter Property="Transitions">
-            <Transitions>
-                <BrushTransition Property="Background" Duration="0:0:0.1" />
-            </Transitions>
-        </Setter>
     </Style>
     <Style Selector="Button.windowBtnClose:pointerover">
         <Setter Property="Background" Value="#E81123" />

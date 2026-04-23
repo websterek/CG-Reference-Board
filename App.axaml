@@ -7,25 +7,10 @@
     <Application.Resources>
         <!-- ═══ Accent Color System ═══ -->
         <Color x:Key="AccentColor">#44AAFF</Color>
-        <Color x:Key="AccentColorLight">#66BBFF</Color>
-        <Color x:Key="AccentColorDark">#2288DD</Color>
-        <Color x:Key="AccentColorDim">#1144AAFF</Color>
 
         <SolidColorBrush
             x:Key="AccentBrush"
             Color="{StaticResource AccentColor}"
-        />
-        <SolidColorBrush
-            x:Key="AccentBrushLight"
-            Color="{StaticResource AccentColorLight}"
-        />
-        <SolidColorBrush
-            x:Key="AccentBrushDark"
-            Color="{StaticResource AccentColorDark}"
-        />
-        <SolidColorBrush
-            x:Key="AccentBrushDim"
-            Color="{StaticResource AccentColorDim}"
         />
 
         <!-- ═══ Surface Colors ═══ -->
@@ -85,7 +70,6 @@
 
         <!-- ═══ Cell UI Constants ═══ -->
         <CornerRadius x:Key="CellCornerRadius">0</CornerRadius>
-        <x:Double x:Key="CellBorderThickness">2.0</x:Double>
 
         <!-- Cell hover: visible but subtle -->
         <Color x:Key="CellHoverBorderColor">#6088AAFF</Color>
