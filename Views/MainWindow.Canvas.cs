@@ -83,12 +83,12 @@ public partial class MainWindow
 
     private void MainCanvas_PointerEntered(object? sender, PointerEventArgs e)
     {
-        IsPointerOverCanvas = true;
+        Vm.IsPointerOverCanvas = true;
     }
 
     private void MainCanvas_PointerExited(object? sender, PointerEventArgs e)
     {
-        IsPointerOverCanvas = false;
+        Vm.IsPointerOverCanvas = false;
         var brushCircle = this.FindControl<Ellipse>("BrushCursorCircle");
         if (brushCircle != null)
             brushCircle.IsVisible = false;
@@ -134,7 +134,7 @@ public partial class MainWindow
         }
 
         // Annotation mode: Eraser
-        if (IsDrawMode && IsEraserMode && !e.Handled && props.IsLeftButtonPressed && !props.IsMiddleButtonPressed)
+        if (Vm.IsDrawMode && Vm.IsEraserMode && !e.Handled && props.IsLeftButtonPressed && !props.IsMiddleButtonPressed)
         {
             EraseIntersectingAnnotations(e.GetPosition(mainCanvas));
             e.Pointer.Capture(sender as IInputElement);
@@ -142,7 +142,7 @@ public partial class MainWindow
         }
 
         // Annotation mode: Move/Select
-        if (IsDrawMode && IsMoveMode && !e.Handled && props.IsLeftButtonPressed)
+        if (Vm.IsDrawMode && Vm.IsMoveMode && !e.Handled && props.IsLeftButtonPressed)
         {
             _selectionAdditive = e.KeyModifiers.HasFlag(KeyModifiers.Control);
             _isSelectingAnnotations = true;
@@ -161,7 +161,7 @@ public partial class MainWindow
             if (!_selectionAdditive)
             {
                 _selectedAnnotations.Clear();
-                foreach (var a in Annotations)
+                foreach (var a in Vm.Annotations)
                     a.IsSelected = false;
             }
             e.Pointer.Capture(sender as IInputElement);
@@ -169,20 +169,20 @@ public partial class MainWindow
         }
 
         // Annotation mode: Draw new annotation
-        if (IsDrawMode && !IsEraserMode && !IsMoveMode && !e.Handled && props.IsLeftButtonPressed)
+        if (Vm.IsDrawMode && !Vm.IsEraserMode && !Vm.IsMoveMode && !e.Handled && props.IsLeftButtonPressed)
         {
             _currentAnnotation = new AnnotationViewModel
             {
-                Type = CurrentTool,
-                Color = CurrentBrushColor,
-                Thickness = CurrentBrushThickness,
+                Type = Vm.CurrentTool,
+                Color = Vm.CurrentBrushColor,
+                Thickness = Vm.CurrentBrushThickness,
                 IsInDrawMode = true
             };
 
             var pt = e.GetPosition(mainCanvas);
             _currentAnnotation.Points.Add(pt);
 
-            if (CurrentTool == "Text")
+            if (Vm.CurrentTool == "Text")
             {
                 _currentAnnotation.Text = "";
                 _editingTextAnnotation = _currentAnnotation;
@@ -206,7 +206,7 @@ public partial class MainWindow
                 }
             }
 
-            Annotations.Add(_currentAnnotation);
+            Vm.Annotations.Add(_currentAnnotation);
             e.Pointer.Capture(sender as IInputElement);
             return;
         }
@@ -230,7 +230,7 @@ public partial class MainWindow
             _panStartPoint = e.GetPosition(this);
         }
         // Left-click on empty canvas space: start cell marquee selection
-        else if (!e.Handled && props.IsLeftButtonPressed && !IsDrawMode)
+        else if (!e.Handled && props.IsLeftButtonPressed && !Vm.IsDrawMode)
         {
             _selectionAdditive = e.KeyModifiers.HasFlag(KeyModifiers.Control);
             if (!_selectionAdditive)
@@ -272,11 +272,11 @@ public partial class MainWindow
         var brushCircle = _cachedBrushCursorCircle ?? this.FindControl<Ellipse>("BrushCursorCircle");
         if (brushCircle != null)
         {
-            bool showCircle = IsDrawMode && (CurrentTool == "Brush" || CurrentTool == "Arrow" || CurrentTool == "Rectangle" || CurrentTool == "Ellipse");
+            bool showCircle = Vm.IsDrawMode && (Vm.CurrentTool == "Brush" || Vm.CurrentTool == "Arrow" || Vm.CurrentTool == "Rectangle" || Vm.CurrentTool == "Ellipse");
             brushCircle.IsVisible = showCircle;
             if (showCircle)
             {
-                double sizeInScreen = CurrentBrushThickness * _scale.ScaleX;
+                double sizeInScreen = Vm.CurrentBrushThickness * _scale.ScaleX;
                 brushCircle.Width = sizeInScreen;
                 brushCircle.Height = sizeInScreen;
                 Canvas.SetLeft(brushCircle, _lastPointerPosition.X - sizeInScreen / 2.0);
@@ -292,7 +292,7 @@ public partial class MainWindow
         }
 
         // Eraser drag
-        if (IsDrawMode && IsEraserMode
+        if (Vm.IsDrawMode && Vm.IsEraserMode
             && e.GetCurrentPoint(this).Properties.IsLeftButtonPressed
             && !e.GetCurrentPoint(this).Properties.IsMiddleButtonPressed)
         {
@@ -321,7 +321,7 @@ public partial class MainWindow
         {
             StartEdgeScrollIfNeeded(_lastPointerPosition);
 
-            if (IsDrawMode)
+            if (Vm.IsDrawMode)
             {
                 double dx = pt.X - _annotationDragStart.X;
                 double dy = pt.Y - _annotationDragStart.Y;
@@ -348,7 +348,7 @@ public partial class MainWindow
                     if (_annotationDragCellOriginals != null && _annotationDragCellOriginals.Count > 0)
                     {
                         var cellsToMove = _annotationDragCellOriginals.Select(x => x.Cell).ToList();
-                        collision = GridLayoutService.HasGroupCollision(GridCells, cellsToMove, LayerManager, dx, dy);
+                        collision = GridLayoutService.HasGroupCollision(Vm.GridCells, cellsToMove, Vm.LayerManager, dx, dy);
                         foreach (var (c, _, _) in _annotationDragCellOriginals)
                         {
                             c.IsDragInvalid = collision;
@@ -432,7 +432,7 @@ public partial class MainWindow
             hoverHighlight.Width = Constants.GridSize;
             hoverHighlight.Height = Constants.GridSize;
             hoverHighlight.IsVisible = !(_isPanning || _isDraggingCell || _isResizing
-                                         || _isPointerDown || existingContent != null || IsDrawMode);
+                                         || _isPointerDown || existingContent != null || Vm.IsDrawMode);
         }
 
         // Nuke-style drag-to-zoom
@@ -538,7 +538,7 @@ public partial class MainWindow
         // Stop edge scrolling when mouse is released
         StopEdgeScroll();
 
-        if (IsEraserMode)
+        if (Vm.IsEraserMode)
             e.Pointer.Capture(null);
 
         // Finish annotation marquee selection
@@ -559,11 +559,11 @@ public partial class MainWindow
                 if (!_selectionAdditive)
                 {
                     _selectedAnnotations.Clear();
-                    foreach (var ann in Annotations)
+                    foreach (var ann in Vm.Annotations)
                         ann.IsSelected = false;
                 }
 
-                foreach (var ann in Annotations)
+                foreach (var ann in Vm.Annotations)
                 {
                     bool inRect = ann.Points.Any(p =>
                     {
@@ -591,18 +591,18 @@ public partial class MainWindow
             {
                 _isAltDuplicateDrag = false;
                 e.Pointer.Capture(null);
-                MarkUnsaved();
-                SaveBoardData();
+                Vm.MarkUnsaved();
+                Vm.SaveBoardData();
                 return;
             }
 
-            if (!IsDrawMode && _annotationDragCellOriginals != null && _annotationDragCellOriginals.Count > 0)
+            if (!Vm.IsDrawMode && _annotationDragCellOriginals != null && _annotationDragCellOriginals.Count > 0)
             {
                 bool hasCollision = false;
 
                 foreach (var (c, startX, startY) in _annotationDragCellOriginals)
                 {
-                    if (GridLayoutService.HasLayerCollision(GridCells, LayerManager.ResolveLayer(c)!, c, c.CanvasX, c.CanvasY, c.ColSpan, c.RowSpan))
+                    if (GridLayoutService.HasLayerCollision(Vm.GridCells, Vm.LayerManager.ResolveLayer(c)!, c, c.CanvasX, c.CanvasY, c.ColSpan, c.RowSpan))
                     {
                         hasCollision = true;
                         break;
@@ -637,8 +637,8 @@ public partial class MainWindow
             }
 
             e.Pointer.Capture(null);
-            MarkUnsaved();
-            SaveBoardData();
+            Vm.MarkUnsaved();
+            Vm.SaveBoardData();
             return;
         }
 
@@ -647,8 +647,8 @@ public partial class MainWindow
         {
             _currentAnnotation = null;
             e.Pointer.Capture(null);
-            MarkUnsaved();
-            SaveBoardData();
+            Vm.MarkUnsaved();
+            Vm.SaveBoardData();
             return;
         }
 
@@ -672,14 +672,14 @@ public partial class MainWindow
                     if (!_selectionAdditive)
                     {
                         _selectedCells.Clear();
-                        foreach (var cell in GridCells)
+                        foreach (var cell in Vm.GridCells)
                             cell.IsSelected = false;
                         _selectedAnnotations.Clear();
-                        foreach (var ann in Annotations)
+                        foreach (var ann in Vm.Annotations)
                             ann.IsSelected = false;
                     }
 
-                    foreach (var cell in GridCells)
+                    foreach (var cell in Vm.GridCells)
                     {
                         if (!cell.HasContent)
                             continue;
@@ -699,7 +699,7 @@ public partial class MainWindow
                     }
 
                     // Also select annotations in grid mode
-                    foreach (var ann in Annotations)
+                    foreach (var ann in Vm.Annotations)
                     {
                         if (ann.Points.Count == 0)
                             continue;
@@ -799,7 +799,7 @@ public partial class MainWindow
 
     private void ShowAll_Click(object? sender, RoutedEventArgs e)
     {
-        if (GridCells.Count == 0 && Annotations.Count == 0)
+        if (Vm.GridCells.Count == 0 && Vm.Annotations.Count == 0)
         {
             _translate.X = 0;
             _translate.Y = 0;
@@ -813,7 +813,7 @@ public partial class MainWindow
         double minX = double.MaxValue, minY = double.MaxValue;
         double maxX = double.MinValue, maxY = double.MinValue;
 
-        foreach (var cell in GridCells)
+        foreach (var cell in Vm.GridCells)
         {
             if (cell.CanvasX < minX)
                 minX = cell.CanvasX;
@@ -825,7 +825,7 @@ public partial class MainWindow
                 maxY = cell.CanvasY + cell.PixelHeight;
         }
 
-        foreach (var ann in Annotations)
+        foreach (var ann in Vm.Annotations)
         {
             if (ann != null)
             {

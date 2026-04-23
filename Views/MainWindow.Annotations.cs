@@ -25,7 +25,7 @@ public partial class MainWindow
 
     private void EraseIntersectingAnnotations(Point pt)
     {
-        var toRemove = Annotations.Where(ann =>
+        var toRemove = Vm.Annotations.Where(ann =>
         {
             double threshold = Math.Max(15, ann.Thickness / 2 + 5);
             if (ann.Points.Count == 0)
@@ -69,18 +69,18 @@ public partial class MainWindow
             return;
 
         foreach (var ann in toRemove)
-            Annotations.Remove(ann);
-        MarkUnsaved();
-        SaveBoardData();
+            Vm.Annotations.Remove(ann);
+        Vm.MarkUnsaved();
+        Vm.SaveBoardData();
     }
 
     private void Annotation_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (_isViewMode || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        if (Vm.IsViewMode || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             return;
 
         // Grid mode: handle Ctrl+click to deselect selected annotations
-        if (!IsDrawMode && sender is Control { DataContext: AnnotationViewModel annGrid })
+        if (!Vm.IsDrawMode && sender is Control { DataContext: AnnotationViewModel annGrid })
         {
             bool isCtrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
             
@@ -110,11 +110,11 @@ public partial class MainWindow
             return;
         }
 
-        if (!IsDrawMode)
+        if (!Vm.IsDrawMode)
             return;
 
         // Move mode: select and drag annotation
-        if (IsMoveMode && sender is Control { DataContext: AnnotationViewModel annMove })
+        if (Vm.IsMoveMode && sender is Control { DataContext: AnnotationViewModel annMove })
         {
             bool isCtrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
             bool isAlt = e.KeyModifiers.HasFlag(KeyModifiers.Alt);
@@ -137,7 +137,7 @@ public partial class MainWindow
                     duplicate.Points.Add(pt);
                 duplicate.UpdateBoundsCache();
 
-                Annotations.Add(duplicate);
+                Vm.Annotations.Add(duplicate);
 
                 ClearSelection();
                 _selectedAnnotations.Add(duplicate);
@@ -166,7 +166,7 @@ public partial class MainWindow
             else if (!_selectedAnnotations.Contains(annMove))
             {
                 _selectedAnnotations.Clear();
-                foreach (var a in Annotations)
+                foreach (var a in Vm.Annotations)
                     a.IsSelected = false;
                 _selectedAnnotations.Add(annMove);
                 annMove.IsSelected = true;
@@ -182,17 +182,17 @@ public partial class MainWindow
         }
 
         // Eraser mode: delete clicked annotation
-        if (IsEraserMode && sender is Control { DataContext: AnnotationViewModel ann })
+        if (Vm.IsEraserMode && sender is Control { DataContext: AnnotationViewModel ann })
         {
-            Annotations.Remove(ann);
-            MarkUnsaved();
-            SaveBoardData();
+            Vm.Annotations.Remove(ann);
+            Vm.MarkUnsaved();
+            Vm.SaveBoardData();
             e.Handled = true;
             return;
         }
 
         // Text tool: edit existing text annotation
-        if (CurrentTool == "Text"
+        if (Vm.CurrentTool == "Text"
             && sender is Control { DataContext: AnnotationViewModel { Type: "Text" } annText })
         {
             _editingTextAnnotation = annText;
@@ -252,7 +252,7 @@ public partial class MainWindow
         }
 
         if (_editingTextAnnotationOriginalText == null)
-            Annotations.Remove(_editingTextAnnotation);
+            Vm.Annotations.Remove(_editingTextAnnotation);
         else
             _editingTextAnnotation.Text = _editingTextAnnotationOriginalText;
 
@@ -277,12 +277,12 @@ public partial class MainWindow
         }
 
         if (string.IsNullOrWhiteSpace(_editingTextAnnotation.Text))
-            Annotations.Remove(_editingTextAnnotation);
+            Vm.Annotations.Remove(_editingTextAnnotation);
 
         _editingTextAnnotation = null;
         _editingTextAnnotationOriginalText = null;
-        MarkUnsaved();
-        SaveBoardData();
+        Vm.MarkUnsaved();
+        Vm.SaveBoardData();
 
         this.FindControl<Border>("CanvasBorder")?.Focus();
     }
@@ -303,7 +303,7 @@ public partial class MainWindow
     /// </summary>
     private void DeleteSelection_Click(object? sender, RoutedEventArgs e)
     {
-        if (_isViewMode)
+        if (Vm.IsViewMode)
             return;
 
         bool anyDeleted = false;
@@ -314,7 +314,7 @@ public partial class MainWindow
             foreach (var cell in _selectedCells.ToList())
             {
                 cell.Clear();
-                GridCells.Remove(cell);
+                Vm.GridCells.Remove(cell);
             }
             _selectedCells.Clear();
             _hoveredCell = null;
@@ -325,7 +325,7 @@ public partial class MainWindow
         if (_selectedAnnotations.Count > 0)
         {
             foreach (var ann in _selectedAnnotations.ToList())
-                Annotations.Remove(ann);
+                Vm.Annotations.Remove(ann);
             _selectedAnnotations.Clear();
             anyDeleted = true;
         }
@@ -333,36 +333,36 @@ public partial class MainWindow
         // If nothing was selected, delete the right-clicked annotation
         if (!anyDeleted && sender is MenuItem { DataContext: AnnotationViewModel clickedAnn })
         {
-            Annotations.Remove(clickedAnn);
+            Vm.Annotations.Remove(clickedAnn);
             anyDeleted = true;
         }
 
         if (anyDeleted)
         {
             UpdateSelectionState();
-            MarkUnsaved();
-            SaveBoardData();
+            Vm.MarkUnsaved();
+            Vm.SaveBoardData();
             ShowToast("🗑 Deleted");
         }
     }
 
     private void AnnotationEffectNone_Click(object? sender, RoutedEventArgs e)
-        => AnnotationEffectMode = "None";
+        => Vm.AnnotationEffectMode = "None";
 
     private void AnnotationEffectShadow_Click(object? sender, RoutedEventArgs e)
-        => AnnotationEffectMode = "Shadow";
+        => Vm.AnnotationEffectMode = "Shadow";
 
     private void AnnotationEffectOutline_Click(object? sender, RoutedEventArgs e)
-        => AnnotationEffectMode = "Outline";
+        => Vm.AnnotationEffectMode = "Outline";
 
     private void GridBackgroundDots_Click(object? sender, RoutedEventArgs e)
-        => GridBackgroundMode = "Dots";
+        => Vm.GridBackgroundMode = "Dots";
 
     private void GridBackgroundGrid_Click(object? sender, RoutedEventArgs e)
-        => GridBackgroundMode = "Grid";
+        => Vm.GridBackgroundMode = "Grid";
 
     private void GridBackgroundNone_Click(object? sender, RoutedEventArgs e)
-        => GridBackgroundMode = "None";
+        => Vm.GridBackgroundMode = "None";
 
     #endregion
 
@@ -370,14 +370,14 @@ public partial class MainWindow
 
     /// <summary>
     /// Brings the specified annotations to the front of the rendering order
-    /// by moving them to the end of the Annotations collection.
+    /// by moving them to the end of the Vm.Annotations collection.
     /// </summary>
     private void BringToFront(IEnumerable<AnnotationViewModel> annotations)
     {
         foreach (var a in annotations.ToList())
         {
-            Annotations.Remove(a);
-            Annotations.Add(a);
+            Vm.Annotations.Remove(a);
+            Vm.Annotations.Add(a);
         }
     }
 

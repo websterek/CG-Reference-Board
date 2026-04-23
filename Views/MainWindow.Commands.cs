@@ -75,7 +75,7 @@ public partial class MainWindow
         if (!await ConfirmDiscardChanges())
             return;
         // Set flag so OnWindowClosing does not show a second prompt.
-        _closingConfirmed = true;
+        Vm.ClosingConfirmed = true;
         Close();
     }
 
@@ -92,10 +92,10 @@ public partial class MainWindow
 
     #region Menu Click Handlers
 
-    private void Undo_Click(object? sender, RoutedEventArgs e) => Undo();
-    private void Redo_Click(object? sender, RoutedEventArgs e) => Redo();
-    private void GridMode_Click(object? sender, RoutedEventArgs e) => IsDrawMode = false;
-    private void AnnotationMode_Click(object? sender, RoutedEventArgs e) => IsDrawMode = true;
+    private void Undo_Click(object? sender, RoutedEventArgs e) => Vm.UndoCommand.Execute(null);
+    private void Redo_Click(object? sender, RoutedEventArgs e) => Vm.RedoCommand.Execute(null);
+    private void GridMode_Click(object? sender, RoutedEventArgs e) => Vm.ModeService.SetMode("Grid");
+    private void AnnotationMode_Click(object? sender, RoutedEventArgs e) => Vm.ModeService.SetMode("Annotation");
     private void Exit_Click(object? sender, RoutedEventArgs e) => Close();
 
     private async void SaveBoard_Click(object? sender, RoutedEventArgs e)
@@ -117,21 +117,16 @@ public partial class MainWindow
         if (file == null)
             return;
 
-        _currentBoardFile = file.Path.LocalPath;
-        _workspaceDir = Path.GetDirectoryName(_currentBoardFile)!;
-        CurrentBoardName = Path.GetFileNameWithoutExtension(_currentBoardFile);
-        OnPropertyChanged(nameof(WindowTitle));
-        UpdateBoardDirectoryList();
+        Vm.SetBoardFilePath(file.Path.LocalPath);
 
-        Directory.CreateDirectory(Path.Combine(_workspaceDir, "images"));
-        Directory.CreateDirectory(Path.Combine(_workspaceDir, "videos"));
+        Directory.CreateDirectory(Path.Combine(Vm.WorkspaceDir, "images"));
+        Directory.CreateDirectory(Path.Combine(Vm.WorkspaceDir, "videos"));
 
         var startupOverlay = this.FindControl<Border>("StartupOverlay");
         if (startupOverlay != null)
             startupOverlay.IsVisible = false;
 
-        OnPropertyChanged(nameof(WindowTitle));
-        SaveBoardData();
+        Vm.SaveBoardData();
         ShowToast("💾 Saved");
     }
 
@@ -154,7 +149,7 @@ public partial class MainWindow
             var emptyBoard = BoardSerializer.Serialize([], []);
             await File.WriteAllTextAsync(boardPath, emptyBoard);
 
-            LoadBoardFromFile(boardPath);
+            Vm.LoadBoardFromFile(boardPath);
             ShowToast("💾 Database created");
         }
     }
@@ -181,7 +176,7 @@ public partial class MainWindow
 
         if (files is { Count: > 0 })
         {
-            LoadBoardFromFile(files[0].Path.LocalPath);
+            Vm.LoadBoardFromFile(files[0].Path.LocalPath);
             ShowToast("📂 Opened");
         }
     }
@@ -191,7 +186,7 @@ public partial class MainWindow
         if (!await ConfirmDiscardChanges())
             return;
 
-        if (string.IsNullOrEmpty(_workspaceDir) || !Directory.Exists(_workspaceDir))
+        if (string.IsNullOrEmpty(Vm.WorkspaceDir) || !Directory.Exists(Vm.WorkspaceDir))
         {
             ShowToast("⚠️ Open a board first to create new boards");
             return;
@@ -206,7 +201,7 @@ public partial class MainWindow
             if (!boardName.EndsWith(Constants.DefaultBoardExtension))
                 boardName += Constants.DefaultBoardExtension;
 
-            var boardPath = Path.Combine(_workspaceDir, boardName);
+            var boardPath = Path.Combine(Vm.WorkspaceDir, boardName);
 
             if (File.Exists(boardPath))
             {
@@ -217,7 +212,7 @@ public partial class MainWindow
             var emptyBoard = BoardSerializer.Serialize([], []);
             await File.WriteAllTextAsync(boardPath, emptyBoard);
 
-            LoadBoardFromFile(boardPath);
+            Vm.LoadBoardFromFile(boardPath);
             ShowToast("📄 Board created");
         }
     }
@@ -236,7 +231,7 @@ public partial class MainWindow
             return;
 
         // #1: release all loaded bitmaps so they are not leaked.
-        foreach (var cell in GridCells)
+        foreach (var cell in Vm.GridCells)
             cell.UnloadImage();
         ImageManager.ClearCaches();
 
@@ -247,24 +242,18 @@ public partial class MainWindow
         _selectedAnnotations.Clear();
         _currentAnnotation = null;
         _editingTextAnnotation = null;
-        _undoStack.Clear();
-        _redoStack.Clear();
-        _lastStateHash = null;
 
-        GridCells.Clear();
-        Annotations.Clear();
+        Vm.GridCells.Clear();
+        Vm.Annotations.Clear();
 
-        _currentBoardFile = "";
-        CurrentBoardName = "New Board";
-        _hasUnsavedChanges = false;
+        Vm.CurrentBoardName = "New Board";
         Title = Constants.AppName;
-        UpdateBoardDirectoryList();
+        Vm.UpdateBoardDirectoryList();
 
         var startupOverlay = this.FindControl<Border>("StartupOverlay");
         if (startupOverlay != null)
             startupOverlay.IsVisible = false;
 
-        OnPropertyChanged(nameof(WindowTitle));
         ShowToast("📄 New Board");
         ShowAll_Click(null, null!);
     }
@@ -296,7 +285,7 @@ public partial class MainWindow
         {
             int x = startX, y = startY;
 
-            while (GridCells.Any(c => (int)c.CanvasX == x && (int)c.CanvasY == y))
+            while (Vm.GridCells.Any(c => (int)c.CanvasX == x && (int)c.CanvasY == y))
             {
                 x += (int)Constants.GridSize;
                 if (x > 1600)
@@ -304,24 +293,24 @@ public partial class MainWindow
             }
 
             var cell = new CellViewModel { CanvasX = x, CanvasY = y };
-            GridCells.Add(cell);
+            Vm.GridCells.Add(cell);
             HighlightCell(cell);
 
             string ext = Path.GetExtension(file.Path.LocalPath).ToLowerInvariant();
             if (videoExtensions.Contains(ext))
             {
-                string destDir = Path.Combine(_workspaceDir, "videos");
+                string destDir = Path.Combine(Vm.WorkspaceDir, "videos");
                 Directory.CreateDirectory(destDir);
                 string destPath = Path.Combine(destDir, Path.GetFileName(file.Path.LocalPath));
                 if (file.Path.LocalPath != destPath && !File.Exists(destPath))
                     File.Copy(file.Path.LocalPath, destPath);
 
                 // Try to extract a thumbnail frame via ffmpeg
-                string thumbDir = Path.Combine(_workspaceDir, "images");
+                string thumbDir = Path.Combine(Vm.WorkspaceDir, "images");
                 string? thumbPath = await YtDlpService.ExtractThumbnailAsync(destPath, thumbDir);
                 cell.SetVideo(destPath, thumbPath ?? destPath);
-                MarkUnsaved();
-                SaveBoardData();
+                Vm.MarkUnsaved();
+                Vm.SaveBoardData();
             }
             else
             {
@@ -332,18 +321,16 @@ public partial class MainWindow
     }
 
     private void BoardDir_Click(object? sender, RoutedEventArgs e)
-        => PlatformHelper.OpenDirectory(_workspaceDir);
+        => PlatformHelper.OpenDirectory(Vm.WorkspaceDir);
 
     private void BoardMenuItem_Click(object? sender, RoutedEventArgs e)
     {
         if (e.Source is MenuItem item && item.DataContext is BoardMenuItemViewModel vm)
         {
-            var path = Path.Combine(_workspaceDir, vm.FileName);
+            var path = Path.Combine(Vm.WorkspaceDir, vm.FileName);
             if (File.Exists(path))
             {
-                _currentBoardFile = path;
-                CurrentBoardName = Path.GetFileNameWithoutExtension(path);
-                LoadBoardFromFile(path);
+                Vm.LoadBoardFromFile(path);
                 ShowToast("📂 Opened");
             }
         }
@@ -353,7 +340,7 @@ public partial class MainWindow
     {
         if (sender is Button btn && btn.DataContext is string path)
         {
-            LoadBoardFromFile(path);
+            Vm.LoadBoardFromFile(path);
             ShowToast("📂 Opened");
         }
     }
@@ -363,25 +350,25 @@ public partial class MainWindow
     #region Annotation Tool Mode Handlers
 
     private void BrushMode_Click(object? sender, RoutedEventArgs e)
-    { CurrentTool = "Brush"; }
+    { Vm.ModeService.AnnotationMode.CurrentTool = "Brush"; }
 
     private void TextMode_Click(object? sender, RoutedEventArgs e)
-    { CurrentTool = "Text"; }
+    { Vm.ModeService.AnnotationMode.CurrentTool = "Text"; }
 
     private void ArrowMode_Click(object? sender, RoutedEventArgs e)
-    { CurrentTool = "Arrow"; }
+    { Vm.ModeService.AnnotationMode.CurrentTool = "Arrow"; }
 
     private void SquareMode_Click(object? sender, RoutedEventArgs e)
-    { CurrentTool = "Rectangle"; }
+    { Vm.ModeService.AnnotationMode.CurrentTool = "Rectangle"; }
 
     private void CircleMode_Click(object? sender, RoutedEventArgs e)
-    { CurrentTool = "Ellipse"; }
+    { Vm.ModeService.AnnotationMode.CurrentTool = "Ellipse"; }
 
     private void EraserMode_Click(object? sender, RoutedEventArgs e)
-    { CurrentTool = "Eraser"; }
+    { Vm.ModeService.AnnotationMode.CurrentTool = "Eraser"; }
 
     private void MoveMode_Click(object? sender, RoutedEventArgs e)
-    { CurrentTool = "Move"; }
+    { Vm.ModeService.AnnotationMode.CurrentTool = "Move"; }
 
     #endregion
 
@@ -498,8 +485,8 @@ public partial class MainWindow
             cell.ForegroundColor = Constants.LabelForegroundColors[(idx + 1) % Constants.LabelForegroundColors.Length];
         }
 
-        MarkUnsaved();
-        SaveBoardData();
+        Vm.MarkUnsaved();
+        Vm.SaveBoardData();
     }
 
     private void ToggleImageFit_Click(object? sender, RoutedEventArgs e)
@@ -507,8 +494,8 @@ public partial class MainWindow
         if (sender is MenuItem { DataContext: CellViewModel { IsImage: true } cell })
         {
             cell.ImageStretch = cell.ImageStretch == "UniformToFill" ? "Uniform" : "UniformToFill";
-            MarkUnsaved();
-            SaveBoardData();
+            Vm.MarkUnsaved();
+            Vm.SaveBoardData();
         }
     }
 
@@ -517,8 +504,8 @@ public partial class MainWindow
         if (sender is MenuItem { DataContext: CellViewModel { IsLabel: true } cell })
         {
             cell.FontSize += 8;
-            MarkUnsaved();
-            SaveBoardData();
+            Vm.MarkUnsaved();
+            Vm.SaveBoardData();
         }
     }
 
@@ -527,8 +514,8 @@ public partial class MainWindow
         if (sender is MenuItem { DataContext: CellViewModel { IsLabel: true } cell } && cell.FontSize > 16)
         {
             cell.FontSize -= 8;
-            MarkUnsaved();
-            SaveBoardData();
+            Vm.MarkUnsaved();
+            Vm.SaveBoardData();
         }
     }
 
@@ -547,7 +534,7 @@ public partial class MainWindow
 
         var (newColSpan, newRowSpan) = GridLayoutService.CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height);
 
-        if (!GridLayoutService.IsSpaceEmpty(GridCells, cell.CanvasX, cell.CanvasY, newColSpan, newRowSpan, LayerManager.ResolveLayer(cell)!, excludeCell: cell))
+        if (!GridLayoutService.IsSpaceEmpty(Vm.GridCells, cell.CanvasX, cell.CanvasY, newColSpan, newRowSpan, Vm.LayerManager.ResolveLayer(cell)!, excludeCell: cell))
         {
             ShakeScreen();
             return;
@@ -556,13 +543,13 @@ public partial class MainWindow
         cell.ColSpan = newColSpan;
         cell.RowSpan = newRowSpan;
 
-        MarkUnsaved();
-        SaveBoardData();
+        Vm.MarkUnsaved();
+        Vm.SaveBoardData();
     }
 
     private void DeleteCell_Click(object? sender, RoutedEventArgs e)
     {
-        if (_isViewMode)
+        if (Vm.IsViewMode)
             return;
 
         bool anyDeleted = false;
@@ -574,7 +561,7 @@ public partial class MainWindow
             {
                 cell.Dispose();
                 cell.Clear();
-                GridCells.Remove(cell);
+                Vm.GridCells.Remove(cell);
             }
             _selectedCells.Clear();
             _hoveredCell = null;
@@ -585,7 +572,7 @@ public partial class MainWindow
         if (_selectedAnnotations.Count > 0)
         {
             foreach (var ann in _selectedAnnotations.ToList())
-                Annotations.Remove(ann);
+                Vm.Annotations.Remove(ann);
             _selectedAnnotations.Clear();
             anyDeleted = true;
         }
@@ -595,15 +582,15 @@ public partial class MainWindow
         {
             clickedCell.Dispose();
             clickedCell.Clear();
-            GridCells.Remove(clickedCell);
+            Vm.GridCells.Remove(clickedCell);
             anyDeleted = true;
         }
 
         if (anyDeleted)
         {
             UpdateSelectionState();
-            MarkUnsaved();
-            SaveBoardData();
+            Vm.MarkUnsaved();
+            Vm.SaveBoardData();
             ShowToast("🗑 Deleted");
         }
     }
@@ -614,7 +601,7 @@ public partial class MainWindow
 
     private void AddText_Click(object? sender, RoutedEventArgs e)
     {
-        if (_isViewMode)
+        if (Vm.IsViewMode)
             return;
         var hoverHighlight = this.FindControl<Border>("HoverHighlight");
         if (hoverHighlight == null)
@@ -624,9 +611,9 @@ public partial class MainWindow
         double y = Canvas.GetTop(hoverHighlight);
 
         // Check for collisions and find an empty slot, just like AddBackdrop does.
-        Point? pos = GridLayoutService.IsSpaceEmpty(GridCells, x, y, 2, 2, LayerManager.Items)
+        Point? pos = GridLayoutService.IsSpaceEmpty(Vm.GridCells, x, y, 2, 2, Vm.LayerManager.Items)
             ? new Point(x, y)
-            : GridLayoutService.FindEmptySpace(GridCells, x, y, 2, 2, LayerManager.Items);
+            : GridLayoutService.FindEmptySpace(Vm.GridCells, x, y, 2, 2, Vm.LayerManager.Items);
 
         if (pos == null)
         {
@@ -638,15 +625,15 @@ public partial class MainWindow
         newCell.Type = CellType.Text;
         newCell.SetText("New Text Block");
 
-        GridCells.Add(newCell);
+        Vm.GridCells.Add(newCell);
         HighlightCell(newCell);
-        MarkUnsaved();
-        SaveBoardData();
+        Vm.MarkUnsaved();
+        Vm.SaveBoardData();
     }
 
     private void AddLabel_Click(object? sender, RoutedEventArgs e)
     {
-        if (_isViewMode)
+        if (Vm.IsViewMode)
             return;
         var hoverHighlight = this.FindControl<Border>("HoverHighlight");
         if (hoverHighlight == null)
@@ -656,9 +643,9 @@ public partial class MainWindow
         double y = Canvas.GetTop(hoverHighlight);
 
         // Labels use the Labels layer; check for space before placing.
-        Point? pos = GridLayoutService.IsSpaceEmpty(GridCells, x, y, 4, 2, LayerManager.Labels)
+        Point? pos = GridLayoutService.IsSpaceEmpty(Vm.GridCells, x, y, 4, 2, Vm.LayerManager.Labels)
             ? new Point(x, y)
-            : GridLayoutService.FindEmptySpace(GridCells, x, y, 4, 2, LayerManager.Labels);
+            : GridLayoutService.FindEmptySpace(Vm.GridCells, x, y, 4, 2, Vm.LayerManager.Labels);
 
         if (pos == null)
         {
@@ -680,15 +667,15 @@ public partial class MainWindow
         newCell.Type = CellType.Label;
         newCell.SetText("New Label");
 
-        GridCells.Add(newCell);
+        Vm.GridCells.Add(newCell);
         HighlightCell(newCell);
-        MarkUnsaved();
-        SaveBoardData();
+        Vm.MarkUnsaved();
+        Vm.SaveBoardData();
     }
 
     private void AddBackdrop_Click(object? sender, RoutedEventArgs e)
     {
-        if (_isViewMode)
+        if (Vm.IsViewMode)
             return;
 
         if (_selectedCells.Count > 0)
@@ -715,14 +702,14 @@ public partial class MainWindow
 
             // Check for collision and find empty space if needed
             Point? finalPosition = null;
-            if (GridLayoutService.IsSpaceEmpty(GridCells, gridX, gridY, colSpan, rowSpan, LayerManager.Backdrops))
+            if (GridLayoutService.IsSpaceEmpty(Vm.GridCells, gridX, gridY, colSpan, rowSpan, Vm.LayerManager.Backdrops))
             {
                 finalPosition = new Point(gridX, gridY);
             }
             else
             {
                 // Try to find nearby empty space
-                finalPosition = GridLayoutService.FindEmptySpace(GridCells, gridX, gridY, colSpan, rowSpan, LayerManager.Backdrops);
+                finalPosition = GridLayoutService.FindEmptySpace(Vm.GridCells, gridX, gridY, colSpan, rowSpan, Vm.LayerManager.Backdrops);
             }
 
             if (finalPosition == null)
@@ -746,10 +733,10 @@ public partial class MainWindow
                 ForegroundColor = Constants.BackdropForegroundColors[colorIdx]
             };
 
-            GridCells.Add(backdrop);
+            Vm.GridCells.Add(backdrop);
             HighlightCell(backdrop);
-            MarkUnsaved();
-            SaveBoardData();
+            Vm.MarkUnsaved();
+            Vm.SaveBoardData();
 
             // Pan view to backdrop if it was placed in a different location
             if (Math.Abs(finalPosition.Value.X - gridX) > 1 || Math.Abs(finalPosition.Value.Y - gridY) > 1)
@@ -787,7 +774,7 @@ public partial class MainWindow
             };
 
             // Show placement preview
-            ShowPlacementPreview(gridX, gridY, _pendingBackdrop.ColSpan, _pendingBackdrop.RowSpan, LayerManager.Backdrops);
+            ShowPlacementPreview(gridX, gridY, _pendingBackdrop.ColSpan, _pendingBackdrop.RowSpan, Vm.LayerManager.Backdrops);
         }
     }
 
@@ -803,7 +790,7 @@ public partial class MainWindow
         double right = left + cell.ColSpan * Constants.GridSize;
         double bottom = top + cell.RowSpan * Constants.GridSize;
 
-        foreach (var c in GridCells)
+        foreach (var c in Vm.GridCells)
         {
             if (!c.HasContent)
                 continue;
@@ -822,7 +809,7 @@ public partial class MainWindow
             }
         }
 
-        foreach (var ann in Annotations)
+        foreach (var ann in Vm.Annotations)
         {
             bool inRect = ann.Points.Any(p =>
             {
@@ -860,11 +847,11 @@ public partial class MainWindow
         double currentY = minY;
         double maxRowHeight = 0;
         int itemsInCurrentRow = 0;
-        var cellsToAvoid = GridCells.Except(sortedCells).ToList();
+        var cellsToAvoid = Vm.GridCells.Except(sortedCells).ToList();
 
         foreach (var cell in sortedCells)
         {
-            var emptySpace = GridLayoutService.FindEmptySpace(cellsToAvoid, currentX, currentY, cell.ColSpan, cell.RowSpan, LayerManager.ResolveLayer(cell)!);
+            var emptySpace = GridLayoutService.FindEmptySpace(cellsToAvoid, currentX, currentY, cell.ColSpan, cell.RowSpan, Vm.LayerManager.ResolveLayer(cell)!);
 
             if (emptySpace != null)
             {
@@ -886,9 +873,9 @@ public partial class MainWindow
             }
         }
 
-        GridLayoutService.MoveAnnotationsWithCells(Annotations, oldPositions);
-        MarkUnsaved();
-        SaveBoardData();
+        GridLayoutService.MoveAnnotationsWithCells(Vm.Annotations, oldPositions);
+        Vm.MarkUnsaved();
+        Vm.SaveBoardData();
     }
 
     private void ArrangeHorizontal_Click(object? sender, RoutedEventArgs e)
@@ -906,11 +893,11 @@ public partial class MainWindow
             oldPositions[cell] = new Point(cell.CanvasX, cell.CanvasY);
 
         double currentX = minX;
-        var cellsToAvoid = GridCells.Except(sortedCells).ToList();
+        var cellsToAvoid = Vm.GridCells.Except(sortedCells).ToList();
 
         foreach (var cell in sortedCells)
         {
-            var emptySpace = GridLayoutService.FindEmptySpace(cellsToAvoid, currentX, minY, cell.ColSpan, cell.RowSpan, LayerManager.ResolveLayer(cell)!);
+            var emptySpace = GridLayoutService.FindEmptySpace(cellsToAvoid, currentX, minY, cell.ColSpan, cell.RowSpan, Vm.LayerManager.ResolveLayer(cell)!);
 
             if (emptySpace != null)
             {
@@ -922,9 +909,9 @@ public partial class MainWindow
             currentX += cell.PixelWidth;
         }
 
-        GridLayoutService.MoveAnnotationsWithCells(Annotations, oldPositions);
-        MarkUnsaved();
-        SaveBoardData();
+        GridLayoutService.MoveAnnotationsWithCells(Vm.Annotations, oldPositions);
+        Vm.MarkUnsaved();
+        Vm.SaveBoardData();
     }
 
     private void ArrangeVertical_Click(object? sender, RoutedEventArgs e)
@@ -942,11 +929,11 @@ public partial class MainWindow
             oldPositions[cell] = new Point(cell.CanvasX, cell.CanvasY);
 
         double currentY = minY;
-        var cellsToAvoid = GridCells.Except(sortedCells).ToList();
+        var cellsToAvoid = Vm.GridCells.Except(sortedCells).ToList();
 
         foreach (var cell in sortedCells)
         {
-            var emptySpace = GridLayoutService.FindEmptySpace(cellsToAvoid, minX, currentY, cell.ColSpan, cell.RowSpan, LayerManager.ResolveLayer(cell)!);
+            var emptySpace = GridLayoutService.FindEmptySpace(cellsToAvoid, minX, currentY, cell.ColSpan, cell.RowSpan, Vm.LayerManager.ResolveLayer(cell)!);
 
             if (emptySpace != null)
             {
@@ -958,9 +945,9 @@ public partial class MainWindow
             currentY += cell.PixelHeight;
         }
 
-        GridLayoutService.MoveAnnotationsWithCells(Annotations, oldPositions);
-        MarkUnsaved();
-        SaveBoardData();
+        GridLayoutService.MoveAnnotationsWithCells(Vm.Annotations, oldPositions);
+        Vm.MarkUnsaved();
+        Vm.SaveBoardData();
     }
 
     #endregion
@@ -1248,8 +1235,8 @@ public partial class MainWindow
         e.Handled = true;
 
         // Switch to grid mode when dragging files from system
-        if (IsDrawMode)
-            IsDrawMode = false;
+        if (Vm.IsDrawMode)
+            Vm.ModeService.SetMode("Grid");
         _isDraggingFromSystem = true;
     }
 
@@ -1258,7 +1245,7 @@ public partial class MainWindow
         e.DragEffects = DragDropEffects.Copy | DragDropEffects.Move;
         e.Handled = true;
 
-        if (!_isDraggingFromSystem || _isViewMode)
+        if (!_isDraggingFromSystem || Vm.IsViewMode)
             return;
 
         var dropPt = e.GetPosition(CanvasGrid);
@@ -1295,7 +1282,7 @@ public partial class MainWindow
         }
 
         // Find snap position
-        var space = GridLayoutService.FindEmptySpace(GridCells, gridX, gridY, colSpan, rowSpan, LayerManager.Items);
+        var space = GridLayoutService.FindEmptySpace(Vm.GridCells, gridX, gridY, colSpan, rowSpan, Vm.LayerManager.Items);
         if (space == null)
             return;
 
@@ -1320,7 +1307,7 @@ public partial class MainWindow
 
     private async void OnDrop(object? sender, DragEventArgs e)
     {
-        if (_isViewMode)
+        if (Vm.IsViewMode)
         { e.Handled = true; return; }
         e.Handled = true;
 
@@ -1364,7 +1351,7 @@ public partial class MainWindow
                     (colSpan, rowSpan) = GridLayoutService.CalculateOptimalCellSize(dim.Value.Width, dim.Value.Height);
             }
 
-            var space = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, colSpan, rowSpan, LayerManager.Items);
+            var space = GridLayoutService.FindEmptySpace(Vm.GridCells, nextX, nextY, colSpan, rowSpan, Vm.LayerManager.Items);
             if (space == null)
                 continue;
 
@@ -1378,12 +1365,12 @@ public partial class MainWindow
 
             if (isVideo)
             {
-                string destDir = Path.Combine(_workspaceDir, "videos");
+                string destDir = Path.Combine(Vm.WorkspaceDir, "videos");
                 Directory.CreateDirectory(destDir);
                 string destPath = Path.Combine(destDir, Path.GetFileName(path));
                 if (path != destPath && !File.Exists(destPath))
                     File.Copy(path, destPath);
-                string thumbDir = Path.Combine(_workspaceDir, "images");
+                string thumbDir = Path.Combine(Vm.WorkspaceDir, "images");
                 string? thumb = await YtDlpService.ExtractThumbnailAsync(destPath, thumbDir);
                 cell.SetVideo(destPath, thumb ?? destPath);
             }
@@ -1395,7 +1382,7 @@ public partial class MainWindow
             }
             else
             {
-                string destDir = Path.Combine(_workspaceDir, "images");
+                string destDir = Path.Combine(Vm.WorkspaceDir, "images");
                 Directory.CreateDirectory(destDir);
                 string destPath = Path.Combine(destDir, Path.GetFileName(path));
                 if (path != destPath && !File.Exists(destPath))
@@ -1403,7 +1390,7 @@ public partial class MainWindow
                 cell.SetImage(destPath);
             }
 
-            GridCells.Add(cell);
+            Vm.GridCells.Add(cell);
             HighlightCell(cell);
             placedCount++;
             nextX = space.Value.X + colSpan * Constants.GridSize;
@@ -1411,8 +1398,8 @@ public partial class MainWindow
 
         if (placedCount > 0)
         {
-            MarkUnsaved();
-            SaveBoardData();
+            Vm.MarkUnsaved();
+            Vm.SaveBoardData();
             ShowToast($"📥 Dropped {placedCount} item(s)");
             return;
         }
@@ -1443,7 +1430,7 @@ public partial class MainWindow
                              || url.Contains("vimeo.com", StringComparison.OrdinalIgnoreCase);
 
             // Reserve a 2×2 slot; resized after image dimensions become known.
-            var space = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, 2, 2, LayerManager.Items);
+            var space = GridLayoutService.FindEmptySpace(Vm.GridCells, nextX, nextY, 2, 2, Vm.LayerManager.Items);
             if (space == null)
                 continue;
 
@@ -1457,13 +1444,13 @@ public partial class MainWindow
 
             if (isVideoUrl)
             {
-                GridCells.Add(cell);
+                Vm.GridCells.Add(cell);
                 HighlightCell(cell);
                 await DownloadMediaToCell(cell, url);
             }
             else
             {
-                GridCells.Add(cell);
+                Vm.GridCells.Add(cell);
                 HighlightCell(cell);
                 await DownloadMediaToCell(cell, url);
             }
@@ -1474,8 +1461,8 @@ public partial class MainWindow
 
         if (placedCount > 0)
         {
-            MarkUnsaved();
-            SaveBoardData();
+            Vm.MarkUnsaved();
+            Vm.SaveBoardData();
             ShowToast($"📥 Dropped {placedCount} item(s)");
             return;
         }
@@ -1483,7 +1470,7 @@ public partial class MainWindow
         // ── Pass 3: plain text ────────────────────────────────────────────
         if (!string.IsNullOrWhiteSpace(payload.PlainText))
         {
-            var space = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, 2, 2, LayerManager.Items);
+            var space = GridLayoutService.FindEmptySpace(Vm.GridCells, nextX, nextY, 2, 2, Vm.LayerManager.Items);
             if (space != null)
             {
                 var cell = new CellViewModel
@@ -1494,10 +1481,10 @@ public partial class MainWindow
                     RowSpan = 2
                 };
                 cell.SetText(payload.PlainText.Trim());
-                GridCells.Add(cell);
+                Vm.GridCells.Add(cell);
                 HighlightCell(cell);
-                MarkUnsaved();
-                SaveBoardData();
+                Vm.MarkUnsaved();
+                Vm.SaveBoardData();
                 ShowToast("📥 Dropped text");
             }
             return;
@@ -1511,7 +1498,7 @@ public partial class MainWindow
             stripped = Regex.Replace(stripped, @"\s+", " ").Trim();
             if (!string.IsNullOrEmpty(stripped))
             {
-                var space = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, 2, 2, LayerManager.Items);
+                var space = GridLayoutService.FindEmptySpace(Vm.GridCells, nextX, nextY, 2, 2, Vm.LayerManager.Items);
                 if (space != null)
                 {
                     var cell = new CellViewModel
@@ -1522,10 +1509,10 @@ public partial class MainWindow
                         RowSpan = 2
                     };
                     cell.SetText(stripped);
-                    GridCells.Add(cell);
+                    Vm.GridCells.Add(cell);
                     HighlightCell(cell);
-                    MarkUnsaved();
-                    SaveBoardData();
+                    Vm.MarkUnsaved();
+                    Vm.SaveBoardData();
                     ShowToast("📥 Dropped text");
                 }
             }
@@ -1562,9 +1549,9 @@ public partial class MainWindow
 
         if (e.Key == Key.S && isCtrl)
         {
-            if (!string.IsNullOrEmpty(_currentBoardFile))
+            if (!string.IsNullOrEmpty(Vm.CurrentBoardFile))
             {
-                SaveBoardData();
+                Vm.SaveBoardData();
                 ShowToast("💾 Saved");
             }
             else
@@ -1577,12 +1564,12 @@ public partial class MainWindow
             return;
 
         if (e.Key == Key.Z && isCtrl && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
-        { Redo(); return; }
+        { Vm.RedoCommand.Execute(null); return; }
         if (e.Key == Key.Y && isCtrl)
-        { Redo(); return; }
+        { Vm.RedoCommand.Execute(null); return; }
 
         if (e.Key == Key.Z && isCtrl)
-        { Undo(); return; }
+        { Vm.UndoCommand.Execute(null); return; }
 
         if (e.Key == Key.I && isCtrl)
         { ImportMedia_Click(null, null!); return; }
@@ -1651,7 +1638,7 @@ public partial class MainWindow
 
         if (e.Key == Key.V && isCtrl)
         {
-            if (_isViewMode)
+            if (Vm.IsViewMode)
                 return;
 
             var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
@@ -1764,7 +1751,7 @@ public partial class MainWindow
                                     (colSpan, rowSpan) = GridLayoutService.CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height);
                             }
 
-                            Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, colSpan, rowSpan, LayerManager.Items);
+                            Point? emptySpace = GridLayoutService.FindEmptySpace(Vm.GridCells, nextX, nextY, colSpan, rowSpan, Vm.LayerManager.Items);
                             if (emptySpace == null)
                                 continue; // no room — skip this file
 
@@ -1778,13 +1765,13 @@ public partial class MainWindow
 
                             if (isVideo)
                             {
-                                string destDir = Path.Combine(_workspaceDir, "videos");
+                                string destDir = Path.Combine(Vm.WorkspaceDir, "videos");
                                 Directory.CreateDirectory(destDir);
                                 string destPath = Path.Combine(destDir, Path.GetFileName(filePath));
                                 if (filePath != destPath && !File.Exists(destPath))
                                     File.Copy(filePath, destPath);
 
-                                string thumbDir = Path.Combine(_workspaceDir, "images");
+                                string thumbDir = Path.Combine(Vm.WorkspaceDir, "images");
                                 string? thumbPath = await YtDlpService.ExtractThumbnailAsync(destPath, thumbDir);
                                 newCell.SetVideo(destPath, thumbPath ?? destPath);
                             }
@@ -1794,7 +1781,7 @@ public partial class MainWindow
                             }
                             else
                             {
-                                string destDir = Path.Combine(_workspaceDir, "images");
+                                string destDir = Path.Combine(Vm.WorkspaceDir, "images");
                                 Directory.CreateDirectory(destDir);
                                 string destPath = Path.Combine(destDir, Path.GetFileName(filePath));
                                 if (filePath != destPath && !File.Exists(destPath))
@@ -1805,7 +1792,7 @@ public partial class MainWindow
                             if (!newCell.HasContent)
                                 continue; // corrupt / unreadable file
 
-                            GridCells.Add(newCell);
+                            Vm.GridCells.Add(newCell);
                             HighlightCell(newCell);
                             pastedCells.Add(newCell);
 
@@ -1833,8 +1820,8 @@ public partial class MainWindow
                         pastedCells[0].CanvasX + pastedCells[0].ColSpan * Constants.GridSize / 2.0,
                         pastedCells[0].CanvasY + pastedCells[0].RowSpan * Constants.GridSize / 2.0);
 
-                    MarkUnsaved();
-                    SaveBoardData();
+                    Vm.MarkUnsaved();
+                    Vm.SaveBoardData();
                     ShowToast(pastedCells.Count == 1 ? "📋 Pasted" : $"📋 Pasted {pastedCells.Count} items");
                     return;
                 }
@@ -1843,7 +1830,7 @@ public partial class MainWindow
                 var single = text.Trim();
                 if (single.Contains("youtube.com") || single.Contains("youtu.be") || single.StartsWith("http", StringComparison.OrdinalIgnoreCase))
                 {
-                    Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, preferredX, preferredY, 2, 2, LayerManager.Items);
+                    Point? emptySpace = GridLayoutService.FindEmptySpace(Vm.GridCells, preferredX, preferredY, 2, 2, Vm.LayerManager.Items);
                     if (emptySpace == null)
                     {
                         ShakeScreen();
@@ -1857,20 +1844,21 @@ public partial class MainWindow
                         ColSpan = 2,
                         RowSpan = 2
                     };
-                    GridCells.Add(newCell);
+                    newCell.SetText($"Checking availability...\n{single}");
+                    Vm.GridCells.Add(newCell);
                     SelectAndPanToCell(newCell);
 
                     await DownloadMediaToCell(newCell, single);
 
                     HighlightCell(newCell);
-                    MarkUnsaved();
-                    SaveBoardData();
+                    Vm.MarkUnsaved();
+                    Vm.SaveBoardData();
                     ShowToast("📋 Pasted");
                     return;
                 }
                 else
                 {
-                    Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, preferredX, preferredY, 2, 2, LayerManager.Items);
+                    Point? emptySpace = GridLayoutService.FindEmptySpace(Vm.GridCells, preferredX, preferredY, 2, 2, Vm.LayerManager.Items);
                     if (emptySpace == null)
                     {
                         ShakeScreen();
@@ -1884,14 +1872,13 @@ public partial class MainWindow
                         ColSpan = 2,
                         RowSpan = 2
                     };
-                    GridCells.Add(newCell);
+                    newCell.SetText(single);
+                    Vm.GridCells.Add(newCell);
                     SelectAndPanToCell(newCell);
 
-                    newCell.SetText(single);
-
                     HighlightCell(newCell);
-                    MarkUnsaved();
-                    SaveBoardData();
+                    Vm.MarkUnsaved();
+                    Vm.SaveBoardData();
                     ShowToast("📋 Pasted");
                     return;
                 }
@@ -1931,7 +1918,7 @@ public partial class MainWindow
                                 (colSpan, rowSpan) = GridLayoutService.CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height);
                         }
 
-                        Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, nextX, nextY, colSpan, rowSpan, LayerManager.Items);
+                        Point? emptySpace = GridLayoutService.FindEmptySpace(Vm.GridCells, nextX, nextY, colSpan, rowSpan, Vm.LayerManager.Items);
                         if (emptySpace == null)
                             continue; // no room — skip this file
 
@@ -1945,13 +1932,13 @@ public partial class MainWindow
 
                         if (isVideo)
                         {
-                            string destDir = Path.Combine(_workspaceDir, "videos");
+                            string destDir = Path.Combine(Vm.WorkspaceDir, "videos");
                             Directory.CreateDirectory(destDir);
                             string destPath = Path.Combine(destDir, Path.GetFileName(filePath));
                             if (filePath != destPath && !File.Exists(destPath))
                                 File.Copy(filePath, destPath);
 
-                            string thumbDir = Path.Combine(_workspaceDir, "images");
+                            string thumbDir = Path.Combine(Vm.WorkspaceDir, "images");
                             string? thumbPath = await YtDlpService.ExtractThumbnailAsync(destPath, thumbDir);
                             newCell.SetVideo(destPath, thumbPath ?? destPath);
                         }
@@ -1961,7 +1948,7 @@ public partial class MainWindow
                         }
                         else
                         {
-                            string destDir = Path.Combine(_workspaceDir, "images");
+                            string destDir = Path.Combine(Vm.WorkspaceDir, "images");
                             Directory.CreateDirectory(destDir);
                             string destPath = Path.Combine(destDir, Path.GetFileName(filePath));
                             if (filePath != destPath && !File.Exists(destPath))
@@ -1972,7 +1959,7 @@ public partial class MainWindow
                         if (!newCell.HasContent)
                             continue; // corrupt / unreadable file
 
-                        GridCells.Add(newCell);
+                        Vm.GridCells.Add(newCell);
                         HighlightCell(newCell);
                         pastedCells.Add(newCell);
 
@@ -2000,8 +1987,8 @@ public partial class MainWindow
                     pastedCells[0].CanvasX + pastedCells[0].ColSpan * Constants.GridSize / 2.0,
                     pastedCells[0].CanvasY + pastedCells[0].RowSpan * Constants.GridSize / 2.0);
 
-                MarkUnsaved();
-                SaveBoardData();
+                Vm.MarkUnsaved();
+                Vm.SaveBoardData();
                 ShowToast(pastedCells.Count == 1 ? "📋 Pasted" : $"📋 Pasted {pastedCells.Count} items");
                 return;
             }
@@ -2012,7 +1999,7 @@ public partial class MainWindow
             catch { /* X11 clipboard may throw when data is not a valid bitmap */ }
             if (bitmap != null)
             {
-                string destDir = Path.Combine(_workspaceDir, "images");
+                string destDir = Path.Combine(Vm.WorkspaceDir, "images");
                 Directory.CreateDirectory(destDir);
                 string path = Path.Combine(destDir, Guid.NewGuid() + ".png");
                 bitmap.Save(path);
@@ -2022,7 +2009,7 @@ public partial class MainWindow
                     ? GridLayoutService.CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height)
                     : (2, 2);
 
-                Point? emptySpace = GridLayoutService.FindEmptySpace(GridCells, preferredX, preferredY, colSpan, rowSpan, LayerManager.Items);
+                Point? emptySpace = GridLayoutService.FindEmptySpace(Vm.GridCells, preferredX, preferredY, colSpan, rowSpan, Vm.LayerManager.Items);
 
                 if (emptySpace == null)
                 {
@@ -2038,16 +2025,16 @@ public partial class MainWindow
                     RowSpan = rowSpan
                 };
                 newCell.SetImage(path);
-                GridCells.Add(newCell);
+                Vm.GridCells.Add(newCell);
                 SelectAndPanToCell(newCell);
                 HighlightCell(newCell);
-                MarkUnsaved();
-                SaveBoardData();
+                Vm.MarkUnsaved();
+                Vm.SaveBoardData();
                 ShowToast("📋 Pasted");
                 return;
             }
 
-            SaveBoardData();
+            Vm.SaveBoardData();
             return;
         }
 
@@ -2061,45 +2048,45 @@ public partial class MainWindow
         { ZoomReset_Click(null, null!); return; }
 
         if (e.Key == Key.D1 && isCtrl)
-        { IsDrawMode = false; return; }
+        { Vm.ModeService.SetMode("Grid"); return; }
 
         if (e.Key == Key.D2 && isCtrl)
-        { IsDrawMode = true; return; }
+        { Vm.ModeService.SetMode("Annotation"); return; }
 
         if (e.Key == Key.A && isShift && !isCtrl)
-        { IsAnnotationsVisible = !IsAnnotationsVisible; return; }
+        { Vm.IsAnnotationsVisible = !Vm.IsAnnotationsVisible; return; }
 
         // Annotation tool shortcuts (Photoshop-style)
-        if (IsDrawMode && noModifiers)
+        if (Vm.IsDrawMode && noModifiers)
         {
             switch (e.Key)
             {
                 case Key.B:
-                    CurrentTool = "Brush";
+                    Vm.ModeService.AnnotationMode.CurrentTool = "Brush";
                     ShowToast("🖌️ Brush");
                     return;
                 case Key.E:
-                    CurrentTool = "Eraser";
+                    Vm.ModeService.AnnotationMode.CurrentTool = "Eraser";
                     ShowToast("🧹 Eraser");
                     return;
                 case Key.T:
-                    CurrentTool = "Text";
+                    Vm.ModeService.AnnotationMode.CurrentTool = "Text";
                     ShowToast("🔤 Text");
                     return;
                 case Key.L:
-                    CurrentTool = "Arrow";
+                    Vm.ModeService.AnnotationMode.CurrentTool = "Arrow";
                     ShowToast("➡️ Arrow");
                     return;
                 case Key.U:
-                    CurrentTool = "Rectangle";
+                    Vm.ModeService.AnnotationMode.CurrentTool = "Rectangle";
                     ShowToast("▪️ Rectangle");
                     return;
                 case Key.O:
-                    CurrentTool = "Ellipse";
+                    Vm.ModeService.AnnotationMode.CurrentTool = "Ellipse";
                     ShowToast("⚪ Ellipse");
                     return;
                 case Key.V:
-                    CurrentTool = "Move";
+                    Vm.ModeService.AnnotationMode.CurrentTool = "Move";
                     ShowToast("✥ Select/Move");
                     return;
             }
@@ -2130,29 +2117,29 @@ public partial class MainWindow
 
                     var (newColSpan, newRowSpan) = GridLayoutService.CalculateOptimalCellSize(dimensions.Value.Width, dimensions.Value.Height);
 
-                    if (GridLayoutService.IsSpaceEmpty(GridCells, cell.CanvasX, cell.CanvasY, newColSpan, newRowSpan, LayerManager.ResolveLayer(cell)!, excludeCell: cell))
+                    if (GridLayoutService.IsSpaceEmpty(Vm.GridCells, cell.CanvasX, cell.CanvasY, newColSpan, newRowSpan, Vm.LayerManager.ResolveLayer(cell)!, excludeCell: cell))
                     {
                         cell.ColSpan = newColSpan;
                         cell.RowSpan = newRowSpan;
                     }
                 }
 
-                MarkUnsaved();
-                SaveBoardData();
+                Vm.MarkUnsaved();
+                Vm.SaveBoardData();
             }
             return;
         }
 
         if (e.Key == Key.T && e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift))
         {
-            IsAlwaysOnTop = !IsAlwaysOnTop;
+            Vm.IsAlwaysOnTop = !Vm.IsAlwaysOnTop;
             e.Handled = true;
             return;
         }
 
         if (e.Key == Key.Delete || e.Key == Key.Back)
         {
-            if (_isViewMode)
+            if (Vm.IsViewMode)
                 return;
 
             bool anyDeleted = false;
@@ -2162,7 +2149,7 @@ public partial class MainWindow
                 foreach (var cell in _selectedCells.ToList())
                 {
                     cell.Clear();
-                    GridCells.Remove(cell);
+                    Vm.GridCells.Remove(cell);
                 }
                 _selectedCells.Clear();
                 _hoveredCell = null;
@@ -2172,24 +2159,24 @@ public partial class MainWindow
             if (_selectedAnnotations.Count > 0)
             {
                 foreach (var ann in _selectedAnnotations.ToList())
-                    Annotations.Remove(ann);
+                    Vm.Annotations.Remove(ann);
                 _selectedAnnotations.Clear();
                 anyDeleted = true;
             }
 
             if (anyDeleted)
             {
-                MarkUnsaved();
-                SaveBoardData();
+                Vm.MarkUnsaved();
+                Vm.SaveBoardData();
                 ShowToast("🗑 Deleted");
             }
             else if (_hoveredCell != null)
             {
                 _hoveredCell.Clear();
-                GridCells.Remove(_hoveredCell);
+                Vm.GridCells.Remove(_hoveredCell);
                 _hoveredCell = null;
-                MarkUnsaved();
-                SaveBoardData();
+                Vm.MarkUnsaved();
+                Vm.SaveBoardData();
                 ShowToast("🗑 Deleted");
             }
         }
@@ -2280,8 +2267,8 @@ public partial class MainWindow
         if (_editingTextCell == null)
             return;
         _editingTextCell.TextContent = FullText.Text;
-        MarkUnsaved();
-        SaveBoardData();
+        Vm.MarkUnsaved();
+        Vm.SaveBoardData();
     }
 
     private void CloseFullMedia_Click(object? sender, RoutedEventArgs e)

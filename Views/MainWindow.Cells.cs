@@ -29,7 +29,7 @@ public partial class MainWindow
 
     private void Cell_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (IsDrawMode || e.Handled || _isViewMode)
+        if (Vm.IsDrawMode || e.Handled || Vm.IsViewMode)
             return;
 
         // Shift+Left: Let it pass through for panning (don't start cell drag)
@@ -71,7 +71,7 @@ public partial class MainWindow
                 duplicate.CurrentLod = ImageLod.Placeholder;
             }
 
-            GridCells.Add(duplicate);
+            Vm.GridCells.Add(duplicate);
 
             // Clear current selection and select the duplicate
             ClearSelection();
@@ -190,7 +190,7 @@ public partial class MainWindow
 
     private void Cell_PointerMoved(object? sender, PointerEventArgs e)
     {
-        if (IsDrawMode || e.Handled || _isViewMode)
+        if (Vm.IsDrawMode || e.Handled || Vm.IsViewMode)
             return;
 
         if (!_isPointerDown || _lastPressedEventArgs == null)
@@ -220,7 +220,7 @@ public partial class MainWindow
                     double right = left + backdrop.ColSpan * Constants.GridSize;
                     double bottom = top + backdrop.RowSpan * Constants.GridSize;
 
-                    foreach (var c in GridCells)
+                    foreach (var c in Vm.GridCells)
                     {
                         if (!c.HasContent || cellsToMove.Contains(c))
                             continue;
@@ -244,7 +244,7 @@ public partial class MainWindow
                     double right = left + cellToMove.ColSpan * Constants.GridSize;
                     double bottom = top + cellToMove.RowSpan * Constants.GridSize;
 
-                    foreach (var ann in Annotations)
+                    foreach (var ann in Vm.Annotations)
                     {
                         if (annotationsToMove.Contains(ann))
                             continue;
@@ -320,7 +320,7 @@ public partial class MainWindow
             if (Math.Abs(dx) > 0.1 || Math.Abs(dy) > 0.1)
             {
                 var cellsToMove = _groupDragStarts.Select(s => s.Cell).ToList();
-                bool collision = GridLayoutService.HasGroupCollision(GridCells, cellsToMove, LayerManager, dx, dy);
+                bool collision = GridLayoutService.HasGroupCollision(Vm.GridCells, cellsToMove, Vm.LayerManager, dx, dy);
 
                 // Update visual state and allow movement
                 foreach (var (c, _, _) in _groupDragStarts)
@@ -353,7 +353,7 @@ public partial class MainWindow
             double newX = Math.Round((canvasPt.X - _dragOffsetX) / Constants.GridSize) * Constants.GridSize;
             double newY = Math.Round((canvasPt.Y - _dragOffsetY) / Constants.GridSize) * Constants.GridSize;
 
-            bool collision = GridLayoutService.HasLayerCollision(GridCells, LayerManager.ResolveLayer(dragTarget)!, dragTarget, newX, newY, dragTarget.ColSpan, dragTarget.RowSpan);
+            bool collision = GridLayoutService.HasLayerCollision(Vm.GridCells, Vm.LayerManager.ResolveLayer(dragTarget)!, dragTarget, newX, newY, dragTarget.ColSpan, dragTarget.RowSpan);
             dragTarget.IsDragInvalid = collision;
             dragTarget.CanvasX = newX;
             dragTarget.CanvasY = newY;
@@ -364,7 +364,7 @@ public partial class MainWindow
     {
         StopEdgeScroll();
 
-        if (IsDrawMode)
+        if (Vm.IsDrawMode)
             return;
 
         if (_isDraggingCell && sender is Control)
@@ -377,7 +377,7 @@ public partial class MainWindow
 
                 foreach (var (c, startX, startY) in _groupDragStarts)
                 {
-                    if (GridLayoutService.HasLayerCollision(GridCells, LayerManager.ResolveLayer(c)!, c, c.CanvasX, c.CanvasY, c.ColSpan, c.RowSpan))
+                    if (GridLayoutService.HasLayerCollision(Vm.GridCells, Vm.LayerManager.ResolveLayer(c)!, c, c.CanvasX, c.CanvasY, c.ColSpan, c.RowSpan))
                     {
                         hasCollision = true;
                         break;
@@ -413,7 +413,7 @@ public partial class MainWindow
             // Handle single cell drag
             else if (_draggingCell != null)
             {
-                bool hasCollision = GridLayoutService.HasLayerCollision(GridCells, LayerManager.ResolveLayer(_draggingCell)!, _draggingCell,
+                bool hasCollision = GridLayoutService.HasLayerCollision(Vm.GridCells, Vm.LayerManager.ResolveLayer(_draggingCell)!, _draggingCell,
                         _draggingCell.CanvasX, _draggingCell.CanvasY,
                         _draggingCell.ColSpan, _draggingCell.RowSpan);
                 if (hasCollision)
@@ -424,7 +424,7 @@ public partial class MainWindow
                         // Bitmap was never shared, so no dispose risk.
                         _draggingCell.IsDragInvalid = false;
                         _draggingCell.IsDragging = false;
-                        GridCells.Remove(_draggingCell);
+                        Vm.GridCells.Remove(_draggingCell);
                         _selectedCells.Remove(_draggingCell);
                         // Skip the IsDragInvalid/IsDragging lines below —
                         // _draggingCell is already cleaned up and removed.
@@ -450,8 +450,8 @@ public partial class MainWindow
             _groupAnnotationDragStarts = null;
             _isAltDuplicateDrag = false;
             EnableCellHitTesting();
-            MarkUnsaved();
-            SaveBoardData();
+            Vm.MarkUnsaved();
+            Vm.SaveBoardData();
         }
         _isPointerDown = false;
         UpdateSelectionState();
@@ -459,7 +459,7 @@ public partial class MainWindow
 
     private void ResizeThumb_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (IsDrawMode || _isViewMode)
+        if (Vm.IsDrawMode || Vm.IsViewMode)
             return;
 
         if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed
@@ -485,7 +485,7 @@ public partial class MainWindow
         int newCols = Math.Max(1, (int)Math.Round((pt.X - _resizingCell.CanvasX) / Constants.GridSize));
         int newRows = Math.Max(1, (int)Math.Round((pt.Y - _resizingCell.CanvasY) / Constants.GridSize));
 
-        bool collision = GridLayoutService.HasLayerCollision(GridCells, LayerManager.ResolveLayer(_resizingCell)!, _resizingCell,
+        bool collision = GridLayoutService.HasLayerCollision(Vm.GridCells, Vm.LayerManager.ResolveLayer(_resizingCell)!, _resizingCell,
             _resizingCell.CanvasX, _resizingCell.CanvasY, newCols, newRows);
 
         _resizingCell.IsDragInvalid = collision;
@@ -498,7 +498,7 @@ public partial class MainWindow
         if (_isResizing && sender is Control && _resizingCell != null)
         {
             // Check for collision and revert if needed
-            bool collision = GridLayoutService.HasLayerCollision(GridCells, LayerManager.ResolveLayer(_resizingCell)!, _resizingCell,
+            bool collision = GridLayoutService.HasLayerCollision(Vm.GridCells, Vm.LayerManager.ResolveLayer(_resizingCell)!, _resizingCell,
                 _resizingCell.CanvasX, _resizingCell.CanvasY, _resizingCell.ColSpan, _resizingCell.RowSpan);
 
             if (collision)
@@ -514,7 +514,7 @@ public partial class MainWindow
             _isResizing = false;
             _resizingCell = null;
             e.Handled = true;
-            SaveBoardData();
+            Vm.SaveBoardData();
         }
     }
 

@@ -1,28 +1,16 @@
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace CGReferenceBoard.ViewModels;
 
 /// <summary>
-/// Base class for all view models, providing <see cref="INotifyPropertyChanged"/> support.
+/// Base class for all ViewModels. Delegates INotifyPropertyChanged infrastructure
+/// to <see cref="ObservableObject"/> from CommunityToolkit.Mvvm.
+///
+/// Compatibility note: <see cref="ObservableObject"/> exposes the same
+/// <c>SetProperty</c> and <c>OnPropertyChanged</c> signatures used by
+/// <see cref="CellViewModel"/> and <see cref="AnnotationViewModel"/>, so those
+/// classes continue to compile without modification.
 /// </summary>
-public class ViewModelBase : INotifyPropertyChanged
+public abstract class ViewModelBase : ObservableObject
 {
-    public event PropertyChangedEventHandler? PropertyChanged;
-
-    protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-    {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
-
-    protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
-    {
-        if (EqualityComparer<T>.Default.Equals(field, value))
-            return false;
-
-        field = value;
-        OnPropertyChanged(propertyName);
-        return true;
-    }
 }

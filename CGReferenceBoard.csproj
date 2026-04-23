@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
@@ -25,6 +25,14 @@
     <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.999-cibuild0064469-alpha" />
     <!-- Explicit pin: transitive dep of Avalonia.FreeDesktop; 0.90.3 has CVE GHSA-xrw6-gwf8-vvr9 --><PackageReference Include="Tmds.DBus.Protocol" Version="0.92.0" />
     <PackageReference Include="YoutubeDLSharp" Version="1.2.0" />
+    <!-- MVVM infrastructure -->
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <!--
+      TODO (SukiUI): SukiUI 6.0.3 declares a hard dependency on Avalonia 11.3.4 and is NOT
+      compatible with this project's Avalonia 12.0.999-cibuild0064469-alpha build.
+      Re-evaluate when SukiUI publishes an Avalonia 12-compatible release.
+      Track: https://github.com/kikipoulet/SukiUI/releases
+    -->
   </ItemGroup>
 
   <!-- No RID specified (dotnet run / IDE debug): include all binaries so both platforms work locally -->

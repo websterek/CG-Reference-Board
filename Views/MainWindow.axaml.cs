@@ -1,11 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -24,9 +21,7 @@ using CGReferenceBoard.ViewModels;
 namespace CGReferenceBoard.Views;
 
 /// <summary>
-/// Main application window. Acts as its own DataContext (View-as-ViewModel pattern)
-/// for the reference board, supporting grid-based image/video/text layout with
-/// an annotation overlay, undo/redo, and pan/zoom navigation.
+/// Main application window — thin View that delegates all state to <see cref="MainWindowViewModel"/>.
 ///
 /// UI event handlers are split across partial class files:
 ///   MainWindow.Canvas.cs      – canvas pointer handlers (pan, zoom, hover, marquee)
@@ -36,406 +31,13 @@ namespace CGReferenceBoard.Views;
 /// </summary>
 public partial class MainWindow : Window, INotifyPropertyChanged
 {
-    private class UserSettings
-    {
-        public string AnnotationEffect { get; set; } = "None";
-        public string GridBackground { get; set; } = "Dots";
-    }
+    // ── ViewModel ─────────────────────────────────────────────────────────────
 
-    #region INPC Support
+    /// <summary>The primary ViewModel. All application state lives here.</summary>
+    public MainWindowViewModel Vm { get; }
 
-    public new event PropertyChangedEventHandler? PropertyChanged;
-
-    protected void OnPropertyChanged(string propertyName)
-        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-
-    #endregion
-
-    #region Undo / Redo
-
-    private readonly Stack<string> _undoStack = new();
-    private readonly Stack<string> _redoStack = new();
-    private bool _isRestoringState;
-    private string? _lastStateHash;
-
-    // Serialises concurrent SaveBoardData calls so writes never interleave.
-    private readonly System.Threading.SemaphoreSlim _saveSemaphore = new(1, 1);
-
-    // Cached process handle used by MemoryUsageText to avoid leaking a handle on every binding refresh.
-    private static readonly System.Diagnostics.Process _thisProcess =
-        System.Diagnostics.Process.GetCurrentProcess();
-
-    // Set to true once the user has confirmed they want to close/discard; prevents double-prompt.
-    private bool _closingConfirmed;
-
-    private void Undo()
-    {
-        if (_undoStack.Count <= 1 || _isViewMode)
-            return;
-        _isRestoringState = true;
-
-        string current = _undoStack.Pop();
-        _redoStack.Push(current);
-        RestoreBoardState(_undoStack.Peek());
-        SaveBoardData();
-        ScheduleViewportUpdate();
-
-        ShowToast("↩ Undo");
-        _isRestoringState = false;
-    }
-
-    private void Redo()
-    {
-        if (_redoStack.Count == 0 || _isViewMode)
-            return;
-        _isRestoringState = true;
-
-        string next = _redoStack.Pop();
-        _undoStack.Push(next);
-        RestoreBoardState(next);
-        SaveBoardData();
-        ScheduleViewportUpdate();
-
-        ShowToast("↪ Redo");
-        _isRestoringState = false;
-    }
-
-    /// <summary>
-    /// Replaces the current board contents with the state described by the given JSON string.
-    /// Updates cells/annotations in-place where possible to preserve image caches.
-    /// </summary>
-    private void RestoreBoardState(string json)
-    {
-        var (newCells, newAnnotations) = BoardSerializer.Deserialize(json, _currentBoardFile);
-
-        UpdateCellsInPlace(newCells);
-        UpdateAnnotationsInPlace(newAnnotations);
-
-        _selectedCells.Clear();
-        _selectedAnnotations.Clear();
-        _currentAnnotation = null;
-        _editingTextAnnotation = null;
-
-        UpdateSelectionState();
-    }
-
-    private void UpdateCellsInPlace(List<CellViewModel> newCells)
-    {
-        var toRemove = new List<CellViewModel>();
-
-        foreach (var existingCell in GridCells)
-        {
-            var match = FindMatchingCell(newCells, existingCell);
-            if (match == null)
-            {
-                toRemove.Add(existingCell);
-            }
-            else
-            {
-                UpdateCellProperties(existingCell, match);
-                newCells.Remove(match);
-            }
-        }
-
-        foreach (var cell in toRemove)
-        {
-            cell.UnloadImage();
-            GridCells.Remove(cell);
-        }
-
-        foreach (var newCell in newCells)
-        {
-            GridCells.Add(newCell);
-        }
-    }
-
-    private CellViewModel? FindMatchingCell(List<CellViewModel> cells, CellViewModel existing)
-    {
-        foreach (var c in cells)
-        {
-            if (Math.Abs(c.CanvasX - existing.CanvasX) < 0.1 &&
-                Math.Abs(c.CanvasY - existing.CanvasY) < 0.1 &&
-                c.Type == existing.Type)
-            {
-                return c;
-            }
-        }
-        return null;
-    }
-
-    private void UpdateCellProperties(CellViewModel target, CellViewModel source)
-    {
-        target.ColSpan = source.ColSpan;
-        target.RowSpan = source.RowSpan;
-        target.TextContent = source.TextContent;
-        target.BackgroundColor = source.BackgroundColor;
-        target.ForegroundColor = source.ForegroundColor;
-        target.FontSize = source.FontSize;
-        target.ImageStretch = source.ImageStretch;
-target.PlaceholderColor = source.PlaceholderColor;
-
-        string? oldFilePath = target.FilePath;
-        string? newFilePath = source.FilePath;
-        
-        if (oldFilePath != newFilePath && !string.IsNullOrEmpty(newFilePath))
-        {
-            target.SetImageDeferred(newFilePath);
-        }
-        
-        string? oldVideoPath = target.VideoPath;
-        string? newVideoPath = source.VideoPath;
-        string? oldVideoFilePath = target.FilePath;
-        string? newVideoFilePath = source.FilePath;
-        
-        if ((oldVideoPath != newVideoPath || oldVideoFilePath != newVideoFilePath) && !string.IsNullOrEmpty(newVideoPath) && !string.IsNullOrEmpty(newVideoFilePath))
-        {
-            target.SetVideoDeferred(newVideoPath, newVideoFilePath);
-        }
-    }
-
-    private void UpdateAnnotationsInPlace(List<AnnotationViewModel> newAnnotations)
-    {
-        var toRemove = new List<AnnotationViewModel>();
-
-        foreach (var existingAnn in Annotations)
-        {
-            var match = FindMatchingAnnotation(newAnnotations, existingAnn);
-            if (match == null)
-            {
-                toRemove.Add(existingAnn);
-            }
-            else
-            {
-                UpdateAnnotationProperties(existingAnn, match);
-                newAnnotations.Remove(match);
-            }
-        }
-
-        foreach (var ann in toRemove)
-        {
-            Annotations.Remove(ann);
-        }
-
-        foreach (var newAnn in newAnnotations)
-        {
-            newAnn.IsInDrawMode = IsDrawMode;
-            Annotations.Add(newAnn);
-        }
-    }
-
-    private AnnotationViewModel? FindMatchingAnnotation(List<AnnotationViewModel> annotations, AnnotationViewModel existing)
-    {
-        foreach (var a in annotations)
-        {
-            if (Math.Abs(a.CanvasX - existing.CanvasX) < 0.1 &&
-                Math.Abs(a.CanvasY - existing.CanvasY) < 0.1 &&
-                a.Type == existing.Type &&
-                a.Points.Count == existing.Points.Count)
-            {
-                return a;
-            }
-        }
-        return null;
-    }
-
-    private void UpdateAnnotationProperties(AnnotationViewModel target, AnnotationViewModel source)
-    {
-        target.Text = source.Text;
-        target.Color = source.Color;
-        target.Thickness = source.Thickness;
-        
-        target.Points.Clear();
-        foreach (var p in source.Points)
-        {
-            target.Points.Add(p);
-        }
-    }
-
-    #endregion
-
-    #region Observable Collections
-
-    public ObservableCollection<CellViewModel> GridCells { get; } = new();
-    public ObservableCollection<AnnotationViewModel> Annotations { get; } = new();
-    public ObservableCollection<string> RecentBoards { get; } = new();
-    public ObservableCollection<BoardMenuItemViewModel> BoardFilesInDirectory { get; } = new();
-
-    #endregion
-
-    #region Layer Management
-
-    public LayerManager LayerManager { get; } = new();
-
-    /// <summary>
-    /// Responds to content-layer property changes (visibility) by updating
-    /// the visual state of all cells in the affected layer.
-    /// </summary>
-    private void OnLayerPropertyChanged(IContentLayer layer, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName != nameof(IContentLayer.IsVisible))
-            return;
-
-        foreach (var cell in layer.Cells)
-            cell.IsLayerVisible = layer.IsVisible;
-    }
-
-    #endregion
-
-    #region Bindable Properties
-
-    private bool _isDrawMode;
-    public bool IsDrawMode
-    {
-        get => _isDrawMode;
-        set
-        {
-            if (_isDrawMode == value)
-                return;
-            _isDrawMode = value;
-
-            // Update hit-test state on all annotations
-            foreach (var ann in Annotations)
-                ann.IsInDrawMode = value;
-
-            ClearSelection();
-            OnPropertyChanged(nameof(IsDrawMode));
-            OnPropertyChanged(nameof(WindowTitle));
-            OnPropertyChanged(nameof(CurrentModeText));
-            OnPropertyChanged(nameof(ModeIndicatorColor));
-            OnPropertyChanged(nameof(IsCursorIconVisible));
-
-            if (value)
-                IsAnnotationsVisible = true;
-        }
-    }
-
-    private bool _isMoveMode;
-    public bool IsMoveMode
-    {
-        get => _isMoveMode;
-        set { if (_isMoveMode != value) { _isMoveMode = value; OnPropertyChanged(nameof(IsMoveMode)); } }
-    }
-
-    private bool _isEraserMode;
-    public bool IsEraserMode
-    {
-        get => _isEraserMode;
-        set { if (_isEraserMode != value) { _isEraserMode = value; OnPropertyChanged(nameof(IsEraserMode)); } }
-    }
-
-    private bool _isAnnotationsVisible = true;
-    public bool IsAnnotationsVisible
-    {
-        get => _isAnnotationsVisible;
-        set
-        {
-            if (_isAnnotationsVisible == value)
-                return;
-            _isAnnotationsVisible = value;
-            LayerManager.Annotations.IsVisible = value;
-            OnPropertyChanged(nameof(IsAnnotationsVisible));
-        }
-    }
-
-
-
-    private bool _isPointerOverCanvas;
-    public bool IsPointerOverCanvas
-    {
-        get => _isPointerOverCanvas;
-        set
-        {
-            if (_isPointerOverCanvas != value)
-            {
-                _isPointerOverCanvas = value;
-                OnPropertyChanged(nameof(IsPointerOverCanvas));
-                OnPropertyChanged(nameof(IsCursorIconVisible));
-            }
-        }
-    }
-
-    public bool IsCursorIconVisible => IsDrawMode && IsPointerOverCanvas;
-
-    private bool _isAlwaysOnTop;
-    public bool IsAlwaysOnTop
-    {
-        get => _isAlwaysOnTop;
-        set
-        {
-            if (_isAlwaysOnTop != value)
-            {
-                _isAlwaysOnTop = value;
-                Topmost = value;
-                OnPropertyChanged(nameof(IsAlwaysOnTop));
-            }
-        }
-    }
-
-    private string _currentBrushColor = "#FFFF4444";
-    public string CurrentBrushColor
-    {
-        get => _currentBrushColor;
-        set { _currentBrushColor = value; OnPropertyChanged(nameof(CurrentBrushColor)); OnPropertyChanged(nameof(CurrentBrushColorBrush)); }
-    }
-
-    /// <summary>Current brush color as a SolidColorBrush for use in XAML bindings.</summary>
-    public SolidColorBrush CurrentBrushColorBrush => SolidColorBrush.Parse(_currentBrushColor);
-
-    private double _currentBrushThickness = 4.0;
-    public double CurrentBrushThickness
-    {
-        get => _currentBrushThickness;
-        set { _currentBrushThickness = value; OnPropertyChanged(nameof(CurrentBrushThickness)); }
-    }
-
-    private string _currentTool = "Brush";
-    public string CurrentTool
-    {
-        get => _currentTool;
-        set
-        {
-            _currentTool = value;
-            _isEraserMode = value == "Eraser";
-            _isMoveMode = value == "Move";
-            OnPropertyChanged(nameof(CurrentTool));
-            OnPropertyChanged(nameof(IsEraserMode));
-            OnPropertyChanged(nameof(IsMoveMode));
-            OnPropertyChanged(nameof(CanvasCursor));
-            OnPropertyChanged(nameof(IsBrushSelected));
-            OnPropertyChanged(nameof(IsTextSelected));
-            OnPropertyChanged(nameof(IsArrowSelected));
-            OnPropertyChanged(nameof(IsRectangleSelected));
-            OnPropertyChanged(nameof(IsEllipseSelected));
-            OnPropertyChanged(nameof(IsEraserSelected));
-            OnPropertyChanged(nameof(IsMoveSelected));
-        }
-    }
-
-    private string _currentBoardName = Constants.AppName;
-    public string CurrentBoardName
-    {
-        get => _currentBoardName;
-        set { _currentBoardName = value; OnPropertyChanged(nameof(CurrentBoardName)); OnPropertyChanged(nameof(WindowTitle)); }
-    }
-
-    public string WindowTitle
-    {
-        get
-        {
-            var startupOverlay = this.FindControl<Border>("StartupOverlay");
-            if (startupOverlay != null && startupOverlay.IsVisible)
-                return Constants.AppName;
-
-            string dir = string.IsNullOrEmpty(_workspaceDir) ? "No Workspace" : Path.GetFileName(_workspaceDir);
-            string board = string.IsNullOrEmpty(CurrentBoardName) ? "Untitled" : CurrentBoardName;
-            string mode = IsDrawMode ? "Annotation" : "Grid";
-            return $"{dir} - {board} - {mode}";
-        }
-    }
-
-    public bool IsViewMode => _isViewMode;
-    public bool HasRecentBoards => RecentBoards.Count > 0;
-    public bool HasBoardFilesInDirectory => BoardFilesInDirectory.Count > 0;
+    // ── Zoom-dependent View-only properties ───────────────────────────────────
+    // These depend on _scale which stays in the View (pan/zoom is pure UI).
 
     /// <summary>Current zoom level as percentage string for the status bar.</summary>
     public string ZoomLevelText => $"{_scale.ScaleX * 100:F0}%";
@@ -449,21 +51,11 @@ target.PlaceholderColor = source.PlaceholderColor;
     /// <summary>Corner radius that remains constant regardless of zoom level.</summary>
     public CornerRadius ZoomIndependentCornerRadius => new CornerRadius(0);
 
-    /// <summary>Application version string for the status bar.</summary>
-    public string VersionText => $"v{Constants.AppVersion}";
+    /// <summary>Hide the dot/grid background below 25% zoom — VisualBrush tile count explodes at low scale.</summary>
+    public bool IsCanvasBackgroundVisible => _scale.ScaleX >= 0.25;
 
-    /// <summary>Memory usage summary for the status bar (loaded image count + working set).</summary>
-    public string MemoryUsageText
-    {
-        get
-        {
-            int loaded = GridCells.Count(c => c.NeedsImage && c.Image != null);
-            int total = GridCells.Count(c => c.NeedsImage);
-            _thisProcess.Refresh();
-            long mb = _thisProcess.WorkingSet64 / (1024 * 1024);
-            return total > 0 ? $"IMG {loaded}/{total} | {mb} MB" : $"{mb} MB";
-        }
-    }
+    /// <summary>Delegates to <see cref="MainWindowViewModel.IsViewMode"/> for bindings inside DataTemplates that use RelativeSource AncestorType=views:MainWindow.</summary>
+    public bool IsViewMode => Vm.IsViewMode;
 
     /// <summary>Number of currently selected items for the status bar.</summary>
     public string SelectionCountText
@@ -475,136 +67,34 @@ target.PlaceholderColor = source.PlaceholderColor;
         }
     }
 
+    /// <summary>Memory usage summary for the status bar (loaded image count + working set).</summary>
+    public string MemoryUsageText
+    {
+        get
+        {
+            int loaded = Vm.GridCells.Count(c => c.NeedsImage && c.Image != null);
+            int total = Vm.GridCells.Count(c => c.NeedsImage);
+            _thisProcess.Refresh();
+            long mb = _thisProcess.WorkingSet64 / (1024 * 1024);
+            return total > 0 ? $"IMG {loaded}/{total} | {mb} MB" : $"{mb} MB";
+        }
+    }
+
     public bool HasMultipleSelection => (_selectedCells.Count + _selectedAnnotations.Count) > 1;
     public bool HasSingleSelection => (_selectedCells.Count + _selectedAnnotations.Count) == 1;
 
-    /// <summary>Current mode display text for the status bar.</summary>
-    public string CurrentModeText => IsDrawMode ? "Annotation" : "Grid";
+    // Cached process handle used by MemoryUsageText.
+    private static readonly System.Diagnostics.Process _thisProcess =
+        System.Diagnostics.Process.GetCurrentProcess();
 
-    /// <summary>Mode indicator color for the status bar — red for Annotation, blue for Grid.</summary>
-    public string ModeIndicatorColor => IsDrawMode ? "#FF4444" : "#44AAFF";
+    // ── INPC for View-only properties ─────────────────────────────────────────
 
-    /// <summary>Material icon kind for the canvas cursor based on the current tool.</summary>
-    public string CanvasCursor => CurrentTool switch
-    {
-        "Brush" => "🖌️",
-        "Move" => "✥",
-        "Text" => "T",
-        "Arrow" => "→",
-        "Rectangle" => "▭",
-        "Ellipse" => "○",
-        "Eraser" => "⌫",
-        _ => "✏️"
-    };
+    public new event PropertyChangedEventHandler? PropertyChanged;
 
-    /// <summary>Hide the dot/grid background below 25 % zoom — VisualBrush tile count explodes at low scale.</summary>
-    public bool IsCanvasBackgroundVisible => _scale.ScaleX >= 0.25;
+    protected void OnPropertyChanged(string propertyName)
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
-    /// <summary>Notifies the UI that all zoom-dependent properties have changed. Batched to reduce binding cascade.</summary>
-    private void NotifyZoomChanged()
-    {
-        if (_zoomNotificationPending)
-            return;
-
-        _zoomNotificationPending = true;
-
-        if (_zoomNotificationTimer == null)
-        {
-            _zoomNotificationTimer = new Avalonia.Threading.DispatcherTimer
-            {
-                Interval = TimeSpan.FromMilliseconds(16) // ~60fps, batch multiple zoom changes
-            };
-            _zoomNotificationTimer.Tick += ZoomNotificationTimer_Tick;
-        }
-
-        _zoomNotificationTimer.Start();
-    }
-
-    private void ZoomNotificationTimer_Tick(object? sender, EventArgs e)
-    {
-        _zoomNotificationTimer?.Stop();
-        _zoomNotificationPending = false;
-
-        OnPropertyChanged(nameof(ZoomLevelText));
-        OnPropertyChanged(nameof(ZoomInverseFactor));
-        OnPropertyChanged(nameof(ZoomIndependentBorderThickness));
-        OnPropertyChanged(nameof(ZoomIndependentCornerRadius));
-        OnPropertyChanged(nameof(IsCanvasBackgroundVisible));
-
-        CGReferenceBoard.Controls.AnnotationShape.SetScale(_scale.ScaleX);
-
-        var canvas = this.FindControl<Avalonia.Controls.Canvas>("MainCanvas");
-        if (canvas != null)
-        {
-            var mode = _scale.ScaleX < 0.35
-                ? Avalonia.Media.Imaging.BitmapInterpolationMode.LowQuality
-                : _scale.ScaleX < 1.0
-                    ? Avalonia.Media.Imaging.BitmapInterpolationMode.MediumQuality
-                    : Avalonia.Media.Imaging.BitmapInterpolationMode.HighQuality;
-            Avalonia.Media.RenderOptions.SetBitmapInterpolationMode(canvas, mode);
-        }
-    }
-
-    /// <summary>Tool selection properties for menu checkmarks.</summary>
-    public bool IsBrushSelected => CurrentTool == "Brush";
-    public bool IsTextSelected => CurrentTool == "Text";
-    public bool IsArrowSelected => CurrentTool == "Arrow";
-    public bool IsRectangleSelected => CurrentTool == "Rectangle";
-    public bool IsEllipseSelected => CurrentTool == "Ellipse";
-    public bool IsEraserSelected => CurrentTool == "Eraser";
-    public bool IsMoveSelected => CurrentTool == "Move";
-
-    // ───────── Grid background ─────────
-    private string _gridBackgroundMode = "Dots";
-    public string GridBackgroundMode
-    {
-        get => _gridBackgroundMode;
-        set
-        {
-            if (_gridBackgroundMode == value)
-                return;
-            _gridBackgroundMode = value;
-            OnPropertyChanged(nameof(GridBackgroundMode));
-            OnPropertyChanged(nameof(IsGridBackgroundDots));
-            OnPropertyChanged(nameof(IsGridBackgroundGrid));
-            OnPropertyChanged(nameof(IsGridBackgroundNone));
-            SaveUserSettings();
-        }
-    }
-    public bool IsGridBackgroundDots => _gridBackgroundMode == "Dots";
-    public bool IsGridBackgroundGrid => _gridBackgroundMode == "Grid";
-    public bool IsGridBackgroundNone => _gridBackgroundMode == "None";
-
-    // ───────── Annotation effect ─────────
-    private string _annotationEffect = "None";
-    public string AnnotationEffectMode
-    {
-        get => _annotationEffect;
-        set
-        {
-            if (_annotationEffect == value)
-                return;
-            _annotationEffect = value;
-            AnnotationShape.SetEffectMode(value switch
-            {
-                "Shadow" => AnnotationEffect.Shadow,
-                "Outline" => AnnotationEffect.Outline,
-                _ => AnnotationEffect.None
-            });
-            OnPropertyChanged(nameof(AnnotationEffectMode));
-            OnPropertyChanged(nameof(IsAnnotationEffectNone));
-            OnPropertyChanged(nameof(IsAnnotationEffectShadow));
-            OnPropertyChanged(nameof(IsAnnotationEffectOutline));
-            SaveUserSettings();
-        }
-    }
-    public bool IsAnnotationEffectNone => _annotationEffect == "None";
-    public bool IsAnnotationEffectShadow => _annotationEffect == "Shadow";
-    public bool IsAnnotationEffectOutline => _annotationEffect == "Outline";
-
-    #endregion
-
-    #region Private State
+    // ── Private State ─────────────────────────────────────────────────────────
 
     // Annotation drawing
     private AnnotationViewModel? _currentAnnotation;
@@ -618,12 +108,6 @@ target.PlaceholderColor = source.PlaceholderColor;
     private AnnotationViewModel? _editingTextAnnotation;
     private string? _editingTextAnnotationOriginalText;
 
-    // Board file state
-    private string _workspaceDir;
-    private string _currentBoardFile = "";
-    private bool _hasUnsavedChanges;
-    private readonly bool _isViewMode;
-
     // Cell interaction
     private CellViewModel? _hoveredCell;
     private CellViewModel? _editingTextCell;
@@ -636,9 +120,7 @@ target.PlaceholderColor = source.PlaceholderColor;
     private readonly TranslateTransform _translate = new(0, 0);
     private readonly ScaleTransform _scale = new(1, 1);
 
-
-
-    // Zoom toggle state (PureRef-style: double-click to zoom in, double-click again to restore)
+    // Zoom toggle state (PureRef-style)
     private double _savedTranslateX;
     private double _savedTranslateY;
     private double _savedScale;
@@ -687,29 +169,12 @@ target.PlaceholderColor = source.PlaceholderColor;
     private bool _previewIsValid;
     private CellViewModel? _pendingBackdrop;
 
-    // Spatial index for O(1) grid-position lookups (replaces O(n) FirstOrDefault scans)
+    // Spatial index for O(1) grid-position lookups
     private readonly Dictionary<(int gridX, int gridY), CellViewModel> _cellSpatialIndex = new();
 
-    // Performance: disable hit testing during pan/drag for faster event processing
-    private void DisableCellHitTesting()
-    {
-        foreach (var cell in GridCells)
-            cell.IsHitTestEnabled = false;
-        foreach (var ann in Annotations)
-            ann.IsHitTestEnabled = false;
-    }
-
-    private void EnableCellHitTesting()
-    {
-        foreach (var cell in GridCells)
-            cell.IsHitTestEnabled = true;
-        foreach (var ann in Annotations)
-            ann.IsHitTestEnabled = true;
-    }
-
     // Auto-scroll when dragging near edges
-    private const double EdgeScrollThreshold = 50.0; // pixels from edge
-    private const double EdgeScrollSpeed = 25.0; // pixels per tick
+    private const double EdgeScrollThreshold = 50.0;
+    private const double EdgeScrollSpeed = 25.0;
     private System.Timers.Timer? _edgeScrollTimer;
     private Point _lastPointerPosition;
     private bool _isEdgeScrolling;
@@ -717,7 +182,7 @@ target.PlaceholderColor = source.PlaceholderColor;
     // Toast notification
     private System.Threading.CancellationTokenSource? _toastCts;
 
-    // Viewport-aware LOD management (polls transform state to detect pan/zoom changes)
+    // Viewport-aware LOD management
     private Avalonia.Threading.DispatcherTimer? _viewportLodTimer;
     private Avalonia.Threading.DispatcherTimer? _lodDebounceTimer;
     private bool _lodUpdatePending;
@@ -729,90 +194,70 @@ target.PlaceholderColor = source.PlaceholderColor;
     private double _lastViewportH = double.NaN;
     private int _lastViewportCellCount = -1;
     private int _lastAnnotationCount = -1;
-    
 
-    // Batched zoom property notifications - debounce to reduce binding cascade
+    // Batched zoom property notifications
     private bool _zoomNotificationPending;
     private Avalonia.Threading.DispatcherTimer? _zoomNotificationTimer;
 
-    #endregion
-
-
-
-
-    #region Constructor
+    // ── Constructor ───────────────────────────────────────────────────────────
 
     /// <summary>Parameterless constructor required by Avalonia designer.</summary>
     public MainWindow() : this(false, null) { }
 
-    // Restore pan cursor when window loses activation (e.g., Alt-Tab) to avoid leaving the hand cursor stuck
     private void Window_Deactivated(object? sender, EventArgs e)
     {
-        try
-        {
-            RestorePanCursor(this.FindControl<Border>("CanvasBorder"));
-        }
-        catch
-        {
-            // ignore
-        }
+        try { RestorePanCursor(this.FindControl<Border>("CanvasBorder")); }
+        catch { }
     }
 
-    // When the canvas border loses pointer capture (e.g., due to OS-level modal or other capture-loss),
-    // ensure we restore the cursor so it doesn't remain as the hand icon.
     private void CanvasBorder_PointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
     {
-        try
-        {
-            RestorePanCursor(this.FindControl<Border>("CanvasBorder"));
-        }
-        catch
-        {
-            // ignore
-        }
+        try { RestorePanCursor(this.FindControl<Border>("CanvasBorder")); }
+        catch { }
     }
 
     public MainWindow(bool isViewMode, string? startFile)
     {
-        // Compact the Large Object Heap on next GC to reduce memory fragmentation
-        // from repeatedly allocated/disposed bitmap pixel buffers.
         System.Runtime.GCSettings.LargeObjectHeapCompactionMode =
             System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
 
-        DataContext = this;
-        _isViewMode = isViewMode;
+        Vm = new MainWindowViewModel(isViewMode);
+        DataContext = Vm;
+
         InitializeComponent();
 
-        // Cache frequently accessed controls for hot paths
+        // Wire ViewModel events to View callbacks
+        Vm.AlwaysOnTopChanged += topmost => Topmost = topmost;
+        Vm.ToastRequested += ShowToast;
+        Vm.ViewportUpdateRequested += ScheduleViewportUpdate;
+        Vm.StartupOverlayHideRequested += () =>
+        {
+            var overlay = this.FindControl<Border>("StartupOverlay");
+            if (overlay != null) overlay.IsVisible = false;
+        };
+
         CacheCanvasControls();
 
-        // Attach a tunneled PointerPressed handler to CanvasBorder so Ctrl+Left-click
-        // or Middle-click will start panning even when the pointer is over child elements.
         try
         {
             var canvasBorder = this.FindControl<Border>("CanvasBorder");
             if (canvasBorder != null)
             {
-                // Use tunneling routing so this runs before child handlers and can take priority.
                 canvasBorder.AddHandler(InputElement.PointerPressedEvent,
                     new EventHandler<PointerPressedEventArgs>(CanvasBorder_Tunneled_PointerPressed),
                     Avalonia.Interactivity.RoutingStrategies.Tunnel);
             }
         }
-        catch
-        {
-            // ignore if attach fails on some platforms
-        }
+        catch { }
 
-        LoadRecentBoards();
-        LoadUserSettings();
-        RecentBoardsList.ItemsSource = RecentBoards;
+        Vm.LoadRecentBoards();
+        Vm.LoadUserSettings();
+        RecentBoardsList.ItemsSource = Vm.RecentBoards;
 
-        _workspaceDir = Path.Combine(Constants.ConfigDirectory, "Assets");
-        if (!Directory.Exists(_workspaceDir))
-            Directory.CreateDirectory(_workspaceDir);
+        if (!Directory.Exists(Vm.WorkspaceDir))
+            Directory.CreateDirectory(Vm.WorkspaceDir);
 
-        GridCells.CollectionChanged += GridCells_CollectionChanged;
+        Vm.GridCells.CollectionChanged += GridCells_CollectionChanged;
 
         void GridCells_CollectionChanged(object? s, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
@@ -821,11 +266,11 @@ target.PlaceholderColor = source.PlaceholderColor;
             if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
             {
                 _cellSpatialIndex.Clear();
-                LayerManager.Clear();
-                foreach (var cell in GridCells)
+                Vm.LayerManager.Clear();
+                foreach (var cell in Vm.GridCells)
                 {
                     AddCellToSpatialIndex(cell);
-                    LayerManager.AddCell(cell);
+                    Vm.LayerManager.AddCell(cell);
                 }
             }
             else
@@ -835,7 +280,8 @@ target.PlaceholderColor = source.PlaceholderColor;
                     foreach (CellViewModel cell in e.OldItems)
                     {
                         RemoveCellFromSpatialIndex(cell);
-                        LayerManager.RemoveCell(cell);
+                        Vm.LayerManager.RemoveCell(cell);
+                        cell.PropertyChanged -= Cell_TypeChanged;
                     }
                 }
                 if (e.NewItems != null)
@@ -843,42 +289,44 @@ target.PlaceholderColor = source.PlaceholderColor;
                     foreach (CellViewModel cell in e.NewItems)
                     {
                         AddCellToSpatialIndex(cell);
-                        LayerManager.AddCell(cell);
+                        if (Vm.LayerManager.AddCell(cell) == null && cell.Type == CellType.None)
+                        {
+                            // Cell has no type yet (e.g. being set up before a download).
+                            // Subscribe so we can route it into the correct layer once the type is set.
+                            cell.PropertyChanged += Cell_TypeChanged;
+                        }
                     }
                 }
             }
         }
 
-        Annotations.CollectionChanged += Annotations_CollectionChanged;
+        Vm.Annotations.CollectionChanged += Annotations_CollectionChanged;
 
         void Annotations_CollectionChanged(object? s, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
             if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
             {
-                LayerManager.Annotations.Items.Clear();
-                foreach (var ann in Annotations)
-                    LayerManager.Annotations.Items.Add(ann);
+                Vm.LayerManager.Annotations.Items.Clear();
+                foreach (var ann in Vm.Annotations)
+                    Vm.LayerManager.Annotations.Items.Add(ann);
             }
             else
             {
                 if (e.OldItems != null)
                 {
                     foreach (AnnotationViewModel ann in e.OldItems)
-                        LayerManager.Annotations.Items.Remove(ann);
+                        Vm.LayerManager.Annotations.Items.Remove(ann);
                 }
                 if (e.NewItems != null)
                 {
                     foreach (AnnotationViewModel ann in e.NewItems)
-                        LayerManager.Annotations.Items.Add(ann);
+                        Vm.LayerManager.Annotations.Items.Add(ann);
                 }
             }
         }
 
-        OnPropertyChanged(nameof(WindowTitle));
-        // ItemsSource is now bound via XAML to LayerManager.{Layer}.Cells
-
         // Wire layer visibility changes to cell visual state
-        foreach (var layer in LayerManager.ContentLayers)
+        foreach (var layer in Vm.LayerManager.ContentLayers)
         {
             if (layer is INotifyPropertyChanged inpc)
                 inpc.PropertyChanged += (_, e) => OnLayerPropertyChanged(layer, e);
@@ -893,7 +341,6 @@ target.PlaceholderColor = source.PlaceholderColor;
         if (mainCanvas != null)
             mainCanvas.RenderTransform = tg;
 
-        // Initialize custom cursor icon position off-screen
         var cursorIcon = this.FindControl<Border>("CursorIconContainer");
         if (cursorIcon != null)
         {
@@ -901,12 +348,6 @@ target.PlaceholderColor = source.PlaceholderColor;
             Canvas.SetTop(cursorIcon, -100);
         }
 
-        // Wire up drag-drop on both the Window and CanvasBorder directly.
-        // On Linux/Wayland the platform DnD protocol requires DragEnter to be
-        // explicitly handled with an accepted effect before the compositor will
-        // deliver any DragOver or Drop events. Registering on CanvasBorder (the
-        // actual hit-test surface) in addition to the Window ensures the events
-        // are received regardless of which routing layer the backend fires on.
         AddHandler(DragDrop.DragEnterEvent, OnDragEnter);
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
         AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
@@ -922,46 +363,31 @@ target.PlaceholderColor = source.PlaceholderColor;
             canvasBorderDnd.AddHandler(DragDrop.DropEvent, OnDrop);
         }
 
-        // Start the viewport LOD polling timer (recalculates image detail levels)
         InitViewportLodTimer();
 
-        // Auto-load a board passed via command line
         if (!string.IsNullOrEmpty(startFile) && File.Exists(startFile))
         {
-            Avalonia.Threading.Dispatcher.UIThread.Post(() => LoadBoardFromFile(startFile));
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => Vm.LoadBoardFromFile(startFile));
         }
 
-        // Unsaved-changes confirmation on OS close button / Alt-F4.
         Closing += OnWindowClosing;
     }
 
-    /// <summary>
-    /// Intercepts window close requests to prompt the user when there are unsaved changes.
-    /// Uses a two-step approach: cancel the first close, show an async dialog, then
-    /// re-close if the user confirms — setting <see cref="_closingConfirmed"/> to skip
-    /// the prompt on the second pass.
-    /// </summary>
     private async void OnWindowClosing(object? sender, WindowClosingEventArgs e)
     {
-        // Already confirmed, or nothing unsaved, or triggered programmatically from
-        // within this handler — let the close proceed.
-        if (_closingConfirmed || !_hasUnsavedChanges || e.IsProgrammatic)
+        if (Vm.ClosingConfirmed || !Vm.HasUnsavedChanges || e.IsProgrammatic)
             return;
 
-        // Cancel this close attempt and show the confirmation dialog asynchronously.
         e.Cancel = true;
 
         bool discard = await ConfirmDiscardChanges();
         if (discard)
         {
-            _closingConfirmed = true;
-            Close(); // will re-enter OnWindowClosing with _closingConfirmed == true
+            Vm.ClosingConfirmed = true;
+            Close();
         }
     }
 
-    /// <summary>
-    /// Stops and releases background timers when the window is fully closed.
-    /// </summary>
     protected override void OnClosed(EventArgs e)
     {
         base.OnClosed(e);
@@ -970,17 +396,12 @@ target.PlaceholderColor = source.PlaceholderColor;
         _zoomNotificationTimer?.Stop();
         _edgeScrollTimer?.Stop();
         _edgeScrollTimer?.Dispose();
-        _saveSemaphore.Dispose();
+        Vm.Cleanup();
     }
 
-    /// <summary>
-    /// Shows an inline confirmation dialog asking the user whether to discard unsaved changes.
-    /// Returns <c>true</c> if the user chose to discard, <c>false</c> if they cancelled.
-    /// Returns <c>true</c> immediately when there are no unsaved changes.
-    /// </summary>
     private async Task<bool> ConfirmDiscardChanges()
     {
-        if (!_hasUnsavedChanges)
+        if (!Vm.HasUnsavedChanges)
             return true;
 
         bool result = false;
@@ -1004,15 +425,8 @@ target.PlaceholderColor = source.PlaceholderColor;
             Margin = new Thickness(24, 20, 24, 0),
         };
 
-        var discardBtn = new Button
-        {
-            Content = "Discard Changes",
-            Margin = new Thickness(0, 0, 8, 0),
-        };
-        var cancelBtn = new Button
-        {
-            Content = "Cancel",
-        };
+        var discardBtn = new Button { Content = "Discard Changes", Margin = new Thickness(0, 0, 8, 0) };
+        var cancelBtn = new Button { Content = "Cancel" };
 
         discardBtn.Click += (_, _) => { result = true; dialog.Close(); };
         cancelBtn.Click += (_, _) => { result = false; dialog.Close(); };
@@ -1032,343 +446,86 @@ target.PlaceholderColor = source.PlaceholderColor;
         layout.Children.Add(btnRow);
 
         dialog.Content = layout;
-
         await dialog.ShowDialog(this);
         return result;
     }
 
-    #endregion
+    // ── Layer Management ──────────────────────────────────────────────────────
 
-    #region Board File I/O
-
-    /// <summary>
-    /// Loads a board from a .cgrb/.json file and replaces the current board state.
-    /// </summary>
-    private async void LoadBoardFromFile(string filePath)
+    private void OnLayerPropertyChanged(IContentLayer layer, PropertyChangedEventArgs e)
     {
-        // Read the file BEFORE touching any board state so that if the read fails
-        // the current board remains valid and _currentBoardFile is left unchanged.
-        string json;
-        try
-        {
-            json = await File.ReadAllTextAsync(filePath);
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"Load error (read): {ex.Message}");
-            ShowToast("⚠️ Could not open board file");
+        if (e.PropertyName != nameof(IContentLayer.IsVisible))
             return;
-        }
-
-        // Commit the new file identity now that we successfully have the data.
-        _currentBoardFile = filePath;
-        _workspaceDir = Path.GetDirectoryName(_currentBoardFile)!;
-        CurrentBoardName = Path.GetFileNameWithoutExtension(_currentBoardFile);
-        OnPropertyChanged(nameof(WindowTitle));
-        UpdateBoardDirectoryList();
-
-        var startupOverlay = this.FindControl<Border>("StartupOverlay");
-        if (startupOverlay != null)
-            startupOverlay.IsVisible = false;
-
-        OnPropertyChanged(nameof(WindowTitle));
-
-        // Dispose existing cell bitmaps and clear colour caches.
-        foreach (var c in GridCells)
-            c.UnloadImage();
-        ImageManager.ClearCaches();
-
-        // Clear stale selection references before discarding the view-models.
-        foreach (var c in _selectedCells)
-            c.IsSelected = false;
-        _selectedCells.Clear();
-
-        GridCells.Clear();
-        Annotations.Clear();
-        _selectedAnnotations.Clear();
-        _currentAnnotation = null;
-        _editingTextAnnotation = null;
-
-        try
-        {
-            var (cells, annotations) = BoardSerializer.Deserialize(json, _currentBoardFile);
-            foreach (var cell in cells)
-                GridCells.Add(cell);
-            foreach (var ann in annotations)
-            {
-                ann.IsInDrawMode = IsDrawMode;
-                Annotations.Add(ann);
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"Load error (deserialize): {ex.Message}");
-            ShowToast("⚠️ Board file is corrupt or unreadable");
-            _hasUnsavedChanges = false;
-            return;
-        }
-
-        _hasUnsavedChanges = false;
-        Title = $"{Constants.AppName} - {Path.GetFileName(_currentBoardFile)}" + (_isViewMode ? " [VIEW MODE]" : "");
-        AddRecentBoard(_currentBoardFile);
-
-        _undoStack.Clear();
-        _redoStack.Clear();
-        _lastStateHash = null;
-        SaveBoardData();
-
-        // For cells loaded from older .cgrb files without a saved PlaceholderColor,
-        // kick off background average-colour computation so the placeholder rects
-        // show a meaningful colour instead of default dark grey.
-        foreach (var cell in GridCells)
-        {
-            if (cell.NeedsImage && cell.PlaceholderColor == "#FF2A2A2A")
-                _ = cell.EnsurePlaceholderColorAsync();
-        }
-
-        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-        {
-            ShowAll_Click(null, null!);
-            ScheduleViewportUpdate();
-        });
+        foreach (var cell in layer.Cells)
+            cell.IsLayerVisible = layer.IsVisible;
     }
 
-    private string ComputeStateHash(IEnumerable<CellViewModel> cells, IEnumerable<AnnotationViewModel> annotations)
-    {
-        unchecked
-        {
-            int hash = 19;
-            foreach (var c in cells)
-            {
-                hash = hash * 31 + c.CanvasX.GetHashCode();
-                hash = hash * 31 + c.CanvasY.GetHashCode();
-                hash = hash * 31 + c.ColSpan;
-                hash = hash * 31 + c.RowSpan;
-                hash = hash * 31 + c.Type.GetHashCode();
-                hash = hash * 31 + (c.TextContent?.GetHashCode() ?? 0);
-            }
-            foreach (var a in annotations)
-            {
-                hash = hash * 31 + (a.Type?.GetHashCode() ?? 0);
-                hash = hash * 31 + a.CanvasX.GetHashCode();
-                hash = hash * 31 + a.CanvasY.GetHashCode();
-                hash = hash * 31 + a.Points.Count;
-                hash = hash * 31 + (a.Text?.GetHashCode() ?? 0);
-            }
-            return hash.ToString("X8");
-        }
-    }
+    // ── Zoom notifications ────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Saves the current board state to the active .cgrb file and pushes to undo stack.
-    /// Concurrent calls are serialised via <see cref="_saveSemaphore"/> so that rapid
-    /// mutations (drag end, undo, redo …) never interleave writes or corrupt the file.
-    /// Uses a write-to-temp-then-rename pattern for atomicity.
-    /// </summary>
-    private async void SaveBoardData()
+    private void NotifyZoomChanged()
     {
-        if (string.IsNullOrEmpty(_currentBoardFile))
+        if (_zoomNotificationPending)
             return;
 
-        string json = BoardSerializer.Serialize(GridCells, Annotations, _currentBoardFile);
+        _zoomNotificationPending = true;
 
-        // Undo stack management is synchronous — do it before the async I/O so the
-        // stack is consistent even if the write below fails.
-        if (!_isRestoringState && !_isViewMode)
+        if (_zoomNotificationTimer == null)
         {
-            // Use hash for quick change detection - skip if state unchanged
-            string currentHash = ComputeStateHash(GridCells, Annotations);
-            bool stackIsEmpty = _undoStack.Count == 0;
-            bool jsonMatchesStack = !stackIsEmpty && _undoStack.Peek() == json;
-
-            if (!jsonMatchesStack)
+            _zoomNotificationTimer = new Avalonia.Threading.DispatcherTimer
             {
-                _undoStack.Push(json);
-                _lastStateHash = currentHash;
-
-                // Trim undo stack to prevent unbounded memory growth
-                if (_undoStack.Count > Constants.MaxUndoDepth)
-                {
-                    var items = _undoStack.ToArray(); // [newest, ..., oldest]
-                    _undoStack.Clear();
-                    for (int i = Constants.MaxUndoDepth - 1; i >= 0; i--)
-                        _undoStack.Push(items[i]);
-                }
-
-                _redoStack.Clear();
-            }
-            else
-            {
-                // State hasn't changed from stack perspective - still update hash in case
-                _lastStateHash = currentHash;
-            }
-        }
-        else
-        {
-            // Restore mode - compute hash for future comparisons
-            _lastStateHash = ComputeStateHash(GridCells, Annotations);
-        }
-
-        // Serialise file I/O: only one write at a time, regardless of how many
-        // concurrent async void invocations are in flight.
-        await _saveSemaphore.WaitAsync();
-        try
-        {
-            // Write to a temp file first, then atomically rename.
-            // This prevents a partial write from leaving a corrupt .cgrb if the
-            // process is killed mid-write or if the disk fills up.
-            string tempFile = _currentBoardFile + ".tmp";
-            await File.WriteAllTextAsync(tempFile, json);
-            File.Move(tempFile, _currentBoardFile, overwrite: true);
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"Save error: {ex.Message}");
-            ShowToast("⚠️ Save failed — check disk space");
-            return;
-        }
-        finally
-        {
-            _saveSemaphore.Release();
-        }
-
-        _hasUnsavedChanges = false;
-        Title = $"{Constants.AppName} - {Path.GetFileName(_currentBoardFile)}" + (_isViewMode ? " [VIEW MODE]" : "");
-        AddRecentBoard(_currentBoardFile);
-    }
-
-    private void MarkUnsaved()
-    {
-        if (_hasUnsavedChanges)
-            return;
-        _hasUnsavedChanges = true;
-        Title = Constants.AppName
-            + (string.IsNullOrEmpty(_currentBoardFile) ? "" : $" - {Path.GetFileName(_currentBoardFile)}")
-            + " *";
-    }
-
-    #endregion
-
-    #region Recent Boards
-
-    private async void LoadRecentBoards()
-    {
-        string path = Path.Combine(Constants.ConfigDirectory, Constants.RecentBoardsFileName);
-
-        if (File.Exists(path))
-        {
-            try
-            {
-                string json = await File.ReadAllTextAsync(path);
-                var list = JsonSerializer.Deserialize<List<string>>(json);
-                if (list != null)
-                {
-                    foreach (var b in list.Where(File.Exists))
-                        RecentBoards.Add(b);
-                }
-            }
-            catch { /* ignore corrupt recent boards file */ }
-        }
-        OnPropertyChanged(nameof(HasRecentBoards));
-    }
-
-    private async void AddRecentBoard(string path)
-    {
-        if (RecentBoards.Contains(path))
-            RecentBoards.Remove(path);
-        RecentBoards.Insert(0, path);
-        while (RecentBoards.Count > Constants.MaxRecentBoards)
-            RecentBoards.RemoveAt(RecentBoards.Count - 1);
-
-        string confDir = Constants.ConfigDirectory;
-        if (!Directory.Exists(confDir))
-            Directory.CreateDirectory(confDir);
-
-        string confPath = Path.Combine(confDir, Constants.RecentBoardsFileName);
-        try
-        { await File.WriteAllTextAsync(confPath, JsonSerializer.Serialize(RecentBoards)); }
-        catch { /* non-critical */ }
-
-        OnPropertyChanged(nameof(HasRecentBoards));
-    }
-
-    private async void UpdateBoardDirectoryList()
-    {
-        BoardFilesInDirectory.Clear();
-        if (string.IsNullOrEmpty(_workspaceDir) || !Directory.Exists(_workspaceDir))
-            return;
-
-        var currentFile = _currentBoardFile;
-        var workspaceDir = _workspaceDir;
-        var extension = Constants.DefaultBoardExtension;
-
-        var files = await Task.Run(() =>
-            Directory.GetFiles(workspaceDir, $"*{extension}")
-                     .OrderBy(Path.GetFileName)
-                     .ToList());
-
-        foreach (var file in files)
-        {
-            BoardFilesInDirectory.Add(new BoardMenuItemViewModel
-            {
-                FileName = Path.GetFileName(file),
-                IsActive = !string.IsNullOrEmpty(currentFile) &&
-                           Path.GetFullPath(file) == Path.GetFullPath(currentFile)
-            });
-        }
-        OnPropertyChanged(nameof(HasBoardFilesInDirectory));
-    }
-
-    #endregion
-
-    #region User Settings
-
-    private void LoadUserSettings()
-    {
-        try
-        {
-            string path = Path.Combine(Constants.ConfigDirectory, Constants.UserSettingsFileName);
-
-            if (!File.Exists(path))
-                return;
-
-            string json = File.ReadAllText(path);
-            var settings = JsonSerializer.Deserialize<UserSettings>(json);
-            if (settings != null)
-            {
-                AnnotationEffectMode = settings.AnnotationEffect ?? "None";
-                GridBackgroundMode = settings.GridBackground ?? "Dots";
-            }
-        }
-        catch { /* ignore corrupt settings */ }
-    }
-
-    private async void SaveUserSettings()
-    {
-        try
-        {
-            string confDir = Constants.ConfigDirectory;
-            if (!Directory.Exists(confDir))
-                Directory.CreateDirectory(confDir);
-
-            string confPath = Path.Combine(confDir, Constants.UserSettingsFileName);
-            var settings = new UserSettings
-            {
-                AnnotationEffect = _annotationEffect,
-                GridBackground = _gridBackgroundMode
+                Interval = TimeSpan.FromMilliseconds(16)
             };
-            await File.WriteAllTextAsync(confPath, JsonSerializer.Serialize(settings));
+            _zoomNotificationTimer.Tick += ZoomNotificationTimer_Tick;
         }
-        catch { /* non-critical */ }
+
+        _zoomNotificationTimer.Start();
     }
 
-    #endregion
+    private void ZoomNotificationTimer_Tick(object? sender, EventArgs e)
+    {
+        _zoomNotificationTimer?.Stop();
+        _zoomNotificationPending = false;
 
-    #region Grid Cell Helpers
+        OnPropertyChanged(nameof(ZoomLevelText));
+        OnPropertyChanged(nameof(ZoomInverseFactor));
+        OnPropertyChanged(nameof(ZoomIndependentBorderThickness));
+        OnPropertyChanged(nameof(ZoomIndependentCornerRadius));
+        OnPropertyChanged(nameof(IsCanvasBackgroundVisible));
+
+        CGReferenceBoard.Controls.AnnotationShape.SetScale(_scale.ScaleX);
+
+        var canvas = this.FindControl<Avalonia.Controls.Canvas>("MainCanvas");
+        if (canvas != null)
+        {
+            var mode = _scale.ScaleX < 0.35
+                ? Avalonia.Media.Imaging.BitmapInterpolationMode.LowQuality
+                : _scale.ScaleX < 1.0
+                    ? Avalonia.Media.Imaging.BitmapInterpolationMode.MediumQuality
+                    : Avalonia.Media.Imaging.BitmapInterpolationMode.HighQuality;
+            Avalonia.Media.RenderOptions.SetBitmapInterpolationMode(canvas, mode);
+        }
+    }
+
+    // ── Grid Cell Helpers ─────────────────────────────────────────────────────
 
     /// <summary>
-    /// Adds a cell to the spatial index for O(1) grid-position lookups.
+    /// Fires when a cell's property changes after it was added to GridCells with Type=None.
+    /// Routes the cell into the correct layer once its Type is assigned.
     /// </summary>
+    private void Cell_TypeChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(CellViewModel.Type))
+            return;
+        if (sender is not CellViewModel cell)
+            return;
+        if (cell.Type == CellType.None)
+            return;
+
+        // Unsubscribe — only need to route once.
+        cell.PropertyChanged -= Cell_TypeChanged;
+        Vm.LayerManager.AddCell(cell);
+    }
+
     private void AddCellToSpatialIndex(CellViewModel cell)
     {
         int gridX = (int)cell.CanvasX;
@@ -1376,9 +533,6 @@ target.PlaceholderColor = source.PlaceholderColor;
         _cellSpatialIndex[(gridX, gridY)] = cell;
     }
 
-    /// <summary>
-    /// Removes a cell from the spatial index.
-    /// </summary>
     private void RemoveCellFromSpatialIndex(CellViewModel cell)
     {
         int gridX = (int)cell.CanvasX;
@@ -1386,9 +540,6 @@ target.PlaceholderColor = source.PlaceholderColor;
         _cellSpatialIndex.Remove((gridX, gridY));
     }
 
-    /// <summary>
-    /// Finds or creates a cell at the grid position nearest to the given canvas point.
-    /// </summary>
     private CellViewModel GetOrCreateCellAt(Point canvasPoint)
     {
         int gridX = (int)(Math.Floor(canvasPoint.X / Constants.GridSize) * Constants.GridSize);
@@ -1398,15 +549,11 @@ target.PlaceholderColor = source.PlaceholderColor;
             return existing;
 
         var newCell = new CellViewModel { CanvasX = gridX, CanvasY = gridY };
-        GridCells.Add(newCell);
-        MarkUnsaved();
+        Vm.GridCells.Add(newCell);
+        Vm.MarkUnsaved();
         return newCell;
     }
 
-    /// <summary>
-    /// Finds an existing content-layer cell at the grid position, or creates one.
-    /// Board elements (Backdrop, Label) at the same position are ignored.
-    /// </summary>
     private CellViewModel GetOrCreateContentCellAt(Point canvasPoint)
     {
         int gridX = (int)(Math.Floor(canvasPoint.X / Constants.GridSize) * Constants.GridSize);
@@ -1416,14 +563,11 @@ target.PlaceholderColor = source.PlaceholderColor;
             return existing;
 
         var newCell = new CellViewModel { CanvasX = gridX, CanvasY = gridY };
-        GridCells.Add(newCell);
-        MarkUnsaved();
+        Vm.GridCells.Add(newCell);
+        Vm.MarkUnsaved();
         return newCell;
     }
 
-    /// <summary>
-    /// Returns the cell under the hover highlight, or creates one at the viewport center.
-    /// </summary>
     private CellViewModel GetHighlightedCell()
     {
         var hoverHighlight = this.FindControl<Border>("HoverHighlight");
@@ -1442,16 +586,14 @@ target.PlaceholderColor = source.PlaceholderColor;
         return GetOrCreateCellAt(centerPos);
     }
 
-    #endregion
-
-    #region Image / Video Loading
+    // ── Image / Video Loading ─────────────────────────────────────────────────
 
     private async void LoadImageToCell(CellViewModel cell, string sourcePath)
     {
         if (!File.Exists(sourcePath))
             return;
 
-        string destDir = Path.Combine(_workspaceDir, "images");
+        string destDir = Path.Combine(Vm.WorkspaceDir, "images");
         if (!Directory.Exists(destDir))
             Directory.CreateDirectory(destDir);
 
@@ -1464,11 +606,11 @@ target.PlaceholderColor = source.PlaceholderColor;
         }
 
         cell.SetImage(destPath);
-        MarkUnsaved();
-        SaveBoardData();
+        Vm.MarkUnsaved();
+        Vm.SaveBoardData();
     }
 
-private async Task DownloadMediaToCell(CellViewModel cell, string url)
+    private async Task DownloadMediaToCell(CellViewModel cell, string url)
     {
         cell.SetText($"Checking availability...\n{url}");
 
@@ -1483,7 +625,7 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
         cell.DownloadProgress = 0f;
         cell.DownloadStatusText = "Starting...";
 
-        string mediaDir = Path.Combine(_workspaceDir, "videos");
+        string mediaDir = Path.Combine(Vm.WorkspaceDir, "videos");
 
         void OnProgress(float percent, string status)
         {
@@ -1513,17 +655,15 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
                     cell.SetText(url);
                     return;
                 }
-                var imgDir = Path.Combine(_workspaceDir, "images");
+                var imgDir = Path.Combine(Vm.WorkspaceDir, "images");
                 Directory.CreateDirectory(imgDir);
                 string destPath = Path.Combine(imgDir, Path.GetFileName(result.MediaPath));
                 if (result.MediaPath != destPath && !File.Exists(destPath))
-                {
                     File.Move(result.MediaPath, destPath);
-                }
                 cell.SetImage(destPath);
             }
-            MarkUnsaved();
-            SaveBoardData();
+            Vm.MarkUnsaved();
+            Vm.SaveBoardData();
         }
         else
         {
@@ -1531,11 +671,26 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
         }
     }
 
-    #endregion
+    // ── Performance helpers ───────────────────────────────────────────────────
 
-    #region Selection Helpers
+    private void DisableCellHitTesting()
+    {
+        foreach (var cell in Vm.GridCells)
+            cell.IsHitTestEnabled = false;
+        foreach (var ann in Vm.Annotations)
+            ann.IsHitTestEnabled = false;
+    }
 
-    /// <summary>Deselects all cells and annotations, clears both selection lists.</summary>
+    private void EnableCellHitTesting()
+    {
+        foreach (var cell in Vm.GridCells)
+            cell.IsHitTestEnabled = true;
+        foreach (var ann in Vm.Annotations)
+            ann.IsHitTestEnabled = true;
+    }
+
+    // ── Selection Helpers ─────────────────────────────────────────────────────
+
     private void ClearSelection()
     {
         foreach (var c in _selectedCells)
@@ -1544,72 +699,57 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
         foreach (var a in _selectedAnnotations)
             a.IsSelected = false;
         _selectedAnnotations.Clear();
+        Vm.SelectionService.ClearSelection();
         UpdateSelectionState();
     }
 
-    // Tunneled PointerPressed handler attached to CanvasBorder to prioritize panning gestures.
-    // This runs in the tunneling phase (before child controls get the PointerPressed),
-    // allowing middle-click to start panning even when over other objects.
-    // Note: Shift+Left-click is NOT handled here to allow Shift+double-click to work on cells.
-    // Shift+drag panning is handled in Canvas_PointerPressed/PointerMoved instead.
     private void CanvasBorder_Tunneled_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        // If event already handled by something more important, do nothing.
         if (e.Handled)
             return;
 
         var props = e.GetCurrentPoint(this).Properties;
-
-        // Only handle middle-button for immediate panning in the tunneling phase.
-        // Shift+Left-click is handled via threshold-based approach in Canvas_PointerMoved.
         if (!props.IsMiddleButtonPressed)
             return;
 
-        // Start panning and capture pointer to the CanvasBorder to handle subsequent moves/releases.
         _isPanning = true;
         _panStartPoint = e.GetPosition(this);
         _middleZoomStartY = e.GetPosition(this).Y;
 
-        // Apply pan cursor on canvas border
         try
         {
             var canvasBorder = this.FindControl<Border>("CanvasBorder");
             if (canvasBorder != null)
             {
                 ApplyPanCursor(canvasBorder);
-                // Capture the pointer on the canvas border so we get PointerMoved/PointerReleased.
                 e.Pointer.Capture(canvasBorder);
             }
         }
-        catch
-        {
-            // ignore cursor/capture errors
-        }
+        catch { }
 
-        // Mark handled so child elements don't intercept the gesture.
         e.Handled = true;
     }
 
     public void UpdateSelectionState()
     {
+        // Sync to SelectionService
+        Vm.SelectionService.SelectRange(_selectedCells, _selectedAnnotations);
+
         OnPropertyChanged(nameof(SelectionCountText));
         OnPropertyChanged(nameof(HasMultipleSelection));
         OnPropertyChanged(nameof(HasSingleSelection));
 
         bool multi = HasMultipleSelection;
         bool single = HasSingleSelection;
-        foreach (var cell in GridCells)
+        foreach (var cell in Vm.GridCells)
         {
             cell.HasMultipleSelection = multi;
             cell.HasSingleSelection = single;
         }
     }
 
-    #endregion
+    // ── Highlight Helpers ─────────────────────────────────────────────────────
 
-    #region Highlight Helpers
-
-    /// <summary>Briefly highlights a cell to draw attention to it (e.g. after paste).</summary>
     private async void HighlightCell(CellViewModel cell)
     {
         cell.IsHighlighted = true;
@@ -1617,9 +757,6 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
         cell.IsHighlighted = false;
     }
 
-    /// <summary>
-    /// Selects a cell and pans the view to center on it without changing zoom.
-    /// </summary>
     private void SelectAndPanToCell(CellViewModel cell)
     {
         ClearSelection();
@@ -1632,11 +769,8 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
         PanToPosition(centerX, centerY);
     }
 
-    #endregion
+    // ── Placement Preview Helpers ─────────────────────────────────────────────
 
-    #region Placement Preview Helpers
-
-    /// <summary>Shows the placement preview rectangle at the specified grid-aligned position.</summary>
     private void ShowPlacementPreview(double x, double y, int colSpan, int rowSpan, IContentLayer owningLayer)
     {
         var previewBorder = this.FindControl<Border>("PlacementPreviewBorder");
@@ -1649,13 +783,9 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
         _previewColSpan = colSpan;
         _previewRowSpan = rowSpan;
 
-        // Check if placement is valid (no collision)
-        _previewIsValid = GridLayoutService.IsSpaceEmpty(GridCells, x, y, colSpan, rowSpan, owningLayer);
+        _previewIsValid = GridLayoutService.IsSpaceEmpty(Vm.GridCells, x, y, colSpan, rowSpan, owningLayer);
 
-        // Update visual appearance based on validity
-        previewBorder.BorderBrush = _previewIsValid
-            ? Brushes.LightGreen
-            : Brushes.Red;
+        previewBorder.BorderBrush = _previewIsValid ? Brushes.LightGreen : Brushes.Red;
         previewBorder.Background = _previewIsValid
             ? new SolidColorBrush(Color.FromArgb(48, 144, 238, 144))
             : new SolidColorBrush(Color.FromArgb(48, 255, 68, 68));
@@ -1667,7 +797,6 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
         previewBorder.IsVisible = true;
     }
 
-    /// <summary>Hides the placement preview rectangle.</summary>
     private void HidePlacementPreview()
     {
         var previewBorder = this.FindControl<Border>("PlacementPreviewBorder");
@@ -1679,20 +808,17 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
         _pendingBackdrop = null;
     }
 
-    /// <summary>Updates the placement preview position based on pointer movement.</summary>
     private void UpdatePlacementPreview(Point canvasPoint)
     {
         if (!_isShowingPlacementPreview || _pendingBackdrop == null)
             return;
 
-        // Snap to grid
         int gridX = (int)(Math.Floor(canvasPoint.X / Constants.GridSize) * Constants.GridSize);
         int gridY = (int)(Math.Floor(canvasPoint.Y / Constants.GridSize) * Constants.GridSize);
 
-        ShowPlacementPreview(gridX, gridY, _previewColSpan, _previewRowSpan, LayerManager.Backdrops);
+        ShowPlacementPreview(gridX, gridY, _previewColSpan, _previewRowSpan, Vm.LayerManager.Backdrops);
     }
 
-    /// <summary>Attempts to place the pending backdrop at the preview location if valid.</summary>
     private bool TryPlacePendingBackdrop()
     {
         if (!_isShowingPlacementPreview || _pendingBackdrop == null || !_previewIsValid)
@@ -1700,18 +826,15 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
 
         _pendingBackdrop.CanvasX = _previewX;
         _pendingBackdrop.CanvasY = _previewY;
-        GridCells.Add(_pendingBackdrop);
-        MarkUnsaved();
-        SaveBoardData();
+        Vm.GridCells.Add(_pendingBackdrop);
+        Vm.MarkUnsaved();
+        Vm.SaveBoardData();
         HidePlacementPreview();
         return true;
     }
 
-    #endregion
+    // ── Edge Scroll Helpers ───────────────────────────────────────────────────
 
-    #region Edge Scroll Helpers
-
-    /// <summary>Starts edge scrolling if the pointer is near the viewport edge.</summary>
     private void StartEdgeScrollIfNeeded(Point screenPoint)
     {
         var canvasBorder = _cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder");
@@ -1729,7 +852,7 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
             _isEdgeScrolling = true;
             if (_edgeScrollTimer == null)
             {
-                _edgeScrollTimer = new System.Timers.Timer(16); // ~60fps
+                _edgeScrollTimer = new System.Timers.Timer(16);
                 _edgeScrollTimer.Elapsed += EdgeScrollTimer_Elapsed;
             }
             _edgeScrollTimer.Start();
@@ -1740,14 +863,12 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
         }
     }
 
-    /// <summary>Stops the edge scroll timer.</summary>
     private void StopEdgeScroll()
     {
         _isEdgeScrolling = false;
         _edgeScrollTimer?.Stop();
     }
 
-    /// <summary>Timer callback that performs the actual edge scrolling.</summary>
     private void EdgeScrollTimer_Elapsed(object? sender, System.Timers.ElapsedEventArgs e)
     {
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
@@ -1777,11 +898,8 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
         }, Avalonia.Threading.DispatcherPriority.Background);
     }
 
-    #endregion
+    // ── Toast Notification ────────────────────────────────────────────────────
 
-    #region Toast Notification
-
-    /// <summary>Shows a brief toast message at the bottom of the window.</summary>
     private async void ShowToast(string message)
     {
         var border = this.FindControl<Border>("ToastBorder");
@@ -1789,7 +907,6 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
         if (border == null || text == null)
             return;
 
-        // Cancel any existing toast
         _toastCts?.Cancel();
         _toastCts = new System.Threading.CancellationTokenSource();
         var token = _toastCts.Token;
@@ -1805,21 +922,11 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
             await Task.Delay(250, token);
             border.IsVisible = false;
         }
-        catch (TaskCanceledException)
-        {
-            // New toast replaced this one — that's fine
-        }
+        catch (TaskCanceledException) { }
     }
 
-    #endregion
+    // ── Viewport LOD Management ───────────────────────────────────────────────
 
-    #region Viewport LOD Management
-
-    /// <summary>
-    /// Initialises a <see cref="Avalonia.Threading.DispatcherTimer"/> that polls the
-    /// current pan/zoom transform every 200 ms and triggers an LOD recalculation
-    /// whenever the viewport changes. Uses debouncing to avoid updating during active pan/zoom.
-    /// </summary>
     private void InitViewportLodTimer()
     {
         _viewportLodTimer = new Avalonia.Threading.DispatcherTimer
@@ -1836,7 +943,6 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
         _lodDebounceTimer.Tick += LodDebounceTimer_Tick;
     }
 
-    /// <summary>Debounced timer - fires after user stops panning/zooming.</summary>
     private void LodDebounceTimer_Tick(object? sender, EventArgs e)
     {
         _lodDebounceTimer?.Stop();
@@ -1849,19 +955,16 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
         }
     }
 
-    /// <summary>Timer callback — fires on the UI thread. Schedules debounced update.</summary>
     private void ViewportLodTimer_Tick(object? sender, EventArgs e)
     {
         double tx = _translate.X;
         double ty = _translate.Y;
         double sc = _scale.ScaleX;
-        int count = GridCells.Count;
+        int count = Vm.GridCells.Count;
         double vw = MainCanvas.Bounds.Width > 0 ? MainCanvas.Bounds.Width : this.Bounds.Width;
         double vh = MainCanvas.Bounds.Height > 0 ? MainCanvas.Bounds.Height : this.Bounds.Height;
+        int annCount = Vm.Annotations.Count;
 
-        int annCount = Annotations.Count;
-
-        // Skip if nothing relevant changed since last tick.
         if (tx == _lastViewportTx && ty == _lastViewportTy
             && sc == _lastViewportScale && count == _lastViewportCellCount
             && vw == _lastViewportW && vh == _lastViewportH
@@ -1876,7 +979,6 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
         _lastViewportH = vh;
         _lastAnnotationCount = annCount;
 
-        // During active pan/zoom, just mark as pending without firing
         _lodUpdatePending = true;
 
         if (!_isLodUpdateScheduled)
@@ -1886,21 +988,11 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
         }
     }
 
-    /// <summary>
-    /// Forces the next timer tick to recalculate LODs regardless of whether
-    /// the cached transform values have changed.
-    /// </summary>
     public void ScheduleViewportUpdate()
     {
         _lastViewportScale = double.NaN;
     }
 
-    /// <summary>
-    /// Iterates every image/video cell and transitions it to the LOD tier
-    /// appropriate for its current on-screen size and visibility.
-    /// Heavy I/O (bitmap decode) is performed on the thread-pool; only the
-    /// final <c>Image</c> property assignment happens on the UI thread.
-    /// </summary>
     private async Task UpdateViewportLodAsync()
     {
         try
@@ -1919,20 +1011,15 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
             double vpRight = viewW / scale - tx;
             double vpBottom = viewH / scale - ty;
 
-            // Generous margin so cells about to scroll into view pre-load their bitmaps
-            // and don't vanish while still within one-cell distance of the edge.
             double margin = Constants.GridSize * 2;
             vpLeft -= margin;
             vpTop -= margin;
             vpRight += margin;
             vpBottom += margin;
 
-            // Viewport centre used for distance-based priority ordering of loads.
             double vpCenterX = (vpLeft + vpRight) / 2.0;
             double vpCenterY = (vpTop + vpBottom) / 2.0;
 
-            // Pre-build a set of cells that are currently mid-drag so we never
-            // cull them (they can briefly leave the margin zone during edge-scroll).
             var draggedCells = new System.Collections.Generic.HashSet<CellViewModel>();
             if (_draggingCell != null)
                 draggedCells.Add(_draggingCell);
@@ -1943,7 +1030,7 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
             var unloads = new System.Collections.Generic.List<CellViewModel>();
             var loads = new System.Collections.Generic.List<(CellViewModel Cell, ImageLod Target, double Distance)>();
 
-            foreach (var cell in GridCells)
+            foreach (var cell in Vm.GridCells)
             {
                 double cellLeft = cell.CanvasX;
                 double cellTop = cell.CanvasY;
@@ -1953,17 +1040,12 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
                 bool isInViewport = cellRight > vpLeft && cellLeft < vpRight
                                  && cellBottom > vpTop && cellTop < vpBottom;
 
-                // Dragged cells are always kept visible regardless of position.
                 if (draggedCells.Contains(cell))
                     isInViewport = true;
 
                 double cellScreenWidth = cell.PixelWidth * scale;
-
-                // Detail elements (text bodies, icon badges) are only worth rendering
-                // when the cell is large enough on screen to be legible.
                 bool showDetail = isInViewport && cellScreenWidth >= 50.0;
 
-                // Early exit if viewport state unchanged and LOD unchanged (optimization)
                 if (cell.IsInViewport == isInViewport && cell.IsDetailVisible == showDetail)
                 {
                     if (!cell.NeedsImage)
@@ -1976,7 +1058,6 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
                 cell.IsInViewport = isInViewport;
                 cell.IsDetailVisible = showDetail;
 
-                // ── Bitmap LOD (image and video cells only) ────────────────────────
                 if (!cell.NeedsImage)
                     continue;
 
@@ -1998,11 +1079,9 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
                 }
             }
 
-            // ── 1. Unloads: synchronous on UI thread ───────────────────────────────
             foreach (var cell in unloads)
                 cell.UnloadImage();
 
-            // ── 2. Loads: throttled async, centre-nearest first ───────────────────
             if (loads.Count > 0)
             {
                 loads.Sort(static (a, b) => a.Distance.CompareTo(b.Distance));
@@ -2011,15 +1090,8 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
 
                 async Task LoadThrottled(CellViewModel cell, ImageLod lod)
                 {
-                    // Do NOT use ConfigureAwait(false) here. The semaphore wait must
-                    // resume on the Avalonia dispatcher (UI thread) so that ApplyLodAsync
-                    // captures the dispatcher SyncContext. This guarantees that after its
-                    // internal await Task.Run(...) the continuation — which sets Image =
-                    // newBitmap and disposes the old bitmap — runs on the UI thread and
-                    // never races with the compositor's in-flight render of the old bitmap.
                     await sem.WaitAsync();
-                    try
-                    { await cell.ApplyLodAsync(lod); }
+                    try { await cell.ApplyLodAsync(lod); }
                     finally { sem.Release(); }
                 }
 
@@ -2033,14 +1105,13 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
             if (unloads.Count > 0 || loads.Count > 0)
                 GC.Collect(2, GCCollectionMode.Optimized, false);
 
-            // ── Annotation viewport culling ────────────────────────────────────────
             double annMargin = Constants.GridSize * 3;
             double annVpLeft = vpLeft - annMargin;
             double annVpTop = vpTop - annMargin;
             double annVpRight = vpRight + annMargin;
             double annVpBottom = vpBottom + annMargin;
 
-            foreach (var ann in Annotations)
+            foreach (var ann in Vm.Annotations)
             {
                 if (ann.Points.Count == 0)
                 {
@@ -2053,17 +1124,12 @@ private async Task DownloadMediaToCell(CellViewModel cell, string url)
                          && ann.AbsBoundsBottom >= annVpTop
                          && ann.AbsBoundsTop <= annVpBottom;
 
-                // Early exit if viewport state unchanged
                 if (ann.IsInViewport == inVp)
                     continue;
 
                 ann.IsInViewport = inVp;
             }
         }
-        finally
-        {
-        }
+        finally { }
     }
-
-    #endregion
 }
