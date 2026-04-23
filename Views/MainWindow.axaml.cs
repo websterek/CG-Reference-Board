@@ -579,7 +579,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 return GetOrCreateCellAt(new Point(left + 80, top + 80));
         }
 
-        var bounds = CanvasGrid.Bounds;
+        var bounds = CanvasBorder.Bounds;
         var centerPos = new Point(
             bounds.Width / 2 / _scale.ScaleX - _translate.X,
             bounds.Height / 2 / _scale.ScaleY - _translate.Y);

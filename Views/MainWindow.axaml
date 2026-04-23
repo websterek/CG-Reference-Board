@@ -1285,23 +1285,28 @@
                         />
 
                         <!-- ─────────────────────────────────────────── -->
+                        <!-- ─────────────────────────────────────────── -->
                         <!-- Board Cells Layer (all cell types)          -->
-                        <!-- Visual layering via CellViewModel.ZIndex:   -->
-                        <!--   Backdrops: -10  Items: 0  Labels: 10     -->
+                        <!-- Per-layer visibility via IsEffectivelyVisible-->
+                        <!-- ZIndex ordering: Backdrops=-10 Items=0 Labels=10 -->
                         <!-- ─────────────────────────────────────────── -->
                         <ItemsControl
                             x:Name="CanvasGrid"
                             ItemsSource="{Binding LayerManager.AllCells}"
-                            HorizontalAlignment="Stretch"
-                            VerticalAlignment="Stretch"
+                            Canvas.Left="0"
+                            Canvas.Top="0"
+                            Padding="0"
+                            Margin="0"
+                            Background="{x:Null}"
                             ClipToBounds="False"
                             IsHitTestVisible="{Binding !IsDrawMode}"
                         >
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <Canvas
-                                        HorizontalAlignment="Stretch"
-                                        VerticalAlignment="Stretch"
+                                        Canvas.Left="0"
+                                        Canvas.Top="0"
+                                        Background="{x:Null}"
                                         ClipToBounds="False"
                                         DragDrop.AllowDrop="True"
                                     />
@@ -1313,18 +1318,9 @@
                                     TargetType="ContentPresenter"
                                     x:DataType="vm:CellViewModel"
                                 >
-                                    <Setter
-                                        Property="Canvas.Left"
-                                        Value="{Binding VisualX}"
-                                    />
-                                    <Setter
-                                        Property="Canvas.Top"
-                                        Value="{Binding VisualY}"
-                                    />
-                                    <Setter
-                                        Property="ZIndex"
-                                        Value="{Binding ZIndex}"
-                                    />
+                                    <Setter Property="Canvas.Left" Value="{Binding VisualX}" />
+                                    <Setter Property="Canvas.Top"  Value="{Binding VisualY}" />
+                                    <Setter Property="ZIndex"       Value="{Binding ZIndex}"  />
                                 </ControlTheme>
                             </ItemsControl.ItemContainerTheme>
 

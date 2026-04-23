@@ -94,7 +94,7 @@ public partial class MainWindow
 
             duplicate.IsDragging = true;
 
-            var canvasPt = e.GetPosition(CanvasGrid);
+            var canvasPt = e.GetPosition(MainCanvas);
             _dragOffsetX = canvasPt.X - duplicate.CanvasX;
             _dragOffsetY = canvasPt.Y - duplicate.CanvasY;
             e.Pointer.Capture(sender as Control);
@@ -296,7 +296,7 @@ public partial class MainWindow
                     cell.IsDragging = true;
                 }
 
-                var canvasPt = e.GetPosition(CanvasGrid);
+                var canvasPt = e.GetPosition(MainCanvas);
                 _dragOffsetX = canvasPt.X - cell.CanvasX;
                 _dragOffsetY = canvasPt.Y - cell.CanvasY;
                 e.Pointer.Capture(sender as Control);
@@ -304,7 +304,7 @@ public partial class MainWindow
         }
         else if (_groupDragStarts != null && (_groupDragStarts.Count + (_groupAnnotationDragStarts?.Count ?? 0)) > 1)
         {
-            var canvasPt = e.GetPosition(CanvasGrid);
+            var canvasPt = e.GetPosition(MainCanvas);
             double targetX = Math.Round((canvasPt.X - _dragOffsetX) / Constants.GridSize) * Constants.GridSize;
             double targetY = Math.Round((canvasPt.Y - _dragOffsetY) / Constants.GridSize) * Constants.GridSize;
             double currentX = _draggingCell?.CanvasX ?? _dragStartX;
@@ -349,7 +349,7 @@ public partial class MainWindow
             // points to the original cell, which is wrong for alt-duplicate drags.
             var dragTarget = _draggingCell ?? cell;
 
-            var canvasPt = e.GetPosition(CanvasGrid);
+            var canvasPt = e.GetPosition(MainCanvas);
             double newX = Math.Round((canvasPt.X - _dragOffsetX) / Constants.GridSize) * Constants.GridSize;
             double newY = Math.Round((canvasPt.Y - _dragOffsetY) / Constants.GridSize) * Constants.GridSize;
 
@@ -466,7 +466,7 @@ public partial class MainWindow
             && sender is Control c && c.DataContext is CellViewModel cell)
         {
             _isResizing = true;
-            _resizeStartPos = e.GetPosition(CanvasGrid);
+            _resizeStartPos = e.GetPosition(MainCanvas);
             _resizingCell = cell;
             _resizeStartColSpan = cell.ColSpan;
             _resizeStartRowSpan = cell.RowSpan;
@@ -481,7 +481,7 @@ public partial class MainWindow
             return;
         e.Handled = true;
 
-        var pt = e.GetPosition(CanvasGrid);
+        var pt = e.GetPosition(MainCanvas);
         int newCols = Math.Max(1, (int)Math.Round((pt.X - _resizingCell.CanvasX) / Constants.GridSize));
         int newRows = Math.Max(1, (int)Math.Round((pt.Y - _resizingCell.CanvasY) / Constants.GridSize));
 

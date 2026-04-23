@@ -1248,7 +1248,7 @@ public partial class MainWindow
         if (!_isDraggingFromSystem || Vm.IsViewMode)
             return;
 
-        var dropPt = e.GetPosition(CanvasGrid);
+        var dropPt = e.GetPosition(MainCanvas);
         int gridX = (int)(Math.Floor(dropPt.X / Constants.GridSize) * Constants.GridSize);
         int gridY = (int)(Math.Floor(dropPt.Y / Constants.GridSize) * Constants.GridSize);
 
@@ -1317,7 +1317,7 @@ public partial class MainWindow
         if (preview != null)
             preview.IsVisible = false;
 
-        var dropPt = e.GetPosition(CanvasGrid);
+        var dropPt = e.GetPosition(MainCanvas);
         double nextX = Math.Floor(dropPt.X / Constants.GridSize) * Constants.GridSize;
         double nextY = Math.Floor(dropPt.Y / Constants.GridSize) * Constants.GridSize;
 

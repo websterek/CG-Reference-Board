@@ -409,7 +409,7 @@ public partial class MainWindow
         }
 
         // Hover highlight for grid cells
-        var gridPt = e.GetPosition(CanvasGrid);
+        var gridPt = e.GetPosition(MainCanvas);
         int gridX = (int)(Math.Floor(gridPt.X / Constants.GridSize) * Constants.GridSize);
         int gridY = (int)(Math.Floor(gridPt.Y / Constants.GridSize) * Constants.GridSize);
 
