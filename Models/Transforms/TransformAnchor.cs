@@ -6,7 +6,8 @@ namespace CGReferenceBoard.Models.Transforms;
 /// </summary>
 public enum TransformAnchor
 {
-    None,        // drag of the whole box — translation only
+    /// <summary>No resize handle — drag of the whole box, translation only.</summary>
+    None,
     TopLeft,
     Top,
     TopRight,
