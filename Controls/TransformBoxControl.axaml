@@ -1,0 +1,101 @@
+<UserControl
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="clr-namespace:CGReferenceBoard.ViewModels"
+    x:Class="CGReferenceBoard.Controls.TransformBoxControl"
+    x:DataType="vm:TransformAdornerViewModel">
+
+    <!--
+        Visual styles for the eight resize handles and the centre move handle.
+        All handles are plain 8×8 squares with the accent colour fill and a
+        1-px dark border for contrast against light backgrounds.
+    -->
+    <UserControl.Styles>
+        <Style Selector="Thumb.transform-handle">
+            <Setter Property="Width"  Value="8" />
+            <Setter Property="Height" Value="8" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="#FF44AAFF"
+                            BorderBrush="#CC000000"
+                            BorderThickness="1"
+                            CornerRadius="1" />
+                </ControlTemplate>
+            </Setter>
+        </Style>
+    </UserControl.Styles>
+
+    <!--
+        Root Canvas.  All children are positioned in code-behind via
+        Canvas.SetLeft / Canvas.SetTop whenever the control's size changes.
+    -->
+    <Canvas>
+
+        <!-- Dashed selection border — sized and positioned in code-behind. -->
+        <Rectangle
+            x:Name="PART_Border"
+            Stroke="#FF44AAFF"
+            StrokeThickness="1"
+            StrokeDashArray="4,4"
+            Fill="Transparent"
+            IsHitTestVisible="False" />
+
+        <!-- Centre move handle — always visible while the adorner is shown. -->
+        <Thumb
+            x:Name="Handle_Center"
+            Classes="transform-handle"
+            Tag="None"
+            Cursor="SizeAll" />
+
+        <!-- Eight resize handles — shown only when a single resizable item is selected. -->
+        <Thumb
+            x:Name="Handle_TopLeft"
+            Classes="transform-handle"
+            Tag="TopLeft"
+            Cursor="SizeNWSE"
+            IsVisible="{Binding CanResize}" />
+        <Thumb
+            x:Name="Handle_Top"
+            Classes="transform-handle"
+            Tag="Top"
+            Cursor="SizeNS"
+            IsVisible="{Binding CanResize}" />
+        <Thumb
+            x:Name="Handle_TopRight"
+            Classes="transform-handle"
+            Tag="TopRight"
+            Cursor="SizeNESW"
+            IsVisible="{Binding CanResize}" />
+        <Thumb
+            x:Name="Handle_Right"
+            Classes="transform-handle"
+            Tag="Right"
+            Cursor="SizeWE"
+            IsVisible="{Binding CanResize}" />
+        <Thumb
+            x:Name="Handle_BottomRight"
+            Classes="transform-handle"
+            Tag="BottomRight"
+            Cursor="SizeNWSE"
+            IsVisible="{Binding CanResize}" />
+        <Thumb
+            x:Name="Handle_Bottom"
+            Classes="transform-handle"
+            Tag="Bottom"
+            Cursor="SizeNS"
+            IsVisible="{Binding CanResize}" />
+        <Thumb
+            x:Name="Handle_BottomLeft"
+            Classes="transform-handle"
+            Tag="BottomLeft"
+            Cursor="SizeNESW"
+            IsVisible="{Binding CanResize}" />
+        <Thumb
+            x:Name="Handle_Left"
+            Classes="transform-handle"
+            Tag="Left"
+            Cursor="SizeWE"
+            IsVisible="{Binding CanResize}" />
+
+    </Canvas>
+</UserControl>
