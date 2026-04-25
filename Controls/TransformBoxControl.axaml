@@ -52,49 +52,49 @@
             x:Name="Handle_TopLeft"
             Classes="transform-handle"
             Tag="TopLeft"
-            Cursor="SizeNWSE"
+            Cursor="TopLeftCorner"
             IsVisible="{Binding CanResize}" />
         <Thumb
             x:Name="Handle_Top"
             Classes="transform-handle"
             Tag="Top"
-            Cursor="SizeNS"
+            Cursor="SizeNorthSouth"
             IsVisible="{Binding CanResize}" />
         <Thumb
             x:Name="Handle_TopRight"
             Classes="transform-handle"
             Tag="TopRight"
-            Cursor="SizeNESW"
+            Cursor="TopRightCorner"
             IsVisible="{Binding CanResize}" />
         <Thumb
             x:Name="Handle_Right"
             Classes="transform-handle"
             Tag="Right"
-            Cursor="SizeWE"
+            Cursor="SizeWestEast"
             IsVisible="{Binding CanResize}" />
         <Thumb
             x:Name="Handle_BottomRight"
             Classes="transform-handle"
             Tag="BottomRight"
-            Cursor="SizeNWSE"
+            Cursor="BottomRightCorner"
             IsVisible="{Binding CanResize}" />
         <Thumb
             x:Name="Handle_Bottom"
             Classes="transform-handle"
             Tag="Bottom"
-            Cursor="SizeNS"
+            Cursor="SizeNorthSouth"
             IsVisible="{Binding CanResize}" />
         <Thumb
             x:Name="Handle_BottomLeft"
             Classes="transform-handle"
             Tag="BottomLeft"
-            Cursor="SizeNESW"
+            Cursor="BottomLeftCorner"
             IsVisible="{Binding CanResize}" />
         <Thumb
             x:Name="Handle_Left"
             Classes="transform-handle"
             Tag="Left"
-            Cursor="SizeWE"
+            Cursor="SizeWestEast"
             IsVisible="{Binding CanResize}" />
 
     </Canvas>
