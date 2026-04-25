@@ -450,30 +450,6 @@
                         />
                     </Border>
 
-                    <!-- Resize Thumb (edit mode only) -->
-                    <Panel
-                        IsVisible="{Binding !IsViewMode, RelativeSource={RelativeSource AncestorType=views:MainWindow}}"
-                        ZIndex="10"
-                    >
-                        <Border
-                            x:Name="ResizeThumb"
-                            Background="#AA000000"
-                            BorderBrush="#88AAFF"
-                            BorderThickness="2.5"
-                            Width="24"
-                            Height="24"
-                            CornerRadius="12"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Bottom"
-                            Margin="6"
-                            Cursor="BottomRightCorner"
-                            ZIndex="10"
-                            PointerPressed="ResizeThumb_PointerPressed"
-                            PointerMoved="ResizeThumb_PointerMoved"
-                            PointerReleased="ResizeThumb_PointerReleased"
-                            IsVisible="{Binding HasContent}"
-                        />
-                    </Panel>
                 </Grid>
             </Border>
         </DataTemplate>
@@ -1346,6 +1322,23 @@
 
                         />
                     </Canvas>
+
+                        <!-- ─────────────────────────────────────────────── -->
+                        <!-- Transform Box Adorner                           -->
+                        <!-- Placed inside MainCanvas so it pans/zooms with  -->
+                        <!-- the board content. Positioned and sized via the  -->
+                        <!-- adorner ViewModel's union bounding box.          -->
+                        <!-- DataContext is set to Vm.Adorner in code-behind. -->
+                        <!-- ─────────────────────────────────────────────── -->
+                        <local:TransformBoxControl
+                            x:Name="TransformBox"
+                            Canvas.Left="{Binding Adorner.Left}"
+                            Canvas.Top="{Binding Adorner.Top}"
+                            Width="{Binding Adorner.Width}"
+                            Height="{Binding Adorner.Height}"
+                            IsVisible="{Binding Adorner.IsVisible}"
+                            ZIndex="5000"
+                        />
 
                     <Canvas x:Name="OverlayCanvas" IsHitTestVisible="False">
                         <!-- Custom Cursor Icon Overlay -->

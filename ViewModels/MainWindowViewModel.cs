@@ -48,6 +48,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public SelectionService SelectionService { get; }
 
     /// <summary>
+    /// Tracks the union bounding box of the current selection and exposes a
+    /// mode-aware ApplyTransform method consumed by the TransformBoxControl overlay.
+    /// </summary>
+    public TransformAdornerViewModel Adorner { get; private set; } = null!;
+
+    /// <summary>
     /// Layer manager that owns the visual layer hierarchy.
     /// Exposed publicly so the View can wire up ItemsSource bindings and
     /// layer-visibility toggles that still live in the code-behind during Step 7.
@@ -263,6 +269,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IsViewMode = isViewMode;
         ModeService = new ModeService();
         SelectionService = new SelectionService();
+        Adorner = new TransformAdornerViewModel(SelectionService, ModeService);
 
         WorkspaceDir = Path.Combine(Constants.ConfigDirectory, "Assets");
 

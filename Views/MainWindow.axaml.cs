@@ -153,13 +153,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private List<(AnnotationViewModel Ann, double StartX, double StartY)>? _groupAnnotationDragStarts;
     private bool _isAltDuplicateDrag;
 
-    // Cell resize
-    private bool _isResizing;
-    private Point _resizeStartPos;
-    private CellViewModel? _resizingCell;
-    private int _resizeStartColSpan;
-    private int _resizeStartRowSpan;
-
     // Placement preview (for backdrop creation)
     private bool _isShowingPlacementPreview;
     private double _previewX;
@@ -237,6 +230,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         };
 
         CacheCanvasControls();
+
+        // Wire the TransformBoxControl's DataContext to the adorner ViewModel
+        // (cannot be done via AXAML binding because Avalonia resolves all compiled
+        // bindings on an element against the DataContext set on that same element).
+        var transformBox = this.FindControl<CGReferenceBoard.Controls.TransformBoxControl>("TransformBox");
+        if (transformBox != null)
+            transformBox.DataContext = Vm.Adorner;
 
         try
         {

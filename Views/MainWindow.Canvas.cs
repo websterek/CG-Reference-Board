@@ -431,7 +431,7 @@ public partial class MainWindow
             Canvas.SetTop(hoverHighlight, gridY);
             hoverHighlight.Width = Constants.GridSize;
             hoverHighlight.Height = Constants.GridSize;
-            hoverHighlight.IsVisible = !(_isPanning || _isDraggingCell || _isResizing
+            hoverHighlight.IsVisible = !(_isPanning || _isDraggingCell
                                          || _isPointerDown || existingContent != null || Vm.IsDrawMode);
         }
 

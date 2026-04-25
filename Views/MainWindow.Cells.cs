@@ -457,67 +457,6 @@ public partial class MainWindow
         UpdateSelectionState();
     }
 
-    private void ResizeThumb_PointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (Vm.IsDrawMode || Vm.IsViewMode)
-            return;
-
-        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed
-            && sender is Control c && c.DataContext is CellViewModel cell)
-        {
-            _isResizing = true;
-            _resizeStartPos = e.GetPosition(MainCanvas);
-            _resizingCell = cell;
-            _resizeStartColSpan = cell.ColSpan;
-            _resizeStartRowSpan = cell.RowSpan;
-            e.Pointer.Capture(c);
-            e.Handled = true;
-        }
-    }
-
-    private void ResizeThumb_PointerMoved(object? sender, PointerEventArgs e)
-    {
-        if (!_isResizing || _resizingCell == null)
-            return;
-        e.Handled = true;
-
-        var pt = e.GetPosition(MainCanvas);
-        int newCols = Math.Max(1, (int)Math.Round((pt.X - _resizingCell.CanvasX) / Constants.GridSize));
-        int newRows = Math.Max(1, (int)Math.Round((pt.Y - _resizingCell.CanvasY) / Constants.GridSize));
-
-        bool collision = GridLayoutService.HasLayerCollision(Vm.GridCells, Vm.LayerManager.ResolveLayer(_resizingCell)!, _resizingCell,
-            _resizingCell.CanvasX, _resizingCell.CanvasY, newCols, newRows);
-
-        _resizingCell.IsDragInvalid = collision;
-        _resizingCell.ColSpan = newCols;
-        _resizingCell.RowSpan = newRows;
-    }
-
-    private void ResizeThumb_PointerReleased(object? sender, PointerReleasedEventArgs e)
-    {
-        if (_isResizing && sender is Control && _resizingCell != null)
-        {
-            // Check for collision and revert if needed
-            bool collision = GridLayoutService.HasLayerCollision(Vm.GridCells, Vm.LayerManager.ResolveLayer(_resizingCell)!, _resizingCell,
-                _resizingCell.CanvasX, _resizingCell.CanvasY, _resizingCell.ColSpan, _resizingCell.RowSpan);
-
-            if (collision)
-            {
-                _resizingCell.ColSpan = _resizeStartColSpan;
-                _resizingCell.RowSpan = _resizeStartRowSpan;
-            }
-
-            // Clear IsDragInvalid flag
-            _resizingCell.IsDragInvalid = false;
-
-            e.Pointer.Capture(null);
-            _isResizing = false;
-            _resizingCell = null;
-            e.Handled = true;
-            Vm.SaveBoardData();
-        }
-    }
-
     /// <summary>
     /// Prevents ScrollViewer from consuming wheel events so canvas zoom still works.
     /// Text scrolling is only available via click-drag on scrollbar.
