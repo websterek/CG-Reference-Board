@@ -11,7 +11,7 @@ namespace CGReferenceBoard.ViewModels;
 /// <summary>
 /// Represents a single cell on the reference board (image, text, video, label, or backdrop).
 /// </summary>
-public class CellViewModel : ViewModelBase, IDisposable
+public class CellViewModel : ViewModelBase, IDisposable, CGReferenceBoard.Models.Transforms.ITransformable
 {
     #region Position
 
@@ -808,6 +808,78 @@ public class CellViewModel : ViewModelBase, IDisposable
         var old = _image;
         _image = null;
         old?.Dispose();
+    }
+
+    #endregion
+
+    #region ITransformable
+
+    /// <inheritdoc/>
+    public double BoundsLeft => VisualX;
+
+    /// <inheritdoc/>
+    public double BoundsTop => VisualY;
+
+    /// <inheritdoc/>
+    public double BoundsWidth => PixelWidth;
+
+    /// <inheritdoc/>
+    public double BoundsHeight => PixelHeight;
+
+    /// <inheritdoc/>
+    public bool CanResize => true;
+
+    /// <summary>
+    /// Moves the cell so its visual top-left corner is at (canvasX, canvasY).
+    /// Converts from visual space to logical CanvasX/Y space (adds backdrop padding back when applicable).
+    /// </summary>
+    public void MoveTo(double canvasX, double canvasY)
+    {
+        CanvasX = canvasX + (Type == CellType.Backdrop ? Constants.BackdropPadding : 0);
+        CanvasY = canvasY + (Type == CellType.Backdrop ? Constants.BackdropPadding : 0);
+    }
+
+    /// <summary>
+    /// Resizes the cell to the given pixel dimensions, keeping the anchor corner fixed.
+    /// Converts pixel size to grid spans (minimum 1×1). Adjusts CanvasX/Y when the
+    /// anchor is on the right or bottom edge so the opposite edge stays fixed.
+    /// </summary>
+    public void ResizeTo(double newWidth, double newHeight, CGReferenceBoard.Models.Transforms.TransformAnchor anchor)
+    {
+        double pad = Type == CellType.Backdrop ? Constants.BackdropPadding : 0;
+        double logicalW = Math.Max(Constants.GridSize, newWidth - 2 * pad);
+        double logicalH = Math.Max(Constants.GridSize, newHeight - 2 * pad);
+
+        int newCols = Math.Max(1, (int)Math.Round(logicalW / Constants.GridSize));
+        int newRows = Math.Max(1, (int)Math.Round(logicalH / Constants.GridSize));
+
+        double oldVisualW = PixelWidth;
+        double oldVisualH = PixelHeight;
+        double newVisualW = newCols * Constants.GridSize + 2 * pad;
+        double newVisualH = newRows * Constants.GridSize + 2 * pad;
+
+        // Anchors on the left edge: the right edge is fixed, left edge moves.
+        if (anchor is CGReferenceBoard.Models.Transforms.TransformAnchor.TopLeft
+                   or CGReferenceBoard.Models.Transforms.TransformAnchor.Left
+                   or CGReferenceBoard.Models.Transforms.TransformAnchor.BottomLeft)
+        {
+            double rightEdge = BoundsLeft + oldVisualW;
+            double newVisualX = rightEdge - newVisualW;
+            CanvasX = newVisualX + pad;
+        }
+
+        // Anchors on the top edge: the bottom edge is fixed, top edge moves.
+        if (anchor is CGReferenceBoard.Models.Transforms.TransformAnchor.TopLeft
+                   or CGReferenceBoard.Models.Transforms.TransformAnchor.Top
+                   or CGReferenceBoard.Models.Transforms.TransformAnchor.TopRight)
+        {
+            double bottomEdge = BoundsTop + oldVisualH;
+            double newVisualY = bottomEdge - newVisualH;
+            CanvasY = newVisualY + pad;
+        }
+
+        ColSpan = newCols;
+        RowSpan = newRows;
     }
 
     #endregion
