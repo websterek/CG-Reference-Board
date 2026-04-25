@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using CGReferenceBoard.Models.Transforms;
 using CGReferenceBoard.Modes.Abstractions;
 
 namespace CGReferenceBoard.Modes;
@@ -74,5 +75,24 @@ public sealed partial class AnnotationMode : ObservableObject, IMode
     {
         // Reset to default tool when leaving annotation mode so re-entry starts clean.
         CurrentTool = "Brush";
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Annotation mode is free-form — no grid snapping is applied.
+    /// Coordinates and dimensions are passed through directly to the target.
+    /// </remarks>
+    public void ApplyTransform(
+        ITransformable target,
+        TransformAnchor anchor,
+        double newLeft,
+        double newTop,
+        double newWidth,
+        double newHeight)
+    {
+        if (anchor == TransformAnchor.None)
+            target.MoveTo(newLeft, newTop);
+        else
+            target.ResizeTo(newWidth, newHeight, anchor);
     }
 }
