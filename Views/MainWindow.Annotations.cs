@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using CGReferenceBoard.Services.Transform;
 using CGReferenceBoard.ViewModels;
 
 namespace CGReferenceBoard.Views;
@@ -95,17 +96,13 @@ public partial class MainWindow
             
             if (!annGrid.IsSelected)
                 return;
-            
-            _isDraggingAnnotations = true;
-            _annotationDragCellOriginals = _selectedCells.Select(c => (c, c.CanvasX, c.CanvasY)).ToList();
-            foreach (var (c, _, _) in _annotationDragCellOriginals)
-                c.IsDragging = true;
+
             var mainCanvas = this.FindControl<Canvas>("MainCanvas");
             if (mainCanvas != null)
             {
-                _annotationDragStart = e.GetPosition(mainCanvas);
+                Vm.TransformService.BeginMove(e.GetPosition(mainCanvas), Vm.SelectionService);
+                e.Pointer.Capture(_cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder"));
             }
-            e.Pointer.Capture(sender as Control);
             e.Handled = true;
             return;
         }
@@ -174,9 +171,12 @@ public partial class MainWindow
 
             BringToFront(_selectedAnnotations);
 
-            _isDraggingAnnotations = true;
-            _annotationDragCellOriginals = null;
-            _annotationDragStart = e.GetPosition(this.FindControl<Canvas>("MainCanvas"));
+            var mainCanvas = this.FindControl<Canvas>("MainCanvas");
+            if (mainCanvas != null)
+            {
+                Vm.TransformService.BeginMove(e.GetPosition(mainCanvas), Vm.SelectionService);
+                e.Pointer.Capture(_cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder"));
+            }
             e.Handled = true;
             return;
         }

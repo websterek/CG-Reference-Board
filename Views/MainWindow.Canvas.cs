@@ -9,6 +9,7 @@ using Avalonia.Media;
 using CGReferenceBoard.Helpers;
 using CGReferenceBoard.Layers.Infrastructure;
 using CGReferenceBoard.Services;
+using CGReferenceBoard.Services.Transform;
 using CGReferenceBoard.ViewModels;
 
 namespace CGReferenceBoard.Views;
@@ -74,6 +75,7 @@ public partial class MainWindow
         if (!Vm.TransformService.IsVisible || bounds.Width <= 0 || bounds.Height <= 0)
         {
             body.IsVisible = false;
+            SetHandleVisibility(false);
             return;
         }
 
@@ -96,6 +98,27 @@ public partial class MainWindow
         SetHandle(_cachedTransformBottom, midX - halfHandle, bounds.Bottom - halfHandle, handleSize);
         SetHandle(_cachedTransformBottomLeft, bounds.X - halfHandle, bounds.Bottom - halfHandle, handleSize);
         SetHandle(_cachedTransformLeft, bounds.X - halfHandle, midY - halfHandle, handleSize);
+    }
+
+    private void SetHandleVisibility(bool isVisible)
+    {
+        foreach (var handle in new[]
+                 {
+                     _cachedTransformTopLeft,
+                     _cachedTransformTop,
+                     _cachedTransformTopRight,
+                     _cachedTransformRight,
+                     _cachedTransformBottomRight,
+                     _cachedTransformBottom,
+                     _cachedTransformBottomLeft,
+                     _cachedTransformLeft
+                 })
+        {
+            if (handle != null)
+            {
+                handle.IsVisible = isVisible;
+            }
+        }
     }
 
     private static void SetHandle(Border? handle, double left, double top, double size)
@@ -131,6 +154,205 @@ public partial class MainWindow
         {
             // Non-critical; ignore failures
         }
+    }
+
+    private void TransformBody_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (Vm.IsViewMode || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            return;
+        }
+
+        var mainCanvas = _cachedMainCanvas ?? this.FindControl<Canvas>("MainCanvas");
+        if (mainCanvas == null)
+        {
+            return;
+        }
+
+        Vm.TransformService.BeginMove(e.GetPosition(mainCanvas), Vm.SelectionService);
+        e.Pointer.Capture(_cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder"));
+        e.Handled = true;
+    }
+
+    private void TransformHandle_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (Vm.IsViewMode || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed || sender is not Control { Tag: string tag })
+        {
+            return;
+        }
+
+        if (!Enum.TryParse<TransformHandle>(tag, out var handle) || handle == TransformHandle.None)
+        {
+            return;
+        }
+
+        var mainCanvas = _cachedMainCanvas ?? this.FindControl<Canvas>("MainCanvas");
+        if (mainCanvas == null)
+        {
+            return;
+        }
+
+        Vm.TransformService.BeginResize(handle, e.GetPosition(mainCanvas), Vm.SelectionService);
+        e.Pointer.Capture(_cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder"));
+        e.Handled = true;
+    }
+
+    private bool UpdateActiveTransform(Point pointer)
+    {
+        if (!Vm.TransformService.HasActiveOperation)
+        {
+            return false;
+        }
+
+        bool annotationMode = Vm.IsDrawMode;
+        var transformService = Vm.TransformService;
+        var delta = transformService.UpdatePreview(pointer, annotationMode);
+
+        if (transformService.Operation == TransformOperation.Move)
+        {
+            if (annotationMode)
+            {
+                AnnotationTransformService.ApplyMove(transformService.ActiveSnapshots, delta);
+            }
+            else
+            {
+                GridTransformService.ApplyMove(transformService.ActiveSnapshots, delta);
+            }
+        }
+        else if (transformService.Operation == TransformOperation.Resize)
+        {
+            if (annotationMode)
+            {
+                AnnotationTransformService.ApplyResize(transformService.ActiveSnapshots, transformService.StartBounds, transformService.Bounds);
+            }
+            else
+            {
+                GridTransformService.ApplyResize(transformService.ActiveSnapshots, transformService.StartBounds, transformService.Bounds);
+            }
+        }
+
+        UpdateGridTransformInvalidState(annotationMode);
+        UpdateTransformOverlayLayout();
+        return true;
+    }
+
+    private bool FinishActiveTransform(PointerReleasedEventArgs e)
+    {
+        if (!Vm.TransformService.HasActiveOperation)
+        {
+            return false;
+        }
+
+        var transformService = Vm.TransformService;
+        bool annotationMode = Vm.IsDrawMode;
+        bool hasCollision = !annotationMode && HasGridTransformCollision();
+
+        if (hasCollision)
+        {
+            RestoreActiveTransformSnapshots();
+            ShakeScreen();
+        }
+
+        ClearGridTransformInvalidState();
+        transformService.End();
+        Vm.RefreshTransformState();
+        UpdateTransformOverlayLayout();
+        e.Pointer.Capture(null);
+
+        if (!hasCollision)
+        {
+            Vm.MarkUnsaved();
+            Vm.SaveBoardData();
+        }
+
+        return true;
+    }
+
+    private void RestoreActiveTransformSnapshots()
+    {
+        foreach (var snapshot in Vm.TransformService.ActiveSnapshots)
+        {
+            if (snapshot.Cell is not null)
+            {
+                snapshot.Cell.CanvasX = snapshot.CanvasX;
+                snapshot.Cell.CanvasY = snapshot.CanvasY;
+                snapshot.Cell.ColSpan = snapshot.ColSpan;
+                snapshot.Cell.RowSpan = snapshot.RowSpan;
+            }
+
+            if (snapshot.Annotation is not null)
+            {
+                snapshot.Annotation.CanvasX = snapshot.CanvasX;
+                snapshot.Annotation.CanvasY = snapshot.CanvasY;
+
+                for (int i = 0; i < snapshot.AnnotationPoints.Count; i++)
+                {
+                    snapshot.Annotation.Points[i] = snapshot.AnnotationPoints[i];
+                }
+
+                snapshot.Annotation.UpdateBoundsCache();
+            }
+        }
+    }
+
+    private void UpdateGridTransformInvalidState(bool annotationMode)
+    {
+        if (annotationMode)
+        {
+            return;
+        }
+
+        bool hasCollision = HasGridTransformCollision();
+        foreach (var snapshot in Vm.TransformService.ActiveSnapshots)
+        {
+            if (snapshot.Cell is not null)
+            {
+                snapshot.Cell.IsDragInvalid = hasCollision;
+            }
+        }
+    }
+
+    private void ClearGridTransformInvalidState()
+    {
+        foreach (var snapshot in Vm.TransformService.ActiveSnapshots)
+        {
+            if (snapshot.Cell is not null)
+            {
+                snapshot.Cell.IsDragInvalid = false;
+            }
+        }
+    }
+
+    private bool HasGridTransformCollision()
+    {
+        var activeCells = Vm.TransformService.ActiveSnapshots
+            .Where(snapshot => snapshot.Cell is not null)
+            .Select(snapshot => snapshot.Cell!)
+            .ToList();
+
+        if (activeCells.Count == 0)
+        {
+            return false;
+        }
+
+        if (Vm.TransformService.Operation == TransformOperation.Move)
+        {
+            var reference = Vm.TransformService.ActiveSnapshots.First(snapshot => snapshot.Cell is not null);
+            double dx = reference.Cell!.CanvasX - reference.CanvasX;
+            double dy = reference.Cell.CanvasY - reference.CanvasY;
+            return GridLayoutService.HasGroupCollision(Vm.GridCells, activeCells, Vm.LayerManager, dx, dy);
+        }
+
+        foreach (var cell in activeCells)
+        {
+            var owningLayer = Vm.LayerManager.ResolveLayer(cell);
+            if (owningLayer != null && GridLayoutService.HasLayerCollision(Vm.GridCells, owningLayer, activeCells, cell.CanvasX, cell.CanvasY, cell.ColSpan, cell.RowSpan))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void RestorePanCursor(Border? canvasBorder)
@@ -360,6 +582,12 @@ public partial class MainWindow
         {
             UpdatePlacementPreview(pt);
             StartEdgeScrollIfNeeded(_lastPointerPosition);
+        }
+
+        if (UpdateActiveTransform(pt))
+        {
+            StartEdgeScrollIfNeeded(_lastPointerPosition);
+            return;
         }
 
         // Eraser drag
@@ -608,6 +836,12 @@ public partial class MainWindow
     {
         // Stop edge scrolling when mouse is released
         StopEdgeScroll();
+
+        if (FinishActiveTransform(e))
+        {
+            UpdateSelectionState();
+            return;
+        }
 
         if (Vm.IsEraserMode)
             e.Pointer.Capture(null);

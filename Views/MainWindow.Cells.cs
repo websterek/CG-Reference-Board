@@ -7,6 +7,7 @@ using Avalonia.Input;
 using CGReferenceBoard.Helpers;
 using CGReferenceBoard.Layers.Infrastructure;
 using CGReferenceBoard.Services;
+using CGReferenceBoard.Services.Transform;
 using CGReferenceBoard.ViewModels;
 
 namespace CGReferenceBoard.Views;
@@ -121,6 +122,8 @@ public partial class MainWindow
         if (isLeftButton
             && sender is Control { DataContext: CellViewModel { HasContent: true } })
         {
+            bool wasSelected = cell.IsSelected;
+
             if (cell.IsBackdrop)
             {
                 // NOTE: Ctrl+Click selects/deselects the backdrop individually.
@@ -178,6 +181,18 @@ public partial class MainWindow
                     ClearSelection();
                     cell.IsSelected = true;
                     _selectedCells.Add(cell);
+                }
+            }
+
+            if (wasSelected && !isCtrl)
+            {
+                var mainCanvas = this.FindControl<Canvas>("MainCanvas");
+                if (mainCanvas != null)
+                {
+                    Vm.TransformService.BeginMove(e.GetPosition(mainCanvas), Vm.SelectionService);
+                    e.Pointer.Capture(_cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder"));
+                    e.Handled = true;
+                    return;
                 }
             }
 
