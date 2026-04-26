@@ -9,7 +9,6 @@ using Avalonia.Media;
 using CGReferenceBoard.Helpers;
 using CGReferenceBoard.Layers.Infrastructure;
 using CGReferenceBoard.Services;
-using CGReferenceBoard.Services.Transform;
 using CGReferenceBoard.ViewModels;
 
 namespace CGReferenceBoard.Views;
@@ -111,33 +110,6 @@ public partial class MainWindow
         handle.Height = size;
         Canvas.SetLeft(handle, left);
         Canvas.SetTop(handle, top);
-    }
-
-    private void TransformBody_PointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed || !Vm.TransformService.IsVisible)
-        {
-            return;
-        }
-
-        Vm.TransformService.BeginMove(e.GetPosition(_cachedMainCanvas ?? MainCanvas), Vm.SelectionService);
-        UpdateTransformOverlayLayout();
-        e.Handled = true;
-    }
-
-    private void TransformHandle_PointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed
-            || !Vm.TransformService.IsVisible
-            || sender is not Control { Tag: string tag }
-            || !Enum.TryParse<TransformHandle>(tag, out var handle))
-        {
-            return;
-        }
-
-        Vm.TransformService.BeginResize(handle, e.GetPosition(_cachedMainCanvas ?? MainCanvas), Vm.SelectionService);
-        UpdateTransformOverlayLayout();
-        e.Handled = true;
     }
 
     private void ApplyPanCursor(Border? canvasBorder)
