@@ -294,6 +294,30 @@ public partial class MainWindow
         return true;
     }
 
+    internal bool CancelPendingAnnotationAltDuplicateDrag()
+    {
+        var pendingDuplicate = _pendingAltDuplicateAnnotation;
+        if (!_isAltDuplicateDrag || pendingDuplicate is null)
+        {
+            return false;
+        }
+
+        if (Vm.TransformService.HasActiveOperation)
+        {
+            CancelActiveTransform();
+        }
+
+        _selectedAnnotations.Remove(pendingDuplicate);
+        Vm.SelectionService.RemoveFromSelection(pendingDuplicate);
+        pendingDuplicate.IsSelected = false;
+        Vm.Annotations.Remove(pendingDuplicate);
+        _pendingAltDuplicateAnnotation = null;
+        _isAltDuplicateDrag = false;
+        Vm.RefreshTransformState();
+        UpdateTransformOverlayLayout();
+        return true;
+    }
+
     internal bool CancelLegacyAltDuplicateDrag()
     {
         if (!_isDraggingCell || !_isAltDuplicateDrag || _draggingCell is null)
@@ -318,6 +342,13 @@ public partial class MainWindow
     private bool HandleEscapeShortcut()
     {
         if (CancelActiveTransform())
+        {
+            CancelPendingAnnotationAltDuplicateDrag();
+            UpdateSelectionState();
+            return true;
+        }
+
+        if (CancelPendingAnnotationAltDuplicateDrag())
         {
             UpdateSelectionState();
             return true;
@@ -356,6 +387,7 @@ public partial class MainWindow
         if (cancelActiveTransform)
         {
             CancelActiveTransform();
+            CancelPendingAnnotationAltDuplicateDrag();
             CancelLegacyAltDuplicateDrag();
         }
 

@@ -337,6 +337,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
         TransformService.Refresh(SelectionService, ModeService, IsViewMode);
     }
 
+    internal void ResetInteractionState()
+    {
+        SelectionResetRequested?.Invoke();
+        SelectionService.ClearSelection();
+        TransformService.Cancel();
+        RefreshTransformState();
+    }
+
     // ── CommunityToolkit.Mvvm partial method callbacks ────────────────────────
 
     /// <summary>
@@ -562,11 +570,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// </summary>
     public void RestoreBoardState(string json)
     {
-        SelectionResetRequested?.Invoke();
+        ResetInteractionState();
         var (newCells, newAnnotations) = BoardSerializer.Deserialize(json, CurrentBoardFile);
         UpdateCellsInPlace(newCells);
         UpdateAnnotationsInPlace(newAnnotations);
-        SelectionService.ClearSelection();
     }
 
     private void UpdateCellsInPlace(List<CellViewModel> newCells)
@@ -689,8 +696,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         foreach (var c in GridCells) c.UnloadImage();
         ImageManager.ClearCaches();
 
-        SelectionResetRequested?.Invoke();
-        SelectionService.ClearSelection();
+        ResetInteractionState();
         GridCells.Clear();
         Annotations.Clear();
         _undoStack.Clear();

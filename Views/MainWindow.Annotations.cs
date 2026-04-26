@@ -151,6 +151,8 @@ public partial class MainWindow
                 ClearSelection();
                 _selectedAnnotations.Add(duplicate);
                 UpdateSelectionState();
+                _isAltDuplicateDrag = true;
+                _pendingAltDuplicateAnnotation = duplicate;
 
                 BringToFront(_selectedAnnotations);
 

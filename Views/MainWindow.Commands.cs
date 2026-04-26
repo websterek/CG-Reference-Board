@@ -236,10 +236,8 @@ public partial class MainWindow
         ImageManager.ClearCaches();
 
         // #1: clear every piece of stale state before discarding view-models.
-        foreach (var c in _selectedCells)
-            c.IsSelected = false;
-        _selectedCells.Clear();
-        _selectedAnnotations.Clear();
+        ResetTransientPointerState(cancelActiveTransform: true);
+        Vm.ResetInteractionState();
         _currentAnnotation = null;
         _editingTextAnnotation = null;
 
