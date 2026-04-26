@@ -48,12 +48,12 @@ public sealed class GridTransformServiceTests
         annotation.UpdateBoundsCache();
         var snapshots = TransformBoundsCalculator.CreateSnapshots(new[] { cell }, new[] { annotation });
         var mixedSelectionBounds = new Rect(0, 0, 1000, 1000);
-        var resizedBounds = new Rect(0, 0, 320, 320);
+        var resizedBounds = new Rect(0, 0, 2000, 2000);
 
         GridTransformService.ApplyResize(snapshots, mixedSelectionBounds, resizedBounds);
 
-        Assert.Equal(0, cell.CanvasX);
-        Assert.Equal(0, cell.CanvasY);
+        Assert.Equal(320, cell.CanvasX);
+        Assert.Equal(320, cell.CanvasY);
         Assert.Equal(2, cell.ColSpan);
         Assert.Equal(2, cell.RowSpan);
     }

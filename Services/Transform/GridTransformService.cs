@@ -30,13 +30,15 @@ public static class GridTransformService
 
     public static void ApplyResize(IReadOnlyList<TransformItemSnapshot> snapshots, Rect originalSelectionBounds, Rect resizedSelectionBounds)
     {
-        _ = originalSelectionBounds;
-        var snappedSelectionBounds = TransformMath.SnapRectToGrid(resizedSelectionBounds);
         var originalCellBounds = GetCellSelectionBounds(snapshots);
         if (originalCellBounds is null)
         {
             return;
         }
+
+        var mappedCellTopLeft = TransformMath.MapPointBetweenRects(originalCellBounds.Value.TopLeft, originalSelectionBounds, resizedSelectionBounds);
+        var mappedCellBottomRight = TransformMath.MapPointBetweenRects(originalCellBounds.Value.BottomRight, originalSelectionBounds, resizedSelectionBounds);
+        var cellDestinationBounds = TransformMath.SnapRectToGrid(CreateRect(mappedCellTopLeft, mappedCellBottomRight));
 
         foreach (var snapshot in snapshots)
         {
@@ -46,13 +48,9 @@ public static class GridTransformService
                 continue;
             }
 
-            var mappedTopLeft = TransformMath.MapPointBetweenRects(snapshot.Bounds.TopLeft, originalCellBounds.Value, snappedSelectionBounds);
-            var mappedBottomRight = TransformMath.MapPointBetweenRects(snapshot.Bounds.BottomRight, originalCellBounds.Value, snappedSelectionBounds);
-            var mappedRect = new Rect(
-                Math.Min(mappedTopLeft.X, mappedBottomRight.X),
-                Math.Min(mappedTopLeft.Y, mappedBottomRight.Y),
-                Math.Abs(mappedBottomRight.X - mappedTopLeft.X),
-                Math.Abs(mappedBottomRight.Y - mappedTopLeft.Y));
+            var mappedTopLeft = TransformMath.MapPointBetweenRects(snapshot.Bounds.TopLeft, originalCellBounds.Value, cellDestinationBounds);
+            var mappedBottomRight = TransformMath.MapPointBetweenRects(snapshot.Bounds.BottomRight, originalCellBounds.Value, cellDestinationBounds);
+            var mappedRect = CreateRect(mappedTopLeft, mappedBottomRight);
             var snappedCellRect = TransformMath.SnapRectToGrid(mappedRect);
 
             cell.CanvasX = snappedCellRect.X;
@@ -78,6 +76,13 @@ public static class GridTransformService
 
         return bounds;
     }
+
+    private static Rect CreateRect(Point first, Point second)
+        => new(
+            Math.Min(first.X, second.X),
+            Math.Min(first.Y, second.Y),
+            Math.Abs(second.X - first.X),
+            Math.Abs(second.Y - first.Y));
 
     private static Rect Union(Rect left, Rect right)
     {
