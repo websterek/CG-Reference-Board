@@ -84,11 +84,17 @@ public partial class MainWindow
         var midX = bounds.X + (bounds.Width / 2.0);
         var midY = bounds.Y + (bounds.Height / 2.0);
 
-        body.IsVisible = true;
+        body.IsVisible = Vm.TransformService.Capabilities.CanMove;
         Canvas.SetLeft(body, bounds.X);
         Canvas.SetTop(body, bounds.Y);
         body.Width = bounds.Width;
         body.Height = bounds.Height;
+
+        if (!Vm.TransformService.Capabilities.CanResize)
+        {
+            SetHandleVisibility(false);
+            return;
+        }
 
         SetHandle(_cachedTransformTopLeft, bounds.X - halfHandle, bounds.Y - halfHandle, handleSize);
         SetHandle(_cachedTransformTop, midX - halfHandle, bounds.Y - halfHandle, handleSize);
@@ -158,7 +164,7 @@ public partial class MainWindow
 
     private void TransformBody_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (Vm.IsViewMode || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        if (Vm.IsViewMode || !Vm.TransformService.Capabilities.CanMove || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
             return;
         }
@@ -176,7 +182,7 @@ public partial class MainWindow
 
     private void TransformHandle_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (Vm.IsViewMode || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed || sender is not Control { Tag: string tag })
+        if (Vm.IsViewMode || !Vm.TransformService.Capabilities.CanResize || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed || sender is not Control { Tag: string tag })
         {
             return;
         }
