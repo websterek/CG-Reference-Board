@@ -1172,14 +1172,15 @@ public partial class MainWindow
 
         foreach (var cell in Vm.GridCells)
         {
-            if (cell.CanvasX < minX)
-                minX = cell.CanvasX;
-            if (cell.CanvasY < minY)
-                minY = cell.CanvasY;
-            if (cell.CanvasX + cell.PixelWidth > maxX)
-                maxX = cell.CanvasX + cell.PixelWidth;
-            if (cell.CanvasY + cell.PixelHeight > maxY)
-                maxY = cell.CanvasY + cell.PixelHeight;
+            var cellBounds = TransformBoundsCalculator.GetCellBounds(cell);
+            if (cellBounds.X < minX)
+                minX = cellBounds.X;
+            if (cellBounds.Y < minY)
+                minY = cellBounds.Y;
+            if (cellBounds.Right > maxX)
+                maxX = cellBounds.Right;
+            if (cellBounds.Bottom > maxY)
+                maxY = cellBounds.Bottom;
         }
 
         var annotationBounds = AnnotationBoundsHelper.GetRenderedBoundsUnion(Vm.Annotations);
@@ -1223,14 +1224,15 @@ public partial class MainWindow
 
         foreach (var cell in _selectedCells)
         {
-            if (cell.CanvasX < minX)
-                minX = cell.CanvasX;
-            if (cell.CanvasY < minY)
-                minY = cell.CanvasY;
-            if (cell.CanvasX + cell.PixelWidth > maxX)
-                maxX = cell.CanvasX + cell.PixelWidth;
-            if (cell.CanvasY + cell.PixelHeight > maxY)
-                maxY = cell.CanvasY + cell.PixelHeight;
+            var cellBounds = TransformBoundsCalculator.GetCellBounds(cell);
+            if (cellBounds.X < minX)
+                minX = cellBounds.X;
+            if (cellBounds.Y < minY)
+                minY = cellBounds.Y;
+            if (cellBounds.Right > maxX)
+                maxX = cellBounds.Right;
+            if (cellBounds.Bottom > maxY)
+                maxY = cellBounds.Bottom;
         }
 
         var selectedAnnotationBounds = AnnotationBoundsHelper.GetRenderedBoundsUnion(_selectedAnnotations);

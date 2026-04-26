@@ -107,6 +107,90 @@ public sealed class MainWindowLegacyDragCleanupTests
         Assert.Empty(viewModel.TransformService.ActiveSnapshots);
     }
 
+    [Fact]
+    public void HandleDeleteSelection_AnnotationOnlySelection_RefreshesSharedSelectionState()
+    {
+        var window = (MainWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(MainWindow));
+        var viewModel = new MainWindowViewModel();
+        var annotation = new AnnotationViewModel
+        {
+            CanvasX = 120,
+            CanvasY = 80,
+            Type = "Brush",
+            IsSelected = true
+        };
+        annotation.Points.Add(new Point(0, 0));
+        annotation.Points.Add(new Point(20, 20));
+        annotation.UpdateBoundsCache();
+
+        SetPrivateField(window, "<Vm>k__BackingField", viewModel);
+        SetPrivateField(window, "_selectedCells", new System.Collections.Generic.List<CellViewModel>());
+        SetPrivateField(window, "_selectedAnnotations", new System.Collections.Generic.List<AnnotationViewModel> { annotation });
+        SetPrivateField(window, "_cachedTransformOverlay", new Canvas());
+        SetPrivateField(window, "_cachedTransformBody", new Border());
+        SetPrivateField(window, "_scale", new ScaleTransform(1, 1));
+
+        viewModel.Annotations.Add(annotation);
+        viewModel.ModeService.SetMode("Annotation");
+        viewModel.ModeService.AnnotationMode.CurrentTool = "Move";
+        viewModel.SelectionService.SelectAnnotation(annotation);
+        viewModel.TransformService.Refresh(viewModel.SelectionService, viewModel.ModeService, viewModel.IsViewMode);
+
+        var deleted = (bool)typeof(MainWindow)
+            .GetMethod("DeleteSelectedContent", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(window, new object?[] { false })!;
+
+        Assert.True(deleted);
+        Assert.Empty(viewModel.Annotations);
+        Assert.Empty(viewModel.SelectionService.SelectedAnnotations);
+        Assert.False(viewModel.SelectionService.HasSelection);
+        Assert.False(viewModel.TransformService.IsVisible);
+        Assert.Equal(TransformCapabilities.None, viewModel.TransformService.Capabilities);
+    }
+
+    [Fact]
+    public void SelectContent_Click_UsesRenderedBackdropExtents()
+    {
+        var window = (MainWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(MainWindow));
+        var viewModel = new MainWindowViewModel();
+        var backdrop = new CellViewModel
+        {
+            CanvasX = 320,
+            CanvasY = 320,
+            ColSpan = 2,
+            RowSpan = 2,
+            Type = CellType.Backdrop
+        };
+        var cellInBackdropPadding = new CellViewModel
+        {
+            CanvasX = backdrop.VisualX + 10,
+            CanvasY = backdrop.VisualY + 10,
+            ColSpan = 1,
+            RowSpan = 1,
+            Type = CellType.Image
+        };
+        cellInBackdropPadding.SetText("inside rendered backdrop padding");
+
+        SetPrivateField(window, "<Vm>k__BackingField", viewModel);
+        SetPrivateField(window, "_selectedCells", new System.Collections.Generic.List<CellViewModel>());
+        SetPrivateField(window, "_selectedAnnotations", new System.Collections.Generic.List<AnnotationViewModel>());
+        SetPrivateField(window, "_cachedTransformOverlay", new Canvas());
+        SetPrivateField(window, "_cachedTransformBody", new Border());
+        SetPrivateField(window, "_scale", new ScaleTransform(1, 1));
+
+        viewModel.GridCells.Add(backdrop);
+        viewModel.GridCells.Add(cellInBackdropPadding);
+
+        var menuItem = new MenuItem { DataContext = backdrop };
+
+        typeof(MainWindow)
+            .GetMethod("SelectContent_Click", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(window, new object?[] { menuItem, null! });
+
+        Assert.Contains(cellInBackdropPadding, viewModel.SelectionService.SelectedCells);
+        Assert.True(cellInBackdropPadding.IsSelected);
+    }
+
     private static object? GetPrivateField(object instance, string fieldName)
         => instance.GetType()
             .GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)!

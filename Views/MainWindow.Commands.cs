@@ -17,6 +17,7 @@ using CGReferenceBoard.Helpers;
 using CGReferenceBoard.Layers.Infrastructure;
 using CGReferenceBoard.Models;
 using CGReferenceBoard.Services;
+using CGReferenceBoard.Services.Transform;
 using CGReferenceBoard.ViewModels;
 
 namespace CGReferenceBoard.Views;
@@ -550,30 +551,7 @@ public partial class MainWindow
         if (Vm.IsViewMode)
             return;
 
-        bool anyDeleted = false;
-
-        // Delete all selected cells
-        if (_selectedCells.Count > 0)
-        {
-            foreach (var cell in _selectedCells.ToList())
-            {
-                cell.Dispose();
-                cell.Clear();
-                Vm.GridCells.Remove(cell);
-            }
-            _selectedCells.Clear();
-            _hoveredCell = null;
-            anyDeleted = true;
-        }
-
-        // Delete all selected annotations
-        if (_selectedAnnotations.Count > 0)
-        {
-            foreach (var ann in _selectedAnnotations.ToList())
-                Vm.Annotations.Remove(ann);
-            _selectedAnnotations.Clear();
-            anyDeleted = true;
-        }
+        bool anyDeleted = DeleteSelectedContent(disposeCells: true);
 
         // Fallback: if nothing was selected, delete the right-clicked cell
         if (!anyDeleted && sender is MenuItem { DataContext: CellViewModel clickedCell })
@@ -586,11 +564,45 @@ public partial class MainWindow
 
         if (anyDeleted)
         {
-            UpdateSelectionState();
             Vm.MarkUnsaved();
             Vm.SaveBoardData();
             ShowToast("🗑 Deleted");
         }
+    }
+
+    private bool DeleteSelectedContent(bool disposeCells)
+    {
+        bool anyDeleted = false;
+
+        if (_selectedCells.Count > 0)
+        {
+            foreach (var cell in _selectedCells.ToList())
+            {
+                if (disposeCells)
+                    cell.Dispose();
+
+                cell.Clear();
+                Vm.GridCells.Remove(cell);
+            }
+
+            _selectedCells.Clear();
+            _hoveredCell = null;
+            anyDeleted = true;
+        }
+
+        if (_selectedAnnotations.Count > 0)
+        {
+            foreach (var ann in _selectedAnnotations.ToList())
+                Vm.Annotations.Remove(ann);
+
+            _selectedAnnotations.Clear();
+            anyDeleted = true;
+        }
+
+        if (anyDeleted)
+            UpdateSelectionState();
+
+        return anyDeleted;
     }
 
     #endregion
@@ -783,10 +795,11 @@ public partial class MainWindow
 
         ClearSelection();
 
-        double left = cell.CanvasX;
-        double top = cell.CanvasY;
-        double right = left + cell.ColSpan * Constants.GridSize;
-        double bottom = top + cell.RowSpan * Constants.GridSize;
+        var backdropBounds = TransformBoundsCalculator.GetCellBounds(cell);
+        double left = backdropBounds.X;
+        double top = backdropBounds.Y;
+        double right = backdropBounds.Right;
+        double bottom = backdropBounds.Bottom;
 
         foreach (var c in Vm.GridCells)
         {
@@ -2141,27 +2154,7 @@ public partial class MainWindow
             if (Vm.IsViewMode)
                 return;
 
-            bool anyDeleted = false;
-
-            if (_selectedCells.Count > 0)
-            {
-                foreach (var cell in _selectedCells.ToList())
-                {
-                    cell.Clear();
-                    Vm.GridCells.Remove(cell);
-                }
-                _selectedCells.Clear();
-                _hoveredCell = null;
-                anyDeleted = true;
-            }
-
-            if (_selectedAnnotations.Count > 0)
-            {
-                foreach (var ann in _selectedAnnotations.ToList())
-                    Vm.Annotations.Remove(ann);
-                _selectedAnnotations.Clear();
-                anyDeleted = true;
-            }
+            bool anyDeleted = DeleteSelectedContent(disposeCells: false);
 
             if (anyDeleted)
             {

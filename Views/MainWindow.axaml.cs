@@ -314,6 +314,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         void Annotations_CollectionChanged(object? s, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
+            UpdateSelectionState();
+
             if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
             {
                 Vm.LayerManager.Annotations.Items.Clear();
