@@ -73,7 +73,13 @@ public partial class MainWindow
             return;
 
         foreach (var ann in toRemove)
+        {
+            _selectedAnnotations.Remove(ann);
+            Vm.SelectionService.RemoveFromSelection(ann);
             Vm.Annotations.Remove(ann);
+        }
+
+        UpdateSelectionState();
         Vm.MarkUnsaved();
         Vm.SaveBoardData();
     }
@@ -192,7 +198,10 @@ public partial class MainWindow
         // Eraser mode: delete clicked annotation
         if (Vm.IsEraserMode && sender is Control { DataContext: AnnotationViewModel ann })
         {
+            _selectedAnnotations.Remove(ann);
+            Vm.SelectionService.RemoveFromSelection(ann);
             Vm.Annotations.Remove(ann);
+            UpdateSelectionState();
             Vm.MarkUnsaved();
             Vm.SaveBoardData();
             e.Handled = true;

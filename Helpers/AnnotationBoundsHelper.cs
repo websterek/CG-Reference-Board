@@ -8,6 +8,15 @@ namespace CGReferenceBoard.Helpers;
 
 internal static class AnnotationBoundsHelper
 {
+    public static bool Intersects(Rect bounds, Rect target)
+        => bounds.Right > target.X
+           && bounds.X < target.Right
+           && bounds.Bottom > target.Y
+           && bounds.Y < target.Bottom;
+
+    public static bool IntersectsRenderedBounds(AnnotationViewModel annotation, Rect target)
+        => Intersects(GetRenderedBounds(annotation), target);
+
     public static Rect GetLocalContentBounds(AnnotationViewModel annotation)
     {
         if (annotation.Points.Count == 0)

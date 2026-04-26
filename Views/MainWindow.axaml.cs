@@ -1135,10 +1135,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     continue;
                 }
 
-                bool inVp = ann.AbsBoundsRight >= annVpLeft
-                         && ann.AbsBoundsLeft <= annVpRight
-                         && ann.AbsBoundsBottom >= annVpTop
-                         && ann.AbsBoundsTop <= annVpBottom;
+                bool inVp = Helpers.AnnotationBoundsHelper.IntersectsRenderedBounds(
+                    ann,
+                    new Rect(annVpLeft, annVpTop, annVpRight - annVpLeft, annVpBottom - annVpTop));
 
                 if (ann.IsInViewport == inVp)
                     continue;

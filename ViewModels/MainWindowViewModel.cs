@@ -562,6 +562,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// </summary>
     public void RestoreBoardState(string json)
     {
+        SelectionResetRequested?.Invoke();
         var (newCells, newAnnotations) = BoardSerializer.Deserialize(json, CurrentBoardFile);
         UpdateCellsInPlace(newCells);
         UpdateAnnotationsInPlace(newAnnotations);
@@ -688,6 +689,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         foreach (var c in GridCells) c.UnloadImage();
         ImageManager.ClearCaches();
 
+        SelectionResetRequested?.Invoke();
         SelectionService.ClearSelection();
         GridCells.Clear();
         Annotations.Clear();

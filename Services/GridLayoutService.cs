@@ -253,12 +253,7 @@ public static class GridLayoutService
 
         foreach (var annotation in annotations)
         {
-            bool inRect = annotation.Points.Any(p =>
-            {
-                double px = p.X + annotation.CanvasX;
-                double py = p.Y + annotation.CanvasY;
-                return backdropRect.Contains(new Point(px, py));
-            });
+            bool inRect = AnnotationBoundsHelper.IntersectsRenderedBounds(annotation, backdropRect);
 
             if (inRect)
                 result.Add(annotation);
@@ -291,12 +286,7 @@ public static class GridLayoutService
                 if (movedAnnotations.Contains(annotation))
                     continue;
 
-                bool inRect = annotation.Points.Any(p =>
-                {
-                    double px = p.X + annotation.CanvasX;
-                    double py = p.Y + annotation.CanvasY;
-                    return cellRect.Contains(new Point(px, py));
-                });
+                bool inRect = AnnotationBoundsHelper.IntersectsRenderedBounds(annotation, cellRect);
 
                 if (inRect)
                 {

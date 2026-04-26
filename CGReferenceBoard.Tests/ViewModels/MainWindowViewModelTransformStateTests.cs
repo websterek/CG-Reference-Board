@@ -1,4 +1,7 @@
 using Avalonia;
+using System;
+using System.IO;
+using System.Threading.Tasks;
 using CGReferenceBoard.ViewModels;
 using Xunit;
 
@@ -35,5 +38,42 @@ public sealed class MainWindowViewModelTransformStateTests
         viewModel.ModeService.SetMode("Annotation");
 
         Assert.Equal(1, resetRequests);
+    }
+
+    [Fact]
+    public void RestoreBoardState_RaisesSelectionResetRequest()
+    {
+        var viewModel = new MainWindowViewModel();
+        int resetRequests = 0;
+        viewModel.SelectionResetRequested += () => resetRequests++;
+
+        viewModel.SetBoardFilePath(Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.cgrb"));
+        viewModel.RestoreBoardState("{\"Cells\":[],\"Annotations\":[]}");
+
+        Assert.Equal(1, resetRequests);
+    }
+
+    [Fact]
+    public async Task LoadBoardFromFile_RaisesSelectionResetRequest()
+    {
+        var viewModel = new MainWindowViewModel();
+        var boardPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.cgrb");
+        await File.WriteAllTextAsync(boardPath, "{\"Cells\":[],\"Annotations\":[]}");
+
+        try
+        {
+            var resetRaised = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            viewModel.SelectionResetRequested += () => resetRaised.TrySetResult();
+
+            viewModel.LoadBoardFromFile(boardPath);
+
+            var completed = await Task.WhenAny(resetRaised.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+
+            Assert.Same(resetRaised.Task, completed);
+        }
+        finally
+        {
+            File.Delete(boardPath);
+        }
     }
 }

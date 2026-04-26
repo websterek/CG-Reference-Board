@@ -75,6 +75,30 @@ public sealed class GridTransformServiceTests
     }
 
     [Fact]
+    public void CreateExpandedMoveSnapshots_UsesRenderedTextBoundsForGridAttachments()
+    {
+        var cell = new CellViewModel { CanvasX = 320, CanvasY = 480, ColSpan = 1, RowSpan = 1, Type = CellType.Image };
+        var overlappingText = new AnnotationViewModel
+        {
+            CanvasX = 300,
+            CanvasY = 460,
+            Type = "Text",
+            Text = "Attached text",
+            TextScale = 2.5,
+            Thickness = 3
+        };
+        overlappingText.Points.Add(new Point(0, 0));
+
+        var snapshots = GridTransformService.CreateExpandedMoveSnapshots(
+            new[] { cell },
+            Array.Empty<AnnotationViewModel>(),
+            new[] { cell },
+            new[] { overlappingText });
+
+        Assert.Contains(snapshots, snapshot => ReferenceEquals(snapshot.Annotation, overlappingText));
+    }
+
+    [Fact]
     public void ApplySingleCellResize_SnapsToGridSpan()
     {
         var cell = new CellViewModel { CanvasX = 0, CanvasY = 0, ColSpan = 1, RowSpan = 1, Type = CellType.Image };

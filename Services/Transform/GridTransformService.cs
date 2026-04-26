@@ -65,10 +65,7 @@ public static class GridTransformService
 
         foreach (var cell in cellsToMove)
         {
-            double left = cell.CanvasX;
-            double top = cell.CanvasY;
-            double right = left + cell.ColSpan * Constants.GridSize;
-            double bottom = top + cell.RowSpan * Constants.GridSize;
+            var cellBounds = new Rect(cell.CanvasX, cell.CanvasY, cell.PixelWidth, cell.PixelHeight);
 
             foreach (var annotation in allAnnotations)
             {
@@ -77,12 +74,7 @@ public static class GridTransformService
                     continue;
                 }
 
-                bool intersects = annotation.Points.Any(point =>
-                {
-                    double px = point.X + annotation.CanvasX;
-                    double py = point.Y + annotation.CanvasY;
-                    return px >= left && px <= right && py >= top && py <= bottom;
-                });
+                bool intersects = AnnotationBoundsHelper.IntersectsRenderedBounds(annotation, cellBounds);
 
                 if (intersects)
                 {
