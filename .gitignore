@@ -56,3 +56,4 @@ Include/*/**
 Temp/**
 dist/**
 dist/linux/CGReferenceBoard
+.worktrees/
