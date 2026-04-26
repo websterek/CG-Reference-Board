@@ -1245,8 +1245,7 @@
                                 BorderThickness="{Binding ZoomIndependentBorderThickness, RelativeSource={RelativeSource AncestorType=views:MainWindow}}"
                                 Background="Transparent"
                                 Cursor="SizeAll"
-                                IsHitTestVisible="True"
-                                PointerPressed="TransformBody_PointerPressed"
+                                IsHitTestVisible="False"
                             />
                             <Border
                                 x:Name="TransformTopLeft"

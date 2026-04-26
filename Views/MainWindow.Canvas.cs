@@ -265,6 +265,12 @@ public partial class MainWindow
         GridTransformService.ClearInvalidState(transformService.ActiveSnapshots);
         transformService.End();
         transformService.ClearSnapshots();
+
+        if (!hasCollision && annotationMode && _pendingAltDuplicateAnnotation is not null)
+        {
+            ClearPendingAnnotationAltDuplicateState();
+        }
+
         Vm.RefreshTransformState();
         UpdateTransformOverlayLayout();
         e.Pointer.Capture(null);
@@ -276,6 +282,12 @@ public partial class MainWindow
         }
 
         return true;
+    }
+
+    private void ClearPendingAnnotationAltDuplicateState()
+    {
+        _pendingAltDuplicateAnnotation = null;
+        _isAltDuplicateDrag = false;
     }
 
     private bool CancelActiveTransform()
@@ -311,8 +323,7 @@ public partial class MainWindow
         Vm.SelectionService.RemoveFromSelection(pendingDuplicate);
         pendingDuplicate.IsSelected = false;
         Vm.Annotations.Remove(pendingDuplicate);
-        _pendingAltDuplicateAnnotation = null;
-        _isAltDuplicateDrag = false;
+        ClearPendingAnnotationAltDuplicateState();
         Vm.RefreshTransformState();
         UpdateTransformOverlayLayout();
         return true;

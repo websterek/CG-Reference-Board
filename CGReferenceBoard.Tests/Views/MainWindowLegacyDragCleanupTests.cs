@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using Avalonia;
@@ -225,6 +226,40 @@ public sealed class MainWindowLegacyDragCleanupTests
     }
 
     [Fact]
+    public void ClearPendingAnnotationAltDuplicateState_ClearsAnnotationDuplicateCancelFlags()
+    {
+        var window = CreateWindowHarness(new MainWindowViewModel());
+        var duplicate = new AnnotationViewModel
+        {
+            CanvasX = 160,
+            CanvasY = 120,
+            Type = "Brush",
+            IsSelected = true,
+            IsInDrawMode = true
+        };
+        duplicate.Points.Add(new Point(0, 0));
+        duplicate.Points.Add(new Point(20, 20));
+        duplicate.UpdateBoundsCache();
+
+        window.Vm.ModeService.SetMode("Annotation");
+        window.Vm.ModeService.AnnotationMode.CurrentTool = "Move";
+        window.Vm.Annotations.Add(duplicate);
+        GetSelectedAnnotations(window).Add(duplicate);
+        window.Vm.SelectionService.SelectAnnotation(duplicate);
+
+        SetPrivateField(window, "_isAltDuplicateDrag", true);
+        SetPrivateField(window, "_pendingAltDuplicateAnnotation", duplicate);
+
+        InvokePrivateMethod(window, "ClearPendingAnnotationAltDuplicateState");
+
+        Assert.Contains(duplicate, window.Vm.Annotations);
+        Assert.Contains(duplicate, window.Vm.SelectionService.SelectedAnnotations);
+        Assert.Contains(duplicate, GetSelectedAnnotations(window));
+        Assert.False((bool)GetPrivateField(window, "_isAltDuplicateDrag")!);
+        Assert.Null(GetPrivateField(window, "_pendingAltDuplicateAnnotation"));
+    }
+
+    [Fact]
     public void HandleDeleteSelection_AnnotationOnlySelection_RefreshesSharedSelectionState()
     {
         var window = (MainWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(MainWindow));
@@ -343,6 +378,17 @@ public sealed class MainWindowLegacyDragCleanupTests
 
         Assert.Contains(cellInBackdropPadding, viewModel.SelectionService.SelectedCells);
         Assert.True(cellInBackdropPadding.IsSelected);
+    }
+
+    [Fact]
+    public void MainWindow_TransformBody_DoesNotParticipateInHitTesting()
+    {
+        var mainWindowXamlPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../Views/MainWindow.axaml"));
+        var xaml = File.ReadAllText(mainWindowXamlPath);
+
+        Assert.Contains("x:Name=\"TransformBody\"", xaml);
+        Assert.Contains("IsHitTestVisible=\"False\"", xaml);
+        Assert.DoesNotContain("PointerPressed=\"TransformBody_PointerPressed\"", xaml);
     }
 
     private static object? GetPrivateField(object instance, string fieldName)
