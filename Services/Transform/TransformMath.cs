@@ -7,17 +7,30 @@ namespace CGReferenceBoard.Services.Transform;
 public static class TransformMath
 {
     public static double SnapToGrid(double value)
-        => Math.Round(value / Constants.GridSize, MidpointRounding.AwayFromZero) * Constants.GridSize;
+        => Math.Round(value / Constants.GridSize) * Constants.GridSize;
 
     public static Vector SnapVectorToGrid(Vector value)
         => new(SnapToGrid(value.X), SnapToGrid(value.Y));
 
     public static Rect SnapRectToGrid(Rect rect)
-        => new(
-            SnapToGrid(rect.X),
-            SnapToGrid(rect.Y),
-            SnapToGrid(rect.Width),
-            SnapToGrid(rect.Height));
+    {
+        var left = SnapToGrid(rect.Left);
+        var top = SnapToGrid(rect.Top);
+        var right = SnapToGrid(rect.Right);
+        var bottom = SnapToGrid(rect.Bottom);
+
+        if (right <= left)
+        {
+            right = left + Constants.GridSize;
+        }
+
+        if (bottom <= top)
+        {
+            bottom = top + Constants.GridSize;
+        }
+
+        return new Rect(left, top, right - left, bottom - top);
+    }
 
     public static Rect ResizeBounds(Rect original, TransformHandle handle, Vector delta, double minSize)
     {

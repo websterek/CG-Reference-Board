@@ -9,11 +9,32 @@ public sealed class TransformMathTests
     [Theory]
     [InlineData(0, 0)]
     [InlineData(79, 0)]
+    [InlineData(80, 0)]
     [InlineData(81, 160)]
     [InlineData(-81, -160)]
     public void SnapToGrid_RoundsToNearestGridLine(double value, double expected)
     {
         Assert.Equal(expected, TransformMath.SnapToGrid(value));
+    }
+
+    [Fact]
+    public void SnapRectToGrid_SnapsEdgesBeforeDerivingSize()
+    {
+        var rect = new Rect(10, 20, 230, 170);
+
+        var snapped = TransformMath.SnapRectToGrid(rect);
+
+        Assert.Equal(new Rect(0, 0, 320, 160), snapped);
+    }
+
+    [Fact]
+    public void SnapRectToGrid_EnforcesAtLeastOneGridCell()
+    {
+        var rect = new Rect(81, 81, 10, 10);
+
+        var snapped = TransformMath.SnapRectToGrid(rect);
+
+        Assert.Equal(new Rect(160, 160, 160, 160), snapped);
     }
 
     [Fact]
