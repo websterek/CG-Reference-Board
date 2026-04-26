@@ -381,14 +381,91 @@ public sealed class MainWindowLegacyDragCleanupTests
     }
 
     [Fact]
-    public void MainWindow_TransformBody_DoesNotParticipateInHitTesting()
+    public void MainWindow_TryStartTransformBodyMove_DoesNotStartMoveForNonLeftPress()
     {
-        var mainWindowXamlPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../Views/MainWindow.axaml"));
-        var xaml = File.ReadAllText(mainWindowXamlPath);
+        var window = CreateWindowHarness(new MainWindowViewModel());
+        var cell = new CellViewModel
+        {
+            CanvasX = Constants.GridSize,
+            CanvasY = Constants.GridSize,
+            ColSpan = 2,
+            RowSpan = 1,
+            Type = CellType.Image,
+            IsSelected = true
+        };
 
-        Assert.Contains("x:Name=\"TransformBody\"", xaml);
-        Assert.Contains("IsHitTestVisible=\"False\"", xaml);
-        Assert.DoesNotContain("PointerPressed=\"TransformBody_PointerPressed\"", xaml);
+        window.Vm.GridCells.Add(cell);
+        GetSelectedCells(window).Add(cell);
+        window.UpdateSelectionState();
+        window.Vm.RefreshTransformState();
+
+        var method = typeof(MainWindow).GetMethod("TryStartTransformBodyMove", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.NotNull(method);
+
+        var started = (bool)method!.Invoke(window, new object?[] { new Point(Constants.GridSize + 20, Constants.GridSize + 20), false })!;
+
+        Assert.False(started);
+        Assert.False(window.Vm.TransformService.HasActiveOperation);
+    }
+
+    [Fact]
+    public void MainWindow_TryStartTransformBodyMove_StartsMoveForPointerInsideBody()
+    {
+        var window = CreateWindowHarness(new MainWindowViewModel());
+        var cell = new CellViewModel
+        {
+            CanvasX = Constants.GridSize,
+            CanvasY = Constants.GridSize,
+            ColSpan = 2,
+            RowSpan = 1,
+            Type = CellType.Image,
+            IsSelected = true
+        };
+
+        window.Vm.GridCells.Add(cell);
+        GetSelectedCells(window).Add(cell);
+        window.UpdateSelectionState();
+        window.Vm.RefreshTransformState();
+
+        var method = typeof(MainWindow).GetMethod("TryStartTransformBodyMove", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.NotNull(method);
+
+        var started = (bool)method!.Invoke(window, new object?[] { new Point(Constants.GridSize + 20, Constants.GridSize + 20), true })!;
+
+        Assert.True(started);
+        Assert.True(window.Vm.TransformService.HasActiveOperation);
+        Assert.Equal(TransformOperation.Move, window.Vm.TransformService.Operation);
+    }
+
+    [Fact]
+    public void MainWindow_TryStartTransformBodyMove_DoesNotStartMoveFromHandleRegion()
+    {
+        var window = CreateWindowHarness(new MainWindowViewModel());
+        var cell = new CellViewModel
+        {
+            CanvasX = Constants.GridSize,
+            CanvasY = Constants.GridSize,
+            ColSpan = 2,
+            RowSpan = 1,
+            Type = CellType.Image,
+            IsSelected = true
+        };
+
+        window.Vm.GridCells.Add(cell);
+        GetSelectedCells(window).Add(cell);
+        window.UpdateSelectionState();
+        window.Vm.RefreshTransformState();
+
+        var method = typeof(MainWindow).GetMethod("TryStartTransformBodyMove", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.NotNull(method);
+
+        var started = (bool)method!.Invoke(window, new object?[] { new Point(Constants.GridSize, Constants.GridSize), true })!;
+
+        Assert.False(started);
+        Assert.False(window.Vm.TransformService.HasActiveOperation);
     }
 
     private static object? GetPrivateField(object instance, string fieldName)

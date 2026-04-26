@@ -165,22 +165,35 @@ public partial class MainWindow
 
     private void TransformBody_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (Vm.IsViewMode || !Vm.TransformService.Capabilities.CanMove || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
-        {
-            return;
-        }
-
         var mainCanvas = _cachedMainCanvas ?? this.FindControl<Canvas>("MainCanvas");
         if (mainCanvas == null)
         {
             return;
         }
 
-        if (StartTransformMoveFromCurrentSelection(e.GetPosition(mainCanvas)))
+        if (TryStartTransformBodyMove(e.GetPosition(mainCanvas), e.GetCurrentPoint(this).Properties.IsLeftButtonPressed))
         {
             e.Pointer.Capture(_cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder"));
+            e.Handled = true;
         }
-        e.Handled = true;
+    }
+
+    private bool TryStartTransformBodyMove(Point pointer, bool isLeftButtonPressed)
+    {
+        if (!isLeftButtonPressed || Vm.IsViewMode || !Vm.TransformService.Capabilities.CanMove)
+        {
+            return false;
+        }
+
+        var bounds = Vm.TransformService.Bounds;
+        var handleHalfSize = 5.0 * ZoomInverseFactor;
+        var bodyBounds = bounds.Deflate(handleHalfSize);
+        if (bodyBounds.Width <= 0 || bodyBounds.Height <= 0 || !bodyBounds.Contains(pointer))
+        {
+            return false;
+        }
+
+        return StartTransformMoveFromCurrentSelection(pointer);
     }
 
     private void TransformHandle_PointerPressed(object? sender, PointerPressedEventArgs e)
@@ -472,6 +485,13 @@ public partial class MainWindow
     {
         var props = e.GetCurrentPoint(this).Properties;
         var mainCanvas = _cachedMainCanvas ?? this.FindControl<Canvas>("MainCanvas");
+
+        if (!e.Handled && mainCanvas != null && TryStartTransformBodyMove(e.GetPosition(mainCanvas), props.IsLeftButtonPressed))
+        {
+            e.Pointer.Capture(_cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder"));
+            e.Handled = true;
+            return;
+        }
 
         // Update custom cursor icon position
         var cursorIcon = _cachedCursorIconContainer ?? this.FindControl<Border>("CursorIconContainer");
