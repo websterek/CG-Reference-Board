@@ -971,7 +971,7 @@ public partial class MainWindow
 
                 foreach (var ann in Vm.Annotations)
                 {
-                    bool inRect = AnnotationBoundsHelper.IntersectsRenderedBounds(ann, new Rect(left, top, marquee.Width, marquee.Height));
+                    bool inRect = AnnotationBoundsHelper.IntersectsRenderedGeometry(ann, new Rect(left, top, marquee.Width, marquee.Height));
 
                     if (inRect && !ann.IsSelected)
                     {
@@ -980,6 +980,7 @@ public partial class MainWindow
                     }
                 }
             }
+            UpdateSelectionState();
             return;
         }
 
@@ -1102,7 +1103,7 @@ public partial class MainWindow
                     // Also select annotations in grid mode
                     foreach (var ann in Vm.Annotations)
                     {
-                        if (AnnotationBoundsHelper.IntersectsRenderedBounds(ann, new Rect(left, top, cellMarquee.Width, cellMarquee.Height)) && !ann.IsSelected)
+                        if (AnnotationBoundsHelper.IntersectsRenderedGeometry(ann, new Rect(left, top, cellMarquee.Width, cellMarquee.Height)) && !ann.IsSelected)
                         {
                             ann.IsSelected = true;
                             _selectedAnnotations.Add(ann);

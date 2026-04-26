@@ -253,7 +253,7 @@ public static class GridLayoutService
 
         foreach (var annotation in annotations)
         {
-            bool inRect = AnnotationBoundsHelper.IntersectsRenderedBounds(annotation, backdropRect);
+            bool inRect = AnnotationBoundsHelper.IntersectsRenderedGeometry(annotation, backdropRect);
 
             if (inRect)
                 result.Add(annotation);
@@ -290,7 +290,7 @@ public static class GridLayoutService
                 if (movedAnnotations.Contains(annotation))
                     continue;
 
-                bool inRect = AnnotationBoundsHelper.IntersectsRenderedBounds(annotation, cellRect);
+                bool inRect = AnnotationBoundsHelper.IntersectsRenderedGeometry(annotation, cellRect);
 
                 if (inRect)
                 {

@@ -74,7 +74,7 @@ public static class GridTransformService
                     continue;
                 }
 
-                bool intersects = AnnotationBoundsHelper.IntersectsRenderedBounds(annotation, cellBounds);
+                bool intersects = AnnotationBoundsHelper.IntersectsRenderedGeometry(annotation, cellBounds);
 
                 if (intersects)
                 {
@@ -166,10 +166,12 @@ public static class GridTransformService
 
         if (operation == TransformOperation.Move)
         {
-            var reference = snapshots.First(snapshot => snapshot.Cell is not null);
-            double dx = reference.Cell!.CanvasX - reference.CanvasX;
-            double dy = reference.Cell.CanvasY - reference.CanvasY;
-            return GridLayoutService.HasGroupCollision(gridCells, activeCells, layerManager, dx, dy);
+            return HasCurrentCellCollision(activeCells, gridCells, layerManager);
+        }
+
+        if (HasInternalOverlap(activeCells))
+        {
+            return true;
         }
 
         foreach (var cell in activeCells)
@@ -183,6 +185,43 @@ public static class GridTransformService
 
         return false;
     }
+
+    private static bool HasCurrentCellCollision(
+        IReadOnlyList<CellViewModel> activeCells,
+        IReadOnlyList<CellViewModel> gridCells,
+        LayerManager layerManager)
+    {
+        foreach (var cell in activeCells)
+        {
+            var owningLayer = layerManager.ResolveLayer(cell);
+            if (owningLayer != null && GridLayoutService.HasLayerCollision(gridCells, owningLayer, activeCells, cell.CanvasX, cell.CanvasY, cell.ColSpan, cell.RowSpan))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasInternalOverlap(IReadOnlyList<CellViewModel> activeCells)
+    {
+        for (int i = 0; i < activeCells.Count; i++)
+        {
+            var first = GetLogicalCellRect(activeCells[i]);
+            for (int j = i + 1; j < activeCells.Count; j++)
+            {
+                if (first.Intersects(GetLogicalCellRect(activeCells[j])))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static Rect GetLogicalCellRect(CellViewModel cell)
+        => new(cell.CanvasX, cell.CanvasY, cell.ColSpan * Constants.GridSize, cell.RowSpan * Constants.GridSize);
 
     public static void RestoreSnapshots(IReadOnlyList<TransformItemSnapshot> snapshots)
     {

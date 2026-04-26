@@ -1,4 +1,5 @@
 using Avalonia;
+using CGReferenceBoard.Layers.Infrastructure;
 using CGReferenceBoard.Models;
 using CGReferenceBoard.Services.Transform;
 using CGReferenceBoard.Tests.TestInfrastructure;
@@ -28,6 +29,38 @@ public sealed class GridTransformServiceTests
         Assert.Equal(0, cell.CanvasY);
         Assert.Equal(165, annotation.CanvasX);
         Assert.Equal(10, annotation.CanvasY);
+    }
+
+    [Fact]
+    public void HasCollision_MoveChecksAppliedDestinationNotDoubleDelta()
+    {
+        var movingCell = new CellViewModel { CanvasX = 0, CanvasY = 0, ColSpan = 1, RowSpan = 1, Type = CellType.Image };
+        var occupiedCell = new CellViewModel { CanvasX = 160, CanvasY = 0, ColSpan = 1, RowSpan = 1, Type = CellType.Image };
+        var snapshots = TransformBoundsCalculator.CreateSnapshots(new[] { movingCell }, Array.Empty<AnnotationViewModel>());
+
+        GridTransformService.ApplyMove(snapshots, new Vector(160, 0));
+
+        Assert.True(GridTransformService.HasCollision(
+            snapshots,
+            TransformOperation.Move,
+            new[] { movingCell, occupiedCell },
+            new LayerManager()));
+    }
+
+    [Fact]
+    public void HasCollision_MoveDoesNotReportCollisionFromDoubleDelta()
+    {
+        var movingCell = new CellViewModel { CanvasX = 0, CanvasY = 0, ColSpan = 1, RowSpan = 1, Type = CellType.Image };
+        var distantCell = new CellViewModel { CanvasX = 320, CanvasY = 0, ColSpan = 1, RowSpan = 1, Type = CellType.Image };
+        var snapshots = TransformBoundsCalculator.CreateSnapshots(new[] { movingCell }, Array.Empty<AnnotationViewModel>());
+
+        GridTransformService.ApplyMove(snapshots, new Vector(160, 0));
+
+        Assert.False(GridTransformService.HasCollision(
+            snapshots,
+            TransformOperation.Move,
+            new[] { movingCell, distantCell },
+            new LayerManager()));
     }
 
     [Fact]
@@ -195,5 +228,23 @@ public sealed class GridTransformServiceTests
         Assert.Equal(0, rightCell.CanvasY);
         Assert.Equal(2, rightCell.ColSpan);
         Assert.Equal(2, rightCell.RowSpan);
+    }
+
+    [Fact]
+    public void HasCollision_ResizeDetectsOverlapBetweenSelectedCells()
+    {
+        var leftCell = new CellViewModel { CanvasX = 0, CanvasY = 0, ColSpan = 1, RowSpan = 1, Type = CellType.Image };
+        var rightCell = new CellViewModel { CanvasX = 160, CanvasY = 0, ColSpan = 1, RowSpan = 1, Type = CellType.Image };
+        var snapshots = TransformBoundsCalculator.CreateSnapshots(new[] { leftCell, rightCell }, Array.Empty<AnnotationViewModel>());
+        var originalBounds = new Rect(0, 0, 320, 160);
+        var resizedBounds = new Rect(0, 0, 160, 160);
+
+        GridTransformService.ApplyResize(snapshots, originalBounds, resizedBounds);
+
+        Assert.True(GridTransformService.HasCollision(
+            snapshots,
+            TransformOperation.Resize,
+            new[] { leftCell, rightCell },
+            new LayerManager()));
     }
 }

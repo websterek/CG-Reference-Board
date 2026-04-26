@@ -822,7 +822,7 @@ public partial class MainWindow
 
         foreach (var ann in Vm.Annotations)
         {
-            bool inRect = AnnotationBoundsHelper.IntersectsRenderedBounds(ann, new Rect(left, top, right - left, bottom - top));
+            bool inRect = AnnotationBoundsHelper.IntersectsRenderedGeometry(ann, new Rect(left, top, right - left, bottom - top));
 
             if (inRect)
             {

@@ -65,4 +65,40 @@ public sealed class AnnotationBoundsHelperTests
         Assert.True(bounds.Value.Right >= brush.CanvasX + brush.Points[1].X + brush.Thickness);
         Assert.True(bounds.Value.Bottom >= brush.CanvasY + brush.Points[1].Y + brush.Thickness);
     }
+
+    [Fact]
+    public void IntersectsRenderedGeometry_DoesNotSelectEmptyDiagonalBrushBoundsCorner()
+    {
+        var brush = new AnnotationViewModel
+        {
+            CanvasX = 0,
+            CanvasY = 0,
+            Type = "Brush",
+            Thickness = 4
+        };
+        brush.Points.Add(new Point(0, 0));
+        brush.Points.Add(new Point(160, 160));
+
+        var emptyCorner = new Rect(120, 0, 40, 40);
+
+        Assert.False(AnnotationBoundsHelper.IntersectsRenderedGeometry(brush, emptyCorner));
+    }
+
+    [Fact]
+    public void IntersectsRenderedGeometry_SelectsBrushWhenStrokeCrossesTarget()
+    {
+        var brush = new AnnotationViewModel
+        {
+            CanvasX = 0,
+            CanvasY = 0,
+            Type = "Brush",
+            Thickness = 4
+        };
+        brush.Points.Add(new Point(0, 0));
+        brush.Points.Add(new Point(160, 160));
+
+        var crossedRect = new Rect(70, 70, 20, 20);
+
+        Assert.True(AnnotationBoundsHelper.IntersectsRenderedGeometry(brush, crossedRect));
+    }
 }
