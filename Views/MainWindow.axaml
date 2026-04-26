@@ -450,30 +450,6 @@
                         />
                     </Border>
 
-                    <!-- Resize Thumb (edit mode only) -->
-                    <Panel
-                        IsVisible="{Binding !IsViewMode, RelativeSource={RelativeSource AncestorType=views:MainWindow}}"
-                        ZIndex="10"
-                    >
-                        <Border
-                            x:Name="ResizeThumb"
-                            Background="#AA000000"
-                            BorderBrush="#88AAFF"
-                            BorderThickness="2.5"
-                            Width="24"
-                            Height="24"
-                            CornerRadius="12"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Bottom"
-                            Margin="6"
-                            Cursor="BottomRightCorner"
-                            ZIndex="10"
-                            PointerPressed="ResizeThumb_PointerPressed"
-                            PointerMoved="ResizeThumb_PointerMoved"
-                            PointerReleased="ResizeThumb_PointerReleased"
-                            IsVisible="{Binding HasContent}"
-                        />
-                    </Panel>
                 </Grid>
             </Border>
         </DataTemplate>
@@ -1256,6 +1232,78 @@
                             VerticalAlignment="Top"
                             ZIndex="104"
                         />
+
+                        <Canvas
+                            x:Name="TransformOverlay"
+                            IsVisible="{Binding TransformService.IsVisible}"
+                            IsHitTestVisible="True"
+                            ZIndex="106"
+                        >
+                            <Border
+                                x:Name="TransformBody"
+                                BorderBrush="{StaticResource AccentBrush}"
+                                BorderThickness="{Binding ZoomIndependentBorderThickness, RelativeSource={RelativeSource AncestorType=views:MainWindow}}"
+                                Background="Transparent"
+                                Cursor="SizeAll"
+                                PointerPressed="TransformBody_PointerPressed"
+                            />
+                            <Border
+                                x:Name="TransformTopLeft"
+                                Classes="TransformHandle"
+                                Cursor="TopLeftCorner"
+                                Tag="TopLeft"
+                                PointerPressed="TransformHandle_PointerPressed"
+                            />
+                            <Border
+                                x:Name="TransformTop"
+                                Classes="TransformHandle"
+                                Cursor="TopSide"
+                                Tag="Top"
+                                PointerPressed="TransformHandle_PointerPressed"
+                            />
+                            <Border
+                                x:Name="TransformTopRight"
+                                Classes="TransformHandle"
+                                Cursor="TopRightCorner"
+                                Tag="TopRight"
+                                PointerPressed="TransformHandle_PointerPressed"
+                            />
+                            <Border
+                                x:Name="TransformRight"
+                                Classes="TransformHandle"
+                                Cursor="RightSide"
+                                Tag="Right"
+                                PointerPressed="TransformHandle_PointerPressed"
+                            />
+                            <Border
+                                x:Name="TransformBottomRight"
+                                Classes="TransformHandle"
+                                Cursor="BottomRightCorner"
+                                Tag="BottomRight"
+                                PointerPressed="TransformHandle_PointerPressed"
+                            />
+                            <Border
+                                x:Name="TransformBottom"
+                                Classes="TransformHandle"
+                                Cursor="BottomSide"
+                                Tag="Bottom"
+                                PointerPressed="TransformHandle_PointerPressed"
+                            />
+                            <Border
+                                x:Name="TransformBottomLeft"
+                                Classes="TransformHandle"
+                                Cursor="BottomLeftCorner"
+                                Tag="BottomLeft"
+                                PointerPressed="TransformHandle_PointerPressed"
+                            />
+                            <Border
+                                x:Name="TransformLeft"
+                                Classes="TransformHandle"
+                                Cursor="LeftSide"
+                                Tag="Left"
+                                PointerPressed="TransformHandle_PointerPressed"
+                            />
+                        </Canvas>
 
                         <!-- Grid cell hover highlight -->
                         <Border

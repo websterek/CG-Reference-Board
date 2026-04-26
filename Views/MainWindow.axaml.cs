@@ -230,6 +230,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         Vm.AlwaysOnTopChanged += topmost => Topmost = topmost;
         Vm.ToastRequested += ShowToast;
         Vm.ViewportUpdateRequested += ScheduleViewportUpdate;
+        Vm.TransformService.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(Vm.TransformService.IsVisible) or nameof(Vm.TransformService.Bounds))
+            {
+                UpdateTransformOverlayLayout();
+            }
+        };
         Vm.StartupOverlayHideRequested += () =>
         {
             var overlay = this.FindControl<Border>("StartupOverlay");
@@ -237,6 +244,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         };
 
         CacheCanvasControls();
+        UpdateTransformOverlayLayout();
 
         try
         {
@@ -491,6 +499,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         OnPropertyChanged(nameof(ZoomIndependentBorderThickness));
         OnPropertyChanged(nameof(ZoomIndependentCornerRadius));
         OnPropertyChanged(nameof(IsCanvasBackgroundVisible));
+        UpdateTransformOverlayLayout();
 
         CGReferenceBoard.Controls.AnnotationShape.SetScale(_scale.ScaleX);
 
@@ -734,6 +743,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         // Sync to SelectionService
         Vm.SelectionService.SelectRange(_selectedCells, _selectedAnnotations);
+        UpdateTransformOverlayLayout();
 
         OnPropertyChanged(nameof(SelectionCountText));
         OnPropertyChanged(nameof(HasMultipleSelection));

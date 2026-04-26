@@ -34,21 +34,6 @@
     </Style>
 
     <!-- ═══════════════════════════════════════════════════════════ -->
-    <!-- Resize Thumb – show on cell hover                          -->
-    <!-- ═══════════════════════════════════════════════════════════ -->
-    <Style Selector="Border.CellRoot Border#ResizeThumb">
-        <Setter Property="Opacity" Value="0" />
-        <Setter Property="Transitions">
-            <Transitions>
-                <DoubleTransition Property="Opacity" Duration="0:0:0.15" />
-            </Transitions>
-        </Setter>
-    </Style>
-    <Style Selector="Border.CellRoot:pointerover Border#ResizeThumb">
-        <Setter Property="Opacity" Value="0.7" />
-    </Style>
-
-    <!-- ═══════════════════════════════════════════════════════════ -->
     <!-- Video Play Overlay – show on cell hover                    -->
     <!-- ═══════════════════════════════════════════════════════════ -->
     <Style Selector="Border.VideoPlayOverlay">
@@ -147,6 +132,13 @@
         <Setter Property="BorderBrush" Value="{StaticResource CellSelectionBorderBrush}" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="IsHitTestVisible" Value="False" />
+    </Style>
+
+    <Style Selector="Border.TransformHandle">
+        <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+        <Setter Property="BorderBrush" Value="White" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="2" />
     </Style>
 
     <!-- ═══════════════════════════════════════════════════════════ -->

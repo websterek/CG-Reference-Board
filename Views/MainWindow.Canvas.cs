@@ -9,6 +9,7 @@ using Avalonia.Media;
 using CGReferenceBoard.Helpers;
 using CGReferenceBoard.Layers.Infrastructure;
 using CGReferenceBoard.Services;
+using CGReferenceBoard.Services.Transform;
 using CGReferenceBoard.ViewModels;
 
 namespace CGReferenceBoard.Views;
@@ -26,6 +27,16 @@ public partial class MainWindow
     private Border? _cachedHoverHighlight;
     private Border? _cachedSelectionMarquee;
     private Border? _cachedCellSelectionMarquee;
+    private Canvas? _cachedTransformOverlay;
+    private Border? _cachedTransformBody;
+    private Border? _cachedTransformTopLeft;
+    private Border? _cachedTransformTop;
+    private Border? _cachedTransformTopRight;
+    private Border? _cachedTransformRight;
+    private Border? _cachedTransformBottomRight;
+    private Border? _cachedTransformBottom;
+    private Border? _cachedTransformBottomLeft;
+    private Border? _cachedTransformLeft;
     private Border? _cachedCursorIconContainer;
     private Ellipse? _cachedBrushCursorCircle;
     private Canvas? _cachedMainCanvas;
@@ -36,9 +47,97 @@ public partial class MainWindow
         _cachedHoverHighlight = this.FindControl<Border>("HoverHighlight");
         _cachedSelectionMarquee = this.FindControl<Border>("SelectionMarquee");
         _cachedCellSelectionMarquee = this.FindControl<Border>("CellSelectionMarquee");
+        _cachedTransformOverlay = this.FindControl<Canvas>("TransformOverlay");
+        _cachedTransformBody = this.FindControl<Border>("TransformBody");
+        _cachedTransformTopLeft = this.FindControl<Border>("TransformTopLeft");
+        _cachedTransformTop = this.FindControl<Border>("TransformTop");
+        _cachedTransformTopRight = this.FindControl<Border>("TransformTopRight");
+        _cachedTransformRight = this.FindControl<Border>("TransformRight");
+        _cachedTransformBottomRight = this.FindControl<Border>("TransformBottomRight");
+        _cachedTransformBottom = this.FindControl<Border>("TransformBottom");
+        _cachedTransformBottomLeft = this.FindControl<Border>("TransformBottomLeft");
+        _cachedTransformLeft = this.FindControl<Border>("TransformLeft");
         _cachedCursorIconContainer = this.FindControl<Border>("CursorIconContainer");
         _cachedBrushCursorCircle = this.FindControl<Ellipse>("BrushCursorCircle");
         _cachedMainCanvas = this.FindControl<Canvas>("MainCanvas");
+    }
+
+    private void UpdateTransformOverlayLayout()
+    {
+        var overlay = _cachedTransformOverlay ?? this.FindControl<Canvas>("TransformOverlay");
+        var body = _cachedTransformBody ?? this.FindControl<Border>("TransformBody");
+        if (overlay == null || body == null)
+        {
+            return;
+        }
+
+        var bounds = Vm.TransformService.Bounds;
+        if (!Vm.TransformService.IsVisible || bounds.Width <= 0 || bounds.Height <= 0)
+        {
+            body.IsVisible = false;
+            return;
+        }
+
+        var handleSize = 10.0 * ZoomInverseFactor;
+        var halfHandle = handleSize / 2.0;
+        var midX = bounds.X + (bounds.Width / 2.0);
+        var midY = bounds.Y + (bounds.Height / 2.0);
+
+        body.IsVisible = true;
+        Canvas.SetLeft(body, bounds.X);
+        Canvas.SetTop(body, bounds.Y);
+        body.Width = bounds.Width;
+        body.Height = bounds.Height;
+
+        SetHandle(_cachedTransformTopLeft, bounds.X - halfHandle, bounds.Y - halfHandle, handleSize);
+        SetHandle(_cachedTransformTop, midX - halfHandle, bounds.Y - halfHandle, handleSize);
+        SetHandle(_cachedTransformTopRight, bounds.Right - halfHandle, bounds.Y - halfHandle, handleSize);
+        SetHandle(_cachedTransformRight, bounds.Right - halfHandle, midY - halfHandle, handleSize);
+        SetHandle(_cachedTransformBottomRight, bounds.Right - halfHandle, bounds.Bottom - halfHandle, handleSize);
+        SetHandle(_cachedTransformBottom, midX - halfHandle, bounds.Bottom - halfHandle, handleSize);
+        SetHandle(_cachedTransformBottomLeft, bounds.X - halfHandle, bounds.Bottom - halfHandle, handleSize);
+        SetHandle(_cachedTransformLeft, bounds.X - halfHandle, midY - halfHandle, handleSize);
+    }
+
+    private static void SetHandle(Border? handle, double left, double top, double size)
+    {
+        if (handle == null)
+        {
+            return;
+        }
+
+        handle.IsVisible = true;
+        handle.Width = size;
+        handle.Height = size;
+        Canvas.SetLeft(handle, left);
+        Canvas.SetTop(handle, top);
+    }
+
+    private void TransformBody_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed || !Vm.TransformService.IsVisible)
+        {
+            return;
+        }
+
+        Vm.TransformService.BeginMove(e.GetPosition(_cachedMainCanvas ?? MainCanvas), Vm.SelectionService);
+        UpdateTransformOverlayLayout();
+        e.Handled = true;
+    }
+
+    private void TransformHandle_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed
+            || !Vm.TransformService.IsVisible
+            || sender is not Control { Tag: string tag }
+            || !Enum.TryParse<TransformHandle>(tag, out var handle))
+        {
+            return;
+        }
+
+        Vm.TransformService.BeginResize(handle, e.GetPosition(_cachedMainCanvas ?? MainCanvas), Vm.SelectionService);
+        UpdateTransformOverlayLayout();
+        e.Handled = true;
     }
 
     private void ApplyPanCursor(Border? canvasBorder)
