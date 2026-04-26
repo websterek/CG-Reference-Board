@@ -39,4 +39,28 @@ public sealed class AnnotationTransformServiceTests
         Assert.Equal(161.29032258064515, annotation.Points[1].X, 10);
         Assert.Equal(67.56756756756756, annotation.Points[1].Y, 10);
     }
+
+    [Fact]
+    public void Resize_RepeatedCallsWithSameSnapshot_DoNotCompound()
+    {
+        var annotation = new AnnotationViewModel { CanvasX = 10, CanvasY = 20, Type = "Brush" };
+        annotation.Points.Add(new Point(0, 0));
+        annotation.Points.Add(new Point(100, 50));
+        annotation.UpdateBoundsCache();
+        var originalBounds = TransformBoundsCalculator.GetSelectionBounds(Array.Empty<CellViewModel>(), new[] { annotation })!.Value;
+        var resizedBounds = new Rect(10, 20, 200, 100);
+        var snapshots = TransformBoundsCalculator.CreateSnapshots(Array.Empty<CellViewModel>(), new[] { annotation });
+
+        AnnotationTransformService.ApplyResize(snapshots, originalBounds, resizedBounds);
+        var firstCanvasX = annotation.CanvasX;
+        var firstCanvasY = annotation.CanvasY;
+        var firstPoint = annotation.Points[1];
+
+        AnnotationTransformService.ApplyResize(snapshots, originalBounds, resizedBounds);
+
+        Assert.Equal(firstCanvasX, annotation.CanvasX, 10);
+        Assert.Equal(firstCanvasY, annotation.CanvasY, 10);
+        Assert.Equal(firstPoint.X, annotation.Points[1].X, 10);
+        Assert.Equal(firstPoint.Y, annotation.Points[1].Y, 10);
+    }
 }

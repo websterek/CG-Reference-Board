@@ -25,18 +25,18 @@ public static class AnnotationTransformService
         foreach (var snapshot in snapshots)
         {
             var annotation = snapshot.Annotation;
-            if (annotation is null || annotation.Points.Count == 0)
+            if (annotation is null || snapshot.AnnotationPoints.Count == 0)
             {
                 continue;
             }
 
-            var mappedPoints = new Point[annotation.Points.Count];
+            var mappedPoints = new Point[snapshot.AnnotationPoints.Count];
             double minX = double.MaxValue;
             double minY = double.MaxValue;
 
-            for (int i = 0; i < annotation.Points.Count; i++)
+            for (int i = 0; i < snapshot.AnnotationPoints.Count; i++)
             {
-                var absolutePoint = new Point(annotation.CanvasX + annotation.Points[i].X, annotation.CanvasY + annotation.Points[i].Y);
+                var absolutePoint = new Point(snapshot.CanvasX + snapshot.AnnotationPoints[i].X, snapshot.CanvasY + snapshot.AnnotationPoints[i].Y);
                 var mappedPoint = TransformMath.MapPointBetweenRects(absolutePoint, originalSelectionBounds, resizedSelectionBounds);
                 mappedPoints[i] = mappedPoint;
 

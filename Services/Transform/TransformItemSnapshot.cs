@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Avalonia;
 using CGReferenceBoard.ViewModels;
 
@@ -20,6 +21,8 @@ public sealed class TransformItemSnapshot
 
     public int RowSpan { get; }
 
+    public IReadOnlyList<Point> AnnotationPoints { get; }
+
     private TransformItemSnapshot(
         CellViewModel? cell,
         AnnotationViewModel? annotation,
@@ -27,7 +30,8 @@ public sealed class TransformItemSnapshot
         double canvasX,
         double canvasY,
         int colSpan,
-        int rowSpan)
+        int rowSpan,
+        IReadOnlyList<Point>? annotationPoints)
     {
         if ((cell is null) == (annotation is null))
         {
@@ -41,11 +45,12 @@ public sealed class TransformItemSnapshot
         CanvasY = canvasY;
         ColSpan = colSpan;
         RowSpan = rowSpan;
+        AnnotationPoints = annotationPoints ?? Array.Empty<Point>();
     }
 
     public static TransformItemSnapshot FromCell(CellViewModel cell, Rect bounds)
-        => new(cell, null, bounds, cell.CanvasX, cell.CanvasY, cell.ColSpan, cell.RowSpan);
+        => new(cell, null, bounds, cell.CanvasX, cell.CanvasY, cell.ColSpan, cell.RowSpan, null);
 
     public static TransformItemSnapshot FromAnnotation(AnnotationViewModel annotation, Rect bounds)
-        => new(null, annotation, bounds, annotation.CanvasX, annotation.CanvasY, 0, 0);
+        => new(null, annotation, bounds, annotation.CanvasX, annotation.CanvasY, 0, 0, new List<Point>(annotation.Points));
 }

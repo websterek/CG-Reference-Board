@@ -46,9 +46,13 @@ public sealed class TransformItemSnapshotTests
             CanvasX = 15,
             CanvasY = 25,
         };
+        annotation.Points.Add(new Point(1, 2));
+        annotation.Points.Add(new Point(3, 4));
         var bounds = new Rect(15, 25, 35, 45);
 
         var snapshot = TransformItemSnapshot.FromAnnotation(annotation, bounds);
+
+        annotation.Points[0] = new Point(9, 9);
 
         Assert.Null(snapshot.Cell);
         Assert.Same(annotation, snapshot.Annotation);
@@ -57,5 +61,8 @@ public sealed class TransformItemSnapshotTests
         Assert.Equal(25, snapshot.CanvasY);
         Assert.Equal(0, snapshot.ColSpan);
         Assert.Equal(0, snapshot.RowSpan);
+        Assert.Equal(2, snapshot.AnnotationPoints.Count);
+        Assert.Equal(new Point(1, 2), snapshot.AnnotationPoints[0]);
+        Assert.Equal(new Point(3, 4), snapshot.AnnotationPoints[1]);
     }
 }
