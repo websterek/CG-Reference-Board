@@ -1,0 +1,99 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using Avalonia;
+using Avalonia.Media;
+using CGReferenceBoard.Helpers;
+using CGReferenceBoard.ViewModels;
+
+namespace CGReferenceBoard.Services.Transform;
+
+public static class TransformBoundsCalculator
+{
+    public static Rect GetCellBounds(CellViewModel cell)
+        => new(
+            cell.CanvasX,
+            cell.CanvasY,
+            cell.ColSpan * Constants.GridSize,
+            cell.RowSpan * Constants.GridSize);
+
+    public static Rect GetAnnotationBounds(AnnotationViewModel annotation)
+    {
+        if (annotation.Type == "Text" && annotation.Points.Count > 0)
+        {
+            var start = annotation.Points[0];
+            var ft = new FormattedText(
+                annotation.Text ?? string.Empty,
+                CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight,
+                new Typeface("Inter, Arial"),
+                Math.Max(12, annotation.Thickness * 4 + 10),
+                Brushes.White);
+
+            return new Rect(
+                annotation.CanvasX + start.X,
+                annotation.CanvasY + start.Y,
+                ft.Width,
+                ft.Height);
+        }
+
+        return new Rect(
+            annotation.AbsBoundsLeft,
+            annotation.AbsBoundsTop,
+            annotation.AbsBoundsRight - annotation.AbsBoundsLeft,
+            annotation.AbsBoundsBottom - annotation.AbsBoundsTop);
+    }
+
+    public static Rect? GetSelectionBounds(IEnumerable<CellViewModel> cells, IEnumerable<AnnotationViewModel> annotations)
+    {
+        var snapshots = CreateSnapshots(cells, annotations);
+        if (snapshots.Count == 0)
+        {
+            return null;
+        }
+
+        var bounds = snapshots[0].Bounds;
+        for (int i = 1; i < snapshots.Count; i++)
+        {
+            bounds = Union(bounds, snapshots[i].Bounds);
+        }
+
+        return bounds;
+    }
+
+    public static IReadOnlyList<TransformItemSnapshot> CreateSnapshots(IEnumerable<CellViewModel> cells, IEnumerable<AnnotationViewModel> annotations)
+    {
+        var snapshots = new List<TransformItemSnapshot>();
+
+        foreach (var cell in cells)
+        {
+            if (!cell.HasContent)
+            {
+                continue;
+            }
+
+            snapshots.Add(TransformItemSnapshot.FromCell(cell, GetCellBounds(cell)));
+        }
+
+        foreach (var annotation in annotations)
+        {
+            if (annotation.Points.Count == 0)
+            {
+                continue;
+            }
+
+            snapshots.Add(TransformItemSnapshot.FromAnnotation(annotation, GetAnnotationBounds(annotation)));
+        }
+
+        return snapshots;
+    }
+
+    private static Rect Union(Rect left, Rect right)
+    {
+        var x1 = Math.Min(left.X, right.X);
+        var y1 = Math.Min(left.Y, right.Y);
+        var x2 = Math.Max(left.Right, right.Right);
+        var y2 = Math.Max(left.Bottom, right.Bottom);
+        return new Rect(x1, y1, x2 - x1, y2 - y1);
+    }
+}
