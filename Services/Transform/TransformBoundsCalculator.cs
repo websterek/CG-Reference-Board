@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using Avalonia;
-using Avalonia.Media;
 using CGReferenceBoard.Helpers;
 using CGReferenceBoard.ViewModels;
 
@@ -18,31 +16,7 @@ public static class TransformBoundsCalculator
             cell.RowSpan * Constants.GridSize);
 
     public static Rect GetAnnotationBounds(AnnotationViewModel annotation)
-    {
-        if (annotation.Type == "Text" && annotation.Points.Count > 0)
-        {
-            var start = annotation.Points[0];
-            var ft = new FormattedText(
-                annotation.Text ?? string.Empty,
-                CultureInfo.CurrentCulture,
-                FlowDirection.LeftToRight,
-                new Typeface("Inter, Arial"),
-                Math.Max(12, annotation.Thickness * 4 + 10),
-                Brushes.White);
-
-            return new Rect(
-                annotation.CanvasX + start.X,
-                annotation.CanvasY + start.Y,
-                Math.Max(40, ft.Width + 20),
-                Math.Max(20, ft.Height + 20));
-        }
-
-        return new Rect(
-            annotation.AbsBoundsLeft,
-            annotation.AbsBoundsTop,
-            annotation.AbsBoundsRight - annotation.AbsBoundsLeft,
-            annotation.AbsBoundsBottom - annotation.AbsBoundsTop);
-    }
+        => AnnotationBoundsHelper.GetRenderedBounds(annotation);
 
     public static Rect? GetSelectionBounds(IEnumerable<CellViewModel> cells, IEnumerable<AnnotationViewModel> annotations)
     {

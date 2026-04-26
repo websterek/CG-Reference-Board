@@ -49,7 +49,7 @@ public sealed class TransformBoundsCalculatorTests
 
         var bounds = TransformBoundsCalculator.GetAnnotationBounds(annotation);
 
-        Assert.Equal(new Rect(15, 26, 20, 30), bounds);
+        Assert.Equal(new Rect(3, 14, 44, 54), bounds);
     }
 
     [Fact]
@@ -79,10 +79,10 @@ public sealed class TransformBoundsCalculatorTests
         var bounds = TransformBoundsCalculator.GetAnnotationBounds(annotation);
 
         Assert.Equal(new Rect(
-            annotation.CanvasX + 15,
-            annotation.CanvasY + 25,
-            Math.Max(40, ft.Width + 20),
-            Math.Max(20, ft.Height + 20)), bounds);
+            annotation.CanvasX + 4,
+            annotation.CanvasY + 14,
+            Math.Max(40, ft.Width + 20) + 22,
+            Math.Max(20, ft.Height + 20) + 22), bounds);
     }
 
     [Fact]
@@ -103,7 +103,7 @@ public sealed class TransformBoundsCalculatorTests
 
         var bounds = TransformBoundsCalculator.GetSelectionBounds(new[] { cell }, new[] { annotation });
 
-        Assert.Equal(new Rect(160, 50, 390, 270), bounds);
+        Assert.Equal(new Rect(160, 38, 402, 282), bounds);
     }
 
     [Fact]

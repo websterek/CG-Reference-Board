@@ -198,44 +198,14 @@ public class AnnotationShape : Control
         if (vm == null || vm.Points.Count == 0)
             return;
 
-        _minX = double.MaxValue;
-        _minY = double.MaxValue;
-        double maxX = double.MinValue;
-        double maxY = double.MinValue;
+        var localBounds = AnnotationBoundsHelper.GetLocalContentBounds(vm);
+        var pad = AnnotationBoundsHelper.GetRenderPadding(vm);
 
-        foreach (var pt in vm.Points)
-        {
-            if (pt.X < _minX)
-                _minX = pt.X;
-            if (pt.X > maxX)
-                maxX = pt.X;
-            if (pt.Y < _minY)
-                _minY = pt.Y;
-            if (pt.Y > maxY)
-                maxY = pt.Y;
-        }
-
-        if (vm.Type == "Text")
-        {
-            // Measure the actual rendered text size using the same font parameters
-            // as RenderText so the control bounds are tight around the content.
-            double fontSize = Math.Max(12, vm.Thickness * 4 + 10);
-            var ft = new FormattedText(
-                vm.Text ?? "",
-                System.Globalization.CultureInfo.CurrentCulture,
-                FlowDirection.LeftToRight,
-                new Typeface("Inter, Arial"),
-                fontSize,
-                Avalonia.Media.Brushes.White);
-            // Add padding so shadow/outline effects are not clipped.
-            maxX = _minX + Math.Max(40, ft.Width + 20);
-            maxY = _minY + Math.Max(20, ft.Height + 20);
-        }
-
-        double pad = vm.Thickness + Constants.AnnotationEffectPadding;
-        Width = (maxX - _minX) + pad * 2;
-        Height = (maxY - _minY) + pad * 2;
-        Margin = new Thickness(_minX - pad, _minY - pad, 0, 0);
+        _minX = localBounds.X;
+        _minY = localBounds.Y;
+        Width = localBounds.Width + pad * 2;
+        Height = localBounds.Height + pad * 2;
+        Margin = new Thickness(localBounds.X - pad, localBounds.Y - pad, 0, 0);
     }
 
     // ───────── Effect helpers ─────────
