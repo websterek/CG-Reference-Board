@@ -280,6 +280,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             if (e.PropertyName == nameof(AnnotationMode.CurrentTool))
             {
+                RefreshTransformState();
                 OnPropertyChanged(nameof(CurrentTool));
                 OnPropertyChanged(nameof(CanvasCursor));
                 OnPropertyChanged(nameof(IsBrushSelected));
