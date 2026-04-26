@@ -350,12 +350,14 @@ public class CellViewModel : ViewModelBase, IDisposable
                 };
             }
 
-            return Type switch
+            int baseZIndex = Type switch
             {
                 CellType.Backdrop => -10,
                 CellType.Label => 10,
                 _ => 0
             };
+
+            return IsSelected ? baseZIndex + 5 : baseZIndex;
         }
     }
 
