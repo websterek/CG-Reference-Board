@@ -10,10 +10,10 @@ public static class TransformBoundsCalculator
 {
     public static Rect GetCellBounds(CellViewModel cell)
         => new(
-            cell.CanvasX,
-            cell.CanvasY,
-            cell.ColSpan * Constants.GridSize,
-            cell.RowSpan * Constants.GridSize);
+            cell.VisualX,
+            cell.VisualY,
+            cell.PixelWidth,
+            cell.PixelHeight);
 
     public static Rect GetAnnotationBounds(AnnotationViewModel annotation)
         => AnnotationBoundsHelper.GetRenderedBounds(annotation);

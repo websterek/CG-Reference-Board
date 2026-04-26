@@ -23,6 +23,8 @@ public sealed class TransformItemSnapshot
 
     public IReadOnlyList<Point> AnnotationPoints { get; }
 
+    public double TextScale { get; }
+
     private TransformItemSnapshot(
         CellViewModel? cell,
         AnnotationViewModel? annotation,
@@ -31,7 +33,8 @@ public sealed class TransformItemSnapshot
         double canvasY,
         int colSpan,
         int rowSpan,
-        IReadOnlyList<Point>? annotationPoints)
+        IReadOnlyList<Point>? annotationPoints,
+        double textScale)
     {
         if ((cell is null) == (annotation is null))
         {
@@ -46,11 +49,12 @@ public sealed class TransformItemSnapshot
         ColSpan = colSpan;
         RowSpan = rowSpan;
         AnnotationPoints = annotationPoints ?? Array.Empty<Point>();
+        TextScale = textScale;
     }
 
     public static TransformItemSnapshot FromCell(CellViewModel cell, Rect bounds)
-        => new(cell, null, bounds, cell.CanvasX, cell.CanvasY, cell.ColSpan, cell.RowSpan, null);
+        => new(cell, null, bounds, cell.CanvasX, cell.CanvasY, cell.ColSpan, cell.RowSpan, null, 1.0);
 
     public static TransformItemSnapshot FromAnnotation(AnnotationViewModel annotation, Rect bounds)
-        => new(null, annotation, bounds, annotation.CanvasX, annotation.CanvasY, 0, 0, new List<Point>(annotation.Points));
+        => new(null, annotation, bounds, annotation.CanvasX, annotation.CanvasY, 0, 0, new List<Point>(annotation.Points), annotation.TextScale);
 }

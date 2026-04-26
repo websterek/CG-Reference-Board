@@ -169,6 +169,7 @@ public class AnnotationShape : Control
                 InvalidateAll();
                 break;
             case nameof(AnnotationViewModel.Text):
+            case nameof(AnnotationViewModel.TextScale):
                 InvalidateAll();
                 break;
         }
@@ -518,7 +519,7 @@ public class AnnotationShape : Control
             return;
         var start = new Point(vm.Points[0].X - ox, vm.Points[0].Y - oy);
         var typeface = new Typeface("Inter, Arial");
-        double fontSize = Math.Max(12, vm.Thickness * 4 + 10);
+        double fontSize = AnnotationViewModel.GetTextFontSize(vm);
         var ft = new FormattedText(
             vm.Text ?? "",
             System.Globalization.CultureInfo.CurrentCulture,

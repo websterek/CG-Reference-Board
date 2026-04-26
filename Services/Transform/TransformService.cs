@@ -95,6 +95,12 @@ public sealed partial class TransformService : ObservableObject
         ActiveSnapshots = Array.Empty<TransformItemSnapshot>();
     }
 
+    public void Cancel()
+    {
+        End();
+        ClearSnapshots();
+    }
+
     private void Begin(TransformOperation operation, TransformHandle handle, Point pointer, SelectionService selection)
     {
         if (!Capabilities.AllowsOperation(operation))

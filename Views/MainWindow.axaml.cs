@@ -206,14 +206,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void Window_Deactivated(object? sender, EventArgs e)
     {
-        try { RestorePanCursor(this.FindControl<Border>("CanvasBorder")); }
-        catch { }
+        ResetTransientPointerState(cancelActiveTransform: true);
+        UpdateSelectionState();
     }
 
     private void CanvasBorder_PointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
     {
-        try { RestorePanCursor(this.FindControl<Border>("CanvasBorder")); }
-        catch { }
+        ResetTransientPointerState(cancelActiveTransform: true);
+        UpdateSelectionState();
     }
 
     public MainWindow(bool isViewMode, string? startFile)

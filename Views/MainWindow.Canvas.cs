@@ -275,6 +275,46 @@ public partial class MainWindow
         return true;
     }
 
+    private bool CancelActiveTransform()
+    {
+        var transformService = Vm.TransformService;
+        if (!transformService.HasActiveOperation)
+        {
+            return false;
+        }
+
+        GridTransformService.RestoreSnapshots(transformService.ActiveSnapshots);
+        GridTransformService.ClearInvalidState(transformService.ActiveSnapshots);
+        transformService.Cancel();
+        Vm.RefreshTransformState();
+        UpdateTransformOverlayLayout();
+        return true;
+    }
+
+    private void ResetTransientPointerState(bool cancelActiveTransform)
+    {
+        StopEdgeScroll();
+        _isPanning = false;
+        _isShiftPanPending = false;
+        _middleZoomAnchorSet = false;
+        _middleZoomActive = false;
+        EnableCellHitTesting();
+
+        if (cancelActiveTransform)
+        {
+            CancelActiveTransform();
+        }
+
+        try
+        {
+            RestorePanCursor(_cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder"));
+        }
+        catch
+        {
+            // Non-critical; ignore failures
+        }
+    }
+
     private void UpdateGridTransformState(bool annotationMode)
     {
         if (annotationMode)

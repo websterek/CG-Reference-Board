@@ -1,5 +1,6 @@
 using Avalonia;
 using CGReferenceBoard.Services.Transform;
+using CGReferenceBoard.Tests.TestInfrastructure;
 using CGReferenceBoard.ViewModels;
 using Xunit;
 
@@ -7,6 +8,11 @@ namespace CGReferenceBoard.Tests.Services.Transform;
 
 public sealed class AnnotationTransformServiceTests
 {
+    static AnnotationTransformServiceTests()
+    {
+        AvaloniaTestApp.EnsureInitialized();
+    }
+
     [Fact]
     public void Move_AddsDeltaToCanvasOffset()
     {
@@ -62,5 +68,27 @@ public sealed class AnnotationTransformServiceTests
         Assert.Equal(firstCanvasY, annotation.CanvasY, 10);
         Assert.Equal(firstPoint.X, annotation.Points[1].X, 10);
         Assert.Equal(firstPoint.Y, annotation.Points[1].Y, 10);
+    }
+
+    [Fact]
+    public void Resize_TextAnnotation_IncreasesTextScale()
+    {
+        var annotation = new AnnotationViewModel
+        {
+            CanvasX = 100,
+            CanvasY = 200,
+            Type = "Text",
+            Text = "Resize me",
+            Thickness = 3
+        };
+        annotation.Points.Add(new Point(10, 20));
+        annotation.UpdateBoundsCache();
+        var originalBounds = new Rect(100, 200, 80, 40);
+        var snapshots = new[] { TransformItemSnapshot.FromAnnotation(annotation, originalBounds) };
+
+        AnnotationTransformService.ApplyResize(snapshots, originalBounds, new Rect(originalBounds.X, originalBounds.Y, originalBounds.Width * 2, originalBounds.Height * 2));
+
+        Assert.Equal(2.0, annotation.TextScale, 10);
+        Assert.Equal(new Point(10, 20), annotation.Points[0]);
     }
 }

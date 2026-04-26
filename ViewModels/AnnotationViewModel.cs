@@ -1,3 +1,4 @@
+using System;
 using Avalonia;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -127,6 +128,14 @@ public class AnnotationViewModel : ViewModelBase
         set => SetProperty(ref _text, value);
     }
 
+    private double _textScale = 1.0;
+    /// <summary>Additional scale factor applied to text annotations during resize.</summary>
+    public double TextScale
+    {
+        get => _textScale;
+        set => SetProperty(ref _textScale, Math.Max(0.25, value));
+    }
+
     private bool _isSelected;
     /// <summary>Whether this annotation is currently selected for moving/editing.</summary>
     public bool IsSelected
@@ -156,4 +165,7 @@ public class AnnotationViewModel : ViewModelBase
     /// True when in draw mode OR when the annotation is selected.
     /// </summary>
     public bool IsHitTestable => IsInDrawMode || IsSelected;
+
+    public static double GetTextFontSize(AnnotationViewModel annotation)
+        => Math.Max(12, (annotation.Thickness * 4 + 10) * annotation.TextScale);
 }

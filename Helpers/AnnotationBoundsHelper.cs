@@ -34,16 +34,10 @@ internal static class AnnotationBoundsHelper
 
         if (annotation.Type == "Text")
         {
-            var ft = new FormattedText(
-                annotation.Text ?? string.Empty,
-                CultureInfo.CurrentCulture,
-                FlowDirection.LeftToRight,
-                new Typeface("Inter, Arial"),
-                Math.Max(12, annotation.Thickness * 4 + 10),
-                Brushes.White);
+            var textSize = MeasureText(annotation);
 
-            maxX = minX + Math.Max(40, ft.Width + 20);
-            maxY = minY + Math.Max(20, ft.Height + 20);
+            maxX = minX + Math.Max(40, textSize.Width + 20);
+            maxY = minY + Math.Max(20, textSize.Height + 20);
         }
 
         return new Rect(minX, minY, maxX - minX, maxY - minY);
@@ -63,4 +57,40 @@ internal static class AnnotationBoundsHelper
 
     public static double GetRenderPadding(AnnotationViewModel annotation)
         => annotation.Thickness + Constants.AnnotationEffectPadding;
+
+    private static Size MeasureText(AnnotationViewModel annotation)
+    {
+        double fontSize = AnnotationViewModel.GetTextFontSize(annotation);
+
+        try
+        {
+            var ft = new FormattedText(
+                annotation.Text ?? string.Empty,
+                CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight,
+                new Typeface("Inter, Arial"),
+                fontSize,
+                Brushes.White);
+
+            return new Size(ft.Width, ft.Height);
+        }
+        catch (InvalidOperationException)
+        {
+            return EstimateText(annotation.Text ?? string.Empty, fontSize);
+        }
+    }
+
+    private static Size EstimateText(string text, double fontSize)
+    {
+        var lines = text.Split('\n');
+        int longestLine = 0;
+        foreach (var line in lines)
+        {
+            longestLine = Math.Max(longestLine, line.Length);
+        }
+
+        double width = longestLine * fontSize * 0.6;
+        double height = Math.Max(1, lines.Length) * fontSize * 1.2;
+        return new Size(width, height);
+    }
 }

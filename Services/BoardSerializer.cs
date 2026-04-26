@@ -31,6 +31,7 @@ public static class BoardSerializer
     private const double DefaultFontSize = 48.0;
     private const string DefaultAnnotationColor = "#FFFF4444";
     private const double DefaultAnnotationThickness = 2.0;
+    private const double DefaultAnnotationTextScale = 1.0;
 
     // ───────── Path helpers ─────────
 
@@ -105,6 +106,7 @@ public static class BoardSerializer
                 a.CanvasY,
                 Color = a.Color != DefaultAnnotationColor ? a.Color : null,
                 Thickness = a.Thickness != DefaultAnnotationThickness ? a.Thickness : (double?)null,
+                TextScale = a.TextScale != DefaultAnnotationTextScale ? a.TextScale : (double?)null,
                 // Compact format: each point is a [x, y] array rounded to 1 decimal place.
                 Points = a.Points.Select(p => new[] { Math.Round(p.X, 1), Math.Round(p.Y, 1) }).ToList()
             }).ToList()
@@ -288,7 +290,8 @@ public static class BoardSerializer
             CanvasX = cxProp.GetDouble(),
             CanvasY = cyProp.GetDouble(),
             Color = element.TryGetProperty("Color", out var colProp) ? colProp.GetString() ?? DefaultAnnotationColor : DefaultAnnotationColor,
-            Thickness = element.TryGetProperty("Thickness", out var thickProp) ? thickProp.GetDouble() : DefaultAnnotationThickness
+            Thickness = element.TryGetProperty("Thickness", out var thickProp) ? thickProp.GetDouble() : DefaultAnnotationThickness,
+            TextScale = element.TryGetProperty("TextScale", out var scaleProp) ? scaleProp.GetDouble() : DefaultAnnotationTextScale
         };
 
         if (element.TryGetProperty("Points", out var pts))

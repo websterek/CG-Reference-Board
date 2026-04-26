@@ -473,6 +473,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 hash = hash * 31 + a.CanvasY.GetHashCode();
                 hash = hash * 31 + a.Points.Count;
                 hash = hash * 31 + (a.Text?.GetHashCode() ?? 0);
+                hash = hash * 31 + a.TextScale.GetHashCode();
             }
             return hash.ToString("X8");
         }
@@ -631,6 +632,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 existing.Text = match.Text;
                 existing.Color = match.Color;
                 existing.Thickness = match.Thickness;
+                existing.TextScale = match.TextScale;
                 existing.Points.Clear();
                 foreach (var p in match.Points) existing.Points.Add(p);
                 newAnnotations.Remove(match);

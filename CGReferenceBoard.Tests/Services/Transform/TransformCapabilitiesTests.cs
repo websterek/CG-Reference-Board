@@ -85,6 +85,30 @@ public sealed class TransformCapabilitiesTests
         Assert.Equal(new Point(100, 200), service.StartPointer);
     }
 
+    [Fact]
+    public void Cancel_RestoresIdleStateAndClearsSnapshots()
+    {
+        var selection = CreateSelectionWithCell();
+        var service = new TransformService
+        {
+            Capabilities = new TransformCapabilities(true, true, false, false),
+            IsVisible = true,
+            Bounds = new Rect(10, 20, 160, 160)
+        };
+        service.BeginMove(new Point(100, 200), selection);
+
+        service.Cancel();
+
+        Assert.False(service.HasActiveOperation);
+        Assert.Equal(TransformOperation.None, service.Operation);
+        Assert.Equal(TransformHandle.None, service.ActiveHandle);
+        Assert.Empty(service.ActiveSnapshots);
+        Assert.Equal(default, service.StartBounds);
+        Assert.Equal(default, service.StartPointer);
+        Assert.True(service.IsVisible);
+        Assert.Equal(new Rect(10, 20, 160, 160), service.Bounds);
+    }
+
     private static SelectionService CreateSelectionWithCell()
     {
         var selection = new SelectionService();

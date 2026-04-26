@@ -42,8 +42,11 @@ public partial class MainWindow
 
                 if (ann.Type == "Text")
                 {
-                    right = left + 150;
-                    bottom = top + 50;
+                    var renderedBounds = Helpers.AnnotationBoundsHelper.GetRenderedBounds(ann);
+                    left = renderedBounds.X;
+                    top = renderedBounds.Y;
+                    right = renderedBounds.Right;
+                    bottom = renderedBounds.Bottom;
                 }
 
                 return pt.X >= left - threshold && pt.X <= right + threshold &&
@@ -125,6 +128,7 @@ public partial class MainWindow
                     CanvasY = annMove.CanvasY,
                     Color = annMove.Color,
                     Thickness = annMove.Thickness,
+                    TextScale = annMove.TextScale,
                     Type = annMove.Type,
                     Text = annMove.Text,
                     IsSelected = true,

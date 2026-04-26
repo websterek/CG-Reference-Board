@@ -57,6 +57,15 @@ public static class GridTransformService
             var mappedRect = CreateRect(mappedTopLeft, mappedBottomRight);
             var snappedCellRect = TransformMath.SnapRectToGrid(mappedRect);
 
+            if (cell.IsBackdrop)
+            {
+                cell.CanvasX = snappedCellRect.X + Constants.BackdropPadding;
+                cell.CanvasY = snappedCellRect.Y + Constants.BackdropPadding;
+                cell.ColSpan = Math.Max(1, (int)Math.Round((snappedCellRect.Width - 2 * Constants.BackdropPadding) / Constants.GridSize));
+                cell.RowSpan = Math.Max(1, (int)Math.Round((snappedCellRect.Height - 2 * Constants.BackdropPadding) / Constants.GridSize));
+                continue;
+            }
+
             cell.CanvasX = snappedCellRect.X;
             cell.CanvasY = snappedCellRect.Y;
             cell.ColSpan = Math.Max(1, (int)Math.Round(snappedCellRect.Width / Constants.GridSize));
@@ -116,6 +125,7 @@ public static class GridTransformService
             {
                 snapshot.Annotation.CanvasX = snapshot.CanvasX;
                 snapshot.Annotation.CanvasY = snapshot.CanvasY;
+                snapshot.Annotation.TextScale = snapshot.TextScale;
 
                 for (int i = 0; i < snapshot.AnnotationPoints.Count; i++)
                 {

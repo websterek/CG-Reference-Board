@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Avalonia;
 using CGReferenceBoard.ViewModels;
@@ -27,6 +28,12 @@ public static class AnnotationTransformService
             var annotation = snapshot.Annotation;
             if (annotation is null || snapshot.AnnotationPoints.Count == 0)
             {
+                continue;
+            }
+
+            if (annotation.Type == "Text")
+            {
+                ApplyTextResize(snapshot, originalSelectionBounds, resizedSelectionBounds);
                 continue;
             }
 
@@ -62,4 +69,23 @@ public static class AnnotationTransformService
             annotation.UpdateBoundsCache();
         }
     }
+
+    private static void ApplyTextResize(TransformItemSnapshot snapshot, Rect originalSelectionBounds, Rect resizedSelectionBounds)
+    {
+        var annotation = snapshot.Annotation!;
+        var anchor = new Point(snapshot.CanvasX + snapshot.AnnotationPoints[0].X, snapshot.CanvasY + snapshot.AnnotationPoints[0].Y);
+        var mappedAnchor = TransformMath.MapPointBetweenRects(anchor, originalSelectionBounds, resizedSelectionBounds);
+
+        annotation.CanvasX = mappedAnchor.X - snapshot.AnnotationPoints[0].X;
+        annotation.CanvasY = mappedAnchor.Y - snapshot.AnnotationPoints[0].Y;
+
+        double widthScale = GetScale(resizedSelectionBounds.Width, originalSelectionBounds.Width);
+        double heightScale = GetScale(resizedSelectionBounds.Height, originalSelectionBounds.Height);
+        double uniformScale = Math.Max(0.25, Math.Max(widthScale, heightScale));
+        annotation.TextScale = snapshot.TextScale * uniformScale;
+        annotation.UpdateBoundsCache();
+    }
+
+    private static double GetScale(double resized, double original)
+        => original <= 0 ? 1.0 : resized / original;
 }

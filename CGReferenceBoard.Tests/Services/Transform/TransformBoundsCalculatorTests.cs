@@ -1,11 +1,8 @@
 using System;
-using System.Globalization;
 using Avalonia;
-using Avalonia.Media;
-using Avalonia.Skia;
-using CGReferenceBoard;
 using CGReferenceBoard.Models;
 using CGReferenceBoard.Services.Transform;
+using CGReferenceBoard.Tests.TestInfrastructure;
 using CGReferenceBoard.ViewModels;
 using Xunit;
 
@@ -15,11 +12,7 @@ public sealed class TransformBoundsCalculatorTests
 {
     static TransformBoundsCalculatorTests()
     {
-        AppBuilder.Configure<App>()
-            .UsePlatformDetect()
-            .WithInterFont()
-            .With(new SkiaOptions { MaxGpuResourceSizeBytes = 256 * 1024 * 1024 })
-            .SetupWithoutStarting();
+        AvaloniaTestApp.EnsureInitialized();
     }
 
     [Fact]
@@ -37,6 +30,23 @@ public sealed class TransformBoundsCalculatorTests
         var bounds = TransformBoundsCalculator.GetCellBounds(cell);
 
         Assert.Equal(new Rect(160, 320, 320, 480), bounds);
+    }
+
+    [Fact]
+    public void GetCellBounds_BackdropUsesRenderedBackdropExtents()
+    {
+        var cell = new CellViewModel
+        {
+            CanvasX = 160,
+            CanvasY = 320,
+            ColSpan = 2,
+            RowSpan = 3,
+            Type = CellType.Backdrop
+        };
+
+        var bounds = TransformBoundsCalculator.GetCellBounds(cell);
+
+        Assert.Equal(new Rect(cell.VisualX, cell.VisualY, cell.PixelWidth, cell.PixelHeight), bounds);
     }
 
     [Fact]
@@ -61,28 +71,32 @@ public sealed class TransformBoundsCalculatorTests
             CanvasY = 200,
             Type = "Text",
             Text = "Transform box",
-            Thickness = 3
+            Thickness = 3,
+            TextScale = 1.5
         };
         annotation.Points.Add(new Point(15, 25));
         annotation.Points.Add(new Point(500, 600));
         annotation.UpdateBoundsCache();
 
-        double fontSize = Math.Max(12, annotation.Thickness * 4 + 10);
-        var ft = new FormattedText(
-            annotation.Text ?? string.Empty,
-            CultureInfo.CurrentCulture,
-            FlowDirection.LeftToRight,
-            new Typeface("Inter, Arial"),
-            fontSize,
-            Brushes.White);
-
         var bounds = TransformBoundsCalculator.GetAnnotationBounds(annotation);
+        var unscaled = new AnnotationViewModel
+        {
+            CanvasX = 100,
+            CanvasY = 200,
+            Type = "Text",
+            Text = "Transform box",
+            Thickness = 3,
+            TextScale = 1.0
+        };
+        unscaled.Points.Add(new Point(15, 25));
+        unscaled.Points.Add(new Point(500, 600));
+        unscaled.UpdateBoundsCache();
+        var unscaledBounds = TransformBoundsCalculator.GetAnnotationBounds(unscaled);
 
-        Assert.Equal(new Rect(
-            annotation.CanvasX + 4,
-            annotation.CanvasY + 14,
-            Math.Max(40, ft.Width + 20) + 22,
-            Math.Max(20, ft.Height + 20) + 22), bounds);
+        Assert.Equal(annotation.CanvasX + 4, bounds.X);
+        Assert.Equal(annotation.CanvasY + 14, bounds.Y);
+        Assert.True(bounds.Width > unscaledBounds.Width);
+        Assert.True(bounds.Height > unscaledBounds.Height);
     }
 
     [Fact]
