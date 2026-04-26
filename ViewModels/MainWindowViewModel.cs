@@ -15,6 +15,7 @@ using CGReferenceBoard.Helpers;
 using CGReferenceBoard.Layers.Infrastructure;
 using CGReferenceBoard.Modes;
 using CGReferenceBoard.Services;
+using CGReferenceBoard.Services.Transform;
 
 namespace CGReferenceBoard.ViewModels;
 
@@ -46,6 +47,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     /// <summary>Manages the current item selection across cells and annotations.</summary>
     public SelectionService SelectionService { get; }
+
+    public TransformService TransformService { get; }
 
     /// <summary>
     /// Layer manager that owns the visual layer hierarchy.
@@ -263,11 +266,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IsViewMode = isViewMode;
         ModeService = new ModeService();
         SelectionService = new SelectionService();
+        TransformService = new TransformService();
 
         WorkspaceDir = Path.Combine(Constants.ConfigDirectory, "Assets");
 
         // ── Wire mode-change reactions ────────────────────────────────────────
         ModeService.ModeChanged += OnModeChanged;
+        ModeService.ModeChanged += (_, _) => RefreshTransformState();
+        SelectionService.SelectionChanged += (_, _) => RefreshTransformState();
 
         // When the annotation tool changes, re-notify all tool-derived properties.
         ModeService.AnnotationMode.PropertyChanged += (_, e) =>
@@ -317,6 +323,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(CurrentModeText));
         OnPropertyChanged(nameof(ModeIndicatorColor));
         OnPropertyChanged(nameof(IsCursorIconVisible));
+    }
+
+    public void RefreshTransformState()
+    {
+        TransformService.Refresh(SelectionService, ModeService, IsViewMode);
     }
 
     // ── CommunityToolkit.Mvvm partial method callbacks ────────────────────────

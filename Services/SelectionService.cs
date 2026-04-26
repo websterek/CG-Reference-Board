@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -14,6 +15,8 @@ namespace CGReferenceBoard.Services;
 /// </summary>
 public sealed partial class SelectionService : ObservableObject
 {
+    public event EventHandler? SelectionChanged;
+
     // ── Selection collections ─────────────────────────────────────────────────
 
     /// <summary>Currently selected grid cells. Do not modify directly — use the Select/Clear methods.</summary>
@@ -141,5 +144,6 @@ public sealed partial class SelectionService : ObservableObject
         OnPropertyChanged(nameof(HasSingleSelection));
         OnPropertyChanged(nameof(SelectionCount));
         OnPropertyChanged(nameof(SelectionCountText));
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 }
