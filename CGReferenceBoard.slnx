@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="CGReferenceBoard.csproj" />
+  <Project Path="CGReferenceBoard.Tests/CGReferenceBoard.Tests.csproj" />
+</Solution>
