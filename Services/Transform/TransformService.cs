@@ -93,6 +93,11 @@ public sealed partial class TransformService : ObservableObject
 
     private void Begin(TransformOperation operation, TransformHandle handle, Point pointer, SelectionService selection)
     {
+        if (!Capabilities.AllowsOperation(operation))
+        {
+            return;
+        }
+
         var snapshots = TransformBoundsCalculator.CreateSnapshots(selection.SelectedCells, selection.SelectedAnnotations);
         if (snapshots.Count == 0)
         {
