@@ -33,8 +33,8 @@ public static class TransformBoundsCalculator
             return new Rect(
                 annotation.CanvasX + start.X,
                 annotation.CanvasY + start.Y,
-                ft.Width,
-                ft.Height);
+                Math.Max(40, ft.Width + 20),
+                Math.Max(20, ft.Height + 20));
         }
 
         return new Rect(

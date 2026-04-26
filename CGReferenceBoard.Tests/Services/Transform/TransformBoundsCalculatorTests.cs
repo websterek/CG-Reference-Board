@@ -1,4 +1,9 @@
+using System;
+using System.Globalization;
 using Avalonia;
+using Avalonia.Media;
+using Avalonia.Skia;
+using CGReferenceBoard;
 using CGReferenceBoard.Models;
 using CGReferenceBoard.Services.Transform;
 using CGReferenceBoard.ViewModels;
@@ -8,6 +13,15 @@ namespace CGReferenceBoard.Tests.Services.Transform;
 
 public sealed class TransformBoundsCalculatorTests
 {
+    static TransformBoundsCalculatorTests()
+    {
+        AppBuilder.Configure<App>()
+            .UsePlatformDetect()
+            .WithInterFont()
+            .With(new SkiaOptions { MaxGpuResourceSizeBytes = 256 * 1024 * 1024 })
+            .SetupWithoutStarting();
+    }
+
     [Fact]
     public void GetCellBounds_UsesGridSpanSize()
     {
@@ -36,6 +50,39 @@ public sealed class TransformBoundsCalculatorTests
         var bounds = TransformBoundsCalculator.GetAnnotationBounds(annotation);
 
         Assert.Equal(new Rect(15, 26, 20, 30), bounds);
+    }
+
+    [Fact]
+    public void GetAnnotationBounds_TextMatchesAnnotationShapeMeasurement()
+    {
+        var annotation = new AnnotationViewModel
+        {
+            CanvasX = 100,
+            CanvasY = 200,
+            Type = "Text",
+            Text = "Transform box",
+            Thickness = 3
+        };
+        annotation.Points.Add(new Point(15, 25));
+        annotation.Points.Add(new Point(500, 600));
+        annotation.UpdateBoundsCache();
+
+        double fontSize = Math.Max(12, annotation.Thickness * 4 + 10);
+        var ft = new FormattedText(
+            annotation.Text ?? string.Empty,
+            CultureInfo.CurrentCulture,
+            FlowDirection.LeftToRight,
+            new Typeface("Inter, Arial"),
+            fontSize,
+            Brushes.White);
+
+        var bounds = TransformBoundsCalculator.GetAnnotationBounds(annotation);
+
+        Assert.Equal(new Rect(
+            annotation.CanvasX + 15,
+            annotation.CanvasY + 25,
+            Math.Max(40, ft.Width + 20),
+            Math.Max(20, ft.Height + 20)), bounds);
     }
 
     [Fact]
