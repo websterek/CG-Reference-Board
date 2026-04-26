@@ -24,4 +24,16 @@ public sealed class MainWindowViewModelTransformStateTests
 
         Assert.True(viewModel.TransformService.IsVisible);
     }
+
+    [Fact]
+    public void ModeChange_RaisesSelectionResetRequest()
+    {
+        var viewModel = new MainWindowViewModel();
+        int resetRequests = 0;
+        viewModel.SelectionResetRequested += () => resetRequests++;
+
+        viewModel.ModeService.SetMode("Annotation");
+
+        Assert.Equal(1, resetRequests);
+    }
 }

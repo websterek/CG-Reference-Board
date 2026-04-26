@@ -1,4 +1,5 @@
 using Avalonia;
+using CGReferenceBoard.Modes;
 using CGReferenceBoard.Models;
 using CGReferenceBoard.Services;
 using CGReferenceBoard.Services.Transform;
@@ -109,6 +110,54 @@ public sealed class TransformCapabilitiesTests
         Assert.Equal(new Rect(10, 20, 160, 160), service.Bounds);
     }
 
+    [Fact]
+    public void Refresh_GridModeWithAnnotationOnlySelection_DisablesResize()
+    {
+        var selection = new SelectionService();
+        var annotation = CreateAnnotation();
+        selection.SelectAnnotation(annotation);
+        var modeService = new ModeService();
+        modeService.SetMode("Grid");
+        var service = new TransformService();
+
+        service.Refresh(selection, modeService, isViewMode: false);
+
+        Assert.True(service.IsVisible);
+        Assert.True(service.Capabilities.CanMove);
+        Assert.False(service.Capabilities.CanResize);
+    }
+
+    [Fact]
+    public void Refresh_GridModeWithMixedSelection_DisablesResize()
+    {
+        var selection = CreateSelectionWithCell();
+        selection.SelectAnnotation(CreateAnnotation(), additive: true);
+        var modeService = new ModeService();
+        modeService.SetMode("Grid");
+        var service = new TransformService();
+
+        service.Refresh(selection, modeService, isViewMode: false);
+
+        Assert.True(service.IsVisible);
+        Assert.True(service.Capabilities.CanMove);
+        Assert.False(service.Capabilities.CanResize);
+    }
+
+    [Fact]
+    public void Refresh_GridModeWithCellOnlySelection_KeepsResizeEnabled()
+    {
+        var selection = CreateSelectionWithCell();
+        var modeService = new ModeService();
+        modeService.SetMode("Grid");
+        var service = new TransformService();
+
+        service.Refresh(selection, modeService, isViewMode: false);
+
+        Assert.True(service.IsVisible);
+        Assert.True(service.Capabilities.CanMove);
+        Assert.True(service.Capabilities.CanResize);
+    }
+
     private static SelectionService CreateSelectionWithCell()
     {
         var selection = new SelectionService();
@@ -123,5 +172,14 @@ public sealed class TransformCapabilitiesTests
 
         selection.SelectCell(cell);
         return selection;
+    }
+
+    private static AnnotationViewModel CreateAnnotation()
+    {
+        var annotation = new AnnotationViewModel { CanvasX = 10, CanvasY = 20, Type = "Brush" };
+        annotation.Points.Add(new Point(0, 0));
+        annotation.Points.Add(new Point(30, 40));
+        annotation.UpdateBoundsCache();
+        return annotation;
     }
 }

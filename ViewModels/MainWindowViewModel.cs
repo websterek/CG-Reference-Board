@@ -163,6 +163,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// </summary>
     public event Action? StartupOverlayHideRequested;
 
+    /// <summary>
+    /// Fired when the view must clear any local selection mirrors before a mode switch completes.
+    /// </summary>
+    public event Action? SelectionResetRequested;
+
     // ── Computed / derived properties ─────────────────────────────────────────
 
     /// <summary>
@@ -314,6 +319,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ann.IsInDrawMode = isAnnotationMode;
 
         // Clear selection when switching modes to avoid stale references.
+        SelectionResetRequested?.Invoke();
         SelectionService.ClearSelection();
 
         // Notify all mode-derived computed properties.

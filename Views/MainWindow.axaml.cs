@@ -230,6 +230,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         Vm.AlwaysOnTopChanged += topmost => Topmost = topmost;
         Vm.ToastRequested += ShowToast;
         Vm.ViewportUpdateRequested += ScheduleViewportUpdate;
+        Vm.SelectionResetRequested += ClearLocalSelectionState;
         Vm.TransformService.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(Vm.TransformService.IsVisible) or nameof(Vm.TransformService.Bounds))
@@ -702,14 +703,19 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void ClearSelection()
     {
+        ClearLocalSelectionState();
+        Vm.SelectionService.ClearSelection();
+        UpdateSelectionState();
+    }
+
+    private void ClearLocalSelectionState()
+    {
         foreach (var c in _selectedCells)
             c.IsSelected = false;
         _selectedCells.Clear();
         foreach (var a in _selectedAnnotations)
             a.IsSelected = false;
         _selectedAnnotations.Clear();
-        Vm.SelectionService.ClearSelection();
-        UpdateSelectionState();
     }
 
     private void CanvasBorder_Tunneled_PointerPressed(object? sender, PointerPressedEventArgs e)

@@ -41,7 +41,7 @@ public sealed partial class TransformService : ObservableObject
             return;
         }
 
-        var capabilities = GetCapabilities(modeService, isViewMode);
+        var capabilities = GetCapabilities(selection, modeService, isViewMode);
         var snapshots = capabilities == TransformCapabilities.None
             ? Array.Empty<TransformItemSnapshot>()
             : TransformBoundsCalculator.CreateSnapshots(selection.SelectedCells, selection.SelectedAnnotations);
@@ -128,7 +128,7 @@ public sealed partial class TransformService : ObservableObject
         OnPropertyChanged(nameof(HasActiveOperation));
     }
 
-    private static TransformCapabilities GetCapabilities(ModeService modeService, bool isViewMode)
+    private static TransformCapabilities GetCapabilities(SelectionService selection, ModeService modeService, bool isViewMode)
     {
         if (isViewMode)
         {
@@ -137,7 +137,19 @@ public sealed partial class TransformService : ObservableObject
 
         if (modeService.IsGridMode)
         {
-            return TransformCapabilities.Grid;
+            bool hasCells = selection.SelectedCells.Count > 0;
+            bool hasAnnotations = selection.SelectedAnnotations.Count > 0;
+
+            if (!hasCells && !hasAnnotations)
+            {
+                return TransformCapabilities.None;
+            }
+
+            return new TransformCapabilities(
+                CanMove: true,
+                CanResize: hasCells && !hasAnnotations,
+                UsesGridSnapping: true,
+                UsesCollisionChecks: true);
         }
 
         return modeService.AnnotationMode.IsMoveMode
