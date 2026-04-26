@@ -277,12 +277,24 @@ public partial class MainWindow
 
         GridTransformService.ClearInvalidState(transformService.ActiveSnapshots);
         GridTransformService.SetDraggingState(transformService.ActiveSnapshots, isDragging: false);
+
+        // Detect whether the transform actually moved/resized before End() resets StartBounds.
+        bool actuallyMoved = !hasCollision && transformService.Bounds != transformService.StartBounds;
+
         transformService.End();
         transformService.ClearSnapshots();
 
         if (!hasCollision && annotationMode && _pendingAltDuplicateAnnotation is not null)
         {
             ClearPendingAnnotationAltDuplicateState();
+        }
+
+        // Only invalidate the zoom-toggle state when the object actually changed position.
+        // A plain click (pointer-down then up without dragging) also calls FinishActiveTransform
+        // but must NOT clear the zoom-toggle state, otherwise double-click zoom can never restore.
+        if (actuallyMoved)
+        {
+            InvalidateZoomRestore();
         }
 
         Vm.RefreshTransformState();
@@ -394,6 +406,12 @@ public partial class MainWindow
     {
         UpdateSelectionState();
 
+        // Capture the pre-drag bounds (computed by Refresh from the directly-selected items)
+        // so we can pass them as an override. This prevents the selection rect from jumping
+        // to a larger union when CreateExpandedMoveSnapshots adds extra items such as
+        // annotations that overlap the selected cell.
+        var preDragBounds = Vm.TransformService.IsVisible ? Vm.TransformService.Bounds : (Rect?)null;
+
         IReadOnlyList<TransformItemSnapshot>? snapshots = null;
         if (!Vm.IsDrawMode)
         {
@@ -404,7 +422,7 @@ public partial class MainWindow
                 Vm.Annotations);
         }
 
-        Vm.TransformService.BeginMove(pointer, Vm.SelectionService, snapshots);
+        Vm.TransformService.BeginMove(pointer, Vm.SelectionService, snapshots, preDragBounds);
         GridTransformService.SetDraggingState(Vm.TransformService.ActiveSnapshots, isDragging: Vm.TransformService.HasActiveOperation && !Vm.IsDrawMode);
         return Vm.TransformService.HasActiveOperation;
     }

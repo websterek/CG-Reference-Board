@@ -87,6 +87,30 @@ internal static class AnnotationBoundsHelper
             localBounds.Height + pad * 2);
     }
 
+    /// <summary>
+    /// Returns the tightly-fitting visual bounds of an annotation — enough to cover the
+    /// stroke, outline and shadow, but without the extra hit-test inflation in
+    /// <see cref="GetRenderPadding"/>.  Use this for the transform/selection overlay so
+    /// the selection rectangle tracks the visible ink rather than the generous hit area.
+    /// </summary>
+    public static Rect GetVisualBounds(AnnotationViewModel annotation)
+    {
+        var localBounds = GetLocalContentBounds(annotation);
+
+        // Visible extent = stroke half-width + outline half-extra-thickness + shadow reach.
+        // Outline extends (Thickness + OutlineExtraThickness)/2 from the path centreline.
+        // Shadow is offset (ShadowOffsetX/Y) with a slightly thicker pen, so add the offset
+        // as an extra margin on the positive axes.
+        double strokeAndOutlinePad = (annotation.Thickness + Constants.AnnotationOutlineExtraThickness) / 2.0;
+        double visualPad = strokeAndOutlinePad + Math.Max(Constants.AnnotationShadowOffsetX, Constants.AnnotationShadowOffsetY);
+
+        return new Rect(
+            annotation.CanvasX + localBounds.X - visualPad,
+            annotation.CanvasY + localBounds.Y - visualPad,
+            localBounds.Width + visualPad * 2,
+            localBounds.Height + visualPad * 2);
+    }
+
     public static Rect? GetRenderedBoundsUnion(IEnumerable<AnnotationViewModel> annotations)
     {
         Rect? bounds = null;

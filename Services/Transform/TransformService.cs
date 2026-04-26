@@ -56,8 +56,8 @@ public sealed partial class TransformService : ObservableObject
         OnPropertyChanged(nameof(HasActiveOperation));
     }
 
-    public void BeginMove(Point pointer, SelectionService selection, IReadOnlyList<TransformItemSnapshot>? snapshots = null)
-        => Begin(TransformOperation.Move, TransformHandle.Body, pointer, selection, snapshots);
+    public void BeginMove(Point pointer, SelectionService selection, IReadOnlyList<TransformItemSnapshot>? snapshots = null, Rect? boundsOverride = null)
+        => Begin(TransformOperation.Move, TransformHandle.Body, pointer, selection, snapshots, boundsOverride);
 
     public void BeginResize(TransformHandle handle, Point pointer, SelectionService selection)
         => Begin(TransformOperation.Resize, handle, pointer, selection, snapshots: null);
@@ -107,7 +107,8 @@ public sealed partial class TransformService : ObservableObject
         TransformHandle handle,
         Point pointer,
         SelectionService selection,
-        IReadOnlyList<TransformItemSnapshot>? snapshots)
+        IReadOnlyList<TransformItemSnapshot>? snapshots,
+        Rect? boundsOverride = null)
     {
         if (!Capabilities.AllowsOperation(operation))
         {
@@ -125,7 +126,10 @@ public sealed partial class TransformService : ObservableObject
         }
 
         ActiveSnapshots = snapshots;
-        StartBounds = GetSelectionBounds(snapshots);
+        // Use the provided bounds override (e.g. from the pre-drag Refresh state) so the
+        // selection rect doesn't jump when CreateExpandedMoveSnapshots adds extra items
+        // (such as annotations overlapping the selected cell).
+        StartBounds = boundsOverride ?? GetSelectionBounds(snapshots);
         Bounds = StartBounds;
         StartPointer = pointer;
         Operation = operation;

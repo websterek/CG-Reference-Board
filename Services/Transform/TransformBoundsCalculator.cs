@@ -16,7 +16,7 @@ public static class TransformBoundsCalculator
             cell.PixelHeight);
 
     public static Rect GetAnnotationBounds(AnnotationViewModel annotation)
-        => AnnotationBoundsHelper.GetRenderedBounds(annotation);
+        => AnnotationBoundsHelper.GetVisualBounds(annotation);
 
     public static Rect? GetSelectionBounds(IEnumerable<CellViewModel> cells, IEnumerable<AnnotationViewModel> annotations)
     {

@@ -184,19 +184,11 @@ public partial class MainWindow
                 }
             }
 
-            if (wasSelected && !isCtrl)
-            {
-                var mainCanvas = this.FindControl<Canvas>("MainCanvas");
-                if (mainCanvas != null)
-                {
-                    if (StartTransformMoveFromCurrentSelection(e.GetPosition(mainCanvas)))
-                    {
-                        e.Pointer.Capture(_cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder"));
-                        e.Handled = true;
-                        return;
-                    }
-                }
-            }
+            // NOTE: Do NOT start the transform move here on pointer-pressed.  Capturing the
+            // pointer at this point breaks Avalonia's tap-detection (it requires press+release
+            // on the same element to register a tap), which would suppress the DoubleTapped
+            // event used by ZoomToCell.  Instead, the transform move is started lazily in
+            // Cell_PointerMoved once the drag threshold is exceeded.
 
             _isPointerDown = true;
             _pointerDownPos = e.GetPosition(this);
