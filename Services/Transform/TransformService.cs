@@ -77,7 +77,8 @@ public sealed partial class TransformService : ObservableObject
             return previewDelta;
         }
 
-        Bounds = TransformMath.ResizeBounds(StartBounds, ActiveHandle, delta, annotationMode ? 1 : 0);
+        var resizedBounds = TransformMath.ResizeBounds(StartBounds, ActiveHandle, delta, annotationMode ? 1 : 0);
+        Bounds = annotationMode ? resizedBounds : TransformMath.SnapRectToGrid(resizedBounds);
         return delta;
     }
 
