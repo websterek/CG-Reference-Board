@@ -232,6 +232,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         Vm.ToastRequested += ShowToast;
         Vm.ViewportUpdateRequested += ScheduleViewportUpdate;
         Vm.SelectionResetRequested += ClearLocalSelectionState;
+        Vm.TransformContextChanging += CancelActiveInteractionForContextChange;
         Vm.TransformService.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(Vm.TransformService.IsVisible) or nameof(Vm.TransformService.Bounds))
@@ -398,6 +399,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             Vm.ClosingConfirmed = true;
             Close();
         }
+    }
+
+    private void CancelActiveInteractionForContextChange()
+    {
+        CancelActiveTransform();
+        CancelPendingAnnotationAltDuplicateDrag();
+        CancelLegacyAltDuplicateDrag();
+        UpdateSelectionState();
     }
 
     protected override void OnClosed(EventArgs e)

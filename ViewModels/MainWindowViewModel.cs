@@ -168,6 +168,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// </summary>
     public event Action? SelectionResetRequested;
 
+    /// <summary>
+    /// Fired before mode/tool changes refresh transform state so the View can cancel live drags cleanly.
+    /// </summary>
+    public event Action? TransformContextChanging;
+
     // ── Computed / derived properties ─────────────────────────────────────────
 
     /// <summary>
@@ -276,8 +281,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         WorkspaceDir = Path.Combine(Constants.ConfigDirectory, "Assets");
 
         // ── Wire mode-change reactions ────────────────────────────────────────
-        ModeService.ModeChanged += OnModeChanged;
-        ModeService.ModeChanged += (_, _) => RefreshTransformState();
+        ModeService.ModeChanged += HandleModeChanged;
         SelectionService.SelectionChanged += (_, _) => RefreshTransformState();
 
         // When the annotation tool changes, re-notify all tool-derived properties.
@@ -285,6 +289,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             if (e.PropertyName == nameof(AnnotationMode.CurrentTool))
             {
+                TransformContextChanging?.Invoke();
                 RefreshTransformState();
                 OnPropertyChanged(nameof(CurrentTool));
                 OnPropertyChanged(nameof(CanvasCursor));
@@ -306,6 +311,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     // ── Mode-change handler ───────────────────────────────────────────────────
+
+    private void HandleModeChanged(object? sender, ModeChangedEventArgs e)
+    {
+        TransformContextChanging?.Invoke();
+        OnModeChanged(sender, e);
+        RefreshTransformState();
+    }
 
     private void OnModeChanged(object? sender, ModeChangedEventArgs e)
     {

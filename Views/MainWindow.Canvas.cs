@@ -344,11 +344,18 @@ public partial class MainWindow
         if (CancelActiveTransform())
         {
             CancelPendingAnnotationAltDuplicateDrag();
+            CancelLegacyAltDuplicateDrag();
             UpdateSelectionState();
             return true;
         }
 
         if (CancelPendingAnnotationAltDuplicateDrag())
+        {
+            UpdateSelectionState();
+            return true;
+        }
+
+        if (CancelLegacyAltDuplicateDrag())
         {
             UpdateSelectionState();
             return true;

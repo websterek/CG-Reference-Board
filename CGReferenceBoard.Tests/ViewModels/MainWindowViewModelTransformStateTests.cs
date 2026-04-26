@@ -30,6 +30,19 @@ public sealed class MainWindowViewModelTransformStateTests
     }
 
     [Fact]
+    public void ModeAndAnnotationToolChanges_RaiseTransformContextChanging()
+    {
+        var viewModel = new MainWindowViewModel();
+        int changeCount = 0;
+        viewModel.TransformContextChanging += () => changeCount++;
+
+        viewModel.ModeService.SetMode("Annotation");
+        viewModel.ModeService.AnnotationMode.CurrentTool = "Move";
+
+        Assert.Equal(2, changeCount);
+    }
+
+    [Fact]
     public void ModeChange_RaisesSelectionResetRequest()
     {
         var viewModel = new MainWindowViewModel();

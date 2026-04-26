@@ -1,9 +1,11 @@
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using CGReferenceBoard.Helpers;
 using CGReferenceBoard.Models;
 using CGReferenceBoard.Services.Transform;
 using CGReferenceBoard.Tests.TestInfrastructure;
@@ -18,6 +20,87 @@ public sealed class MainWindowLegacyDragCleanupTests
     static MainWindowLegacyDragCleanupTests()
     {
         AvaloniaTestApp.EnsureInitialized();
+    }
+
+    [Fact]
+    public void CancelActiveInteractionForContextChange_CancelsActiveTransformAndRestoresMovedCell()
+    {
+        var window = CreateWindowHarness(new MainWindowViewModel());
+        var cell = new CellViewModel
+        {
+            CanvasX = Constants.GridSize,
+            CanvasY = Constants.GridSize,
+            ColSpan = 1,
+            RowSpan = 1,
+            Type = CellType.Image,
+            IsSelected = true
+        };
+
+        window.Vm.GridCells.Add(cell);
+        GetSelectedCells(window).Add(cell);
+        window.UpdateSelectionState();
+        window.Vm.TransformService.BeginMove(new Point(Constants.GridSize, Constants.GridSize), window.Vm.SelectionService);
+
+        InvokePrivateMethod(window, "UpdateActiveTransform", new Point(Constants.GridSize * 2, Constants.GridSize * 2));
+
+        Assert.True(window.Vm.TransformService.HasActiveOperation);
+        Assert.Equal(Constants.GridSize * 2, cell.CanvasX);
+        Assert.Equal(Constants.GridSize * 2, cell.CanvasY);
+
+        InvokePrivateMethod(window, "CancelActiveInteractionForContextChange");
+
+        Assert.False(window.Vm.TransformService.HasActiveOperation);
+        Assert.Equal(Constants.GridSize, cell.CanvasX);
+        Assert.Equal(Constants.GridSize, cell.CanvasY);
+    }
+
+    [Fact]
+    public void CancelActiveInteractionForContextChange_CancelsActiveTransformAndRestoresMovedAnnotation()
+    {
+        var window = CreateWindowHarness(new MainWindowViewModel());
+        var annotation = new AnnotationViewModel
+        {
+            CanvasX = 120,
+            CanvasY = 80,
+            Type = "Brush",
+            IsSelected = true,
+            IsInDrawMode = true
+        };
+        annotation.Points.Add(new Point(0, 0));
+        annotation.Points.Add(new Point(20, 20));
+        annotation.UpdateBoundsCache();
+
+        window.Vm.ModeService.SetMode("Annotation");
+        window.Vm.ModeService.AnnotationMode.CurrentTool = "Move";
+        window.Vm.Annotations.Add(annotation);
+        GetSelectedAnnotations(window).Add(annotation);
+        window.UpdateSelectionState();
+        window.Vm.RefreshTransformState();
+        window.Vm.TransformService.BeginMove(
+            new Point(120, 80),
+            window.Vm.SelectionService,
+            new[]
+            {
+                TransformItemSnapshot.FromAnnotation(
+                    annotation,
+                    new Rect(
+                        annotation.AbsBoundsLeft,
+                        annotation.AbsBoundsTop,
+                        annotation.AbsBoundsRight - annotation.AbsBoundsLeft,
+                        annotation.AbsBoundsBottom - annotation.AbsBoundsTop))
+            });
+
+        InvokePrivateMethod(window, "UpdateActiveTransform", new Point(200, 160));
+
+        Assert.True(window.Vm.TransformService.HasActiveOperation);
+        Assert.Equal(200, annotation.CanvasX);
+        Assert.Equal(160, annotation.CanvasY);
+
+        InvokePrivateMethod(window, "CancelActiveInteractionForContextChange");
+
+        Assert.False(window.Vm.TransformService.HasActiveOperation);
+        Assert.Equal(120, annotation.CanvasX);
+        Assert.Equal(80, annotation.CanvasY);
     }
 
     [Fact]
@@ -105,6 +188,40 @@ public sealed class MainWindowLegacyDragCleanupTests
         Assert.False(viewModel.TransformService.HasActiveOperation);
         Assert.False(viewModel.TransformService.IsVisible);
         Assert.Empty(viewModel.TransformService.ActiveSnapshots);
+    }
+
+    [Fact]
+    public void HandleEscapeShortcut_CancelsLegacyAltDuplicateDrag()
+    {
+        var window = CreateWindowHarness(new MainWindowViewModel());
+        var duplicate = new CellViewModel
+        {
+            CanvasX = Constants.GridSize,
+            CanvasY = Constants.GridSize,
+            ColSpan = 1,
+            RowSpan = 1,
+            Type = CellType.Image,
+            IsDragging = true,
+            IsDragInvalid = true,
+            IsSelected = true
+        };
+
+        window.Vm.GridCells.Add(duplicate);
+        GetSelectedCells(window).Add(duplicate);
+        SetPrivateField(window, "_draggingCell", duplicate);
+        SetPrivateField(window, "_isDraggingCell", true);
+        SetPrivateField(window, "_isAltDuplicateDrag", true);
+
+        var handled = (bool)InvokePrivateMethod(window, "HandleEscapeShortcut")!;
+
+        Assert.True(handled);
+        Assert.DoesNotContain(duplicate, window.Vm.GridCells);
+        Assert.DoesNotContain(duplicate, GetSelectedCells(window));
+        Assert.False(duplicate.IsDragging);
+        Assert.False(duplicate.IsDragInvalid);
+        Assert.False((bool)GetPrivateField(window, "_isDraggingCell")!);
+        Assert.False((bool)GetPrivateField(window, "_isAltDuplicateDrag")!);
+        Assert.Null(GetPrivateField(window, "_draggingCell"));
     }
 
     [Fact]
@@ -196,8 +313,31 @@ public sealed class MainWindowLegacyDragCleanupTests
             .GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(instance);
 
+    private static MainWindow CreateWindowHarness(MainWindowViewModel viewModel)
+    {
+        var window = (MainWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(MainWindow));
+        SetPrivateField(window, "<Vm>k__BackingField", viewModel);
+        SetPrivateField(window, "_selectedCells", new List<CellViewModel>());
+        SetPrivateField(window, "_selectedAnnotations", new List<AnnotationViewModel>());
+        SetPrivateField(window, "_cachedTransformOverlay", new Canvas());
+        SetPrivateField(window, "_cachedTransformBody", new Border());
+        SetPrivateField(window, "_scale", new ScaleTransform(1, 1));
+        return window;
+    }
+
+    private static List<CellViewModel> GetSelectedCells(MainWindow window)
+        => (List<CellViewModel>)GetPrivateField(window, "_selectedCells")!;
+
+    private static List<AnnotationViewModel> GetSelectedAnnotations(MainWindow window)
+        => (List<AnnotationViewModel>)GetPrivateField(window, "_selectedAnnotations")!;
+
     private static void SetPrivateField(object instance, string fieldName, object? value)
         => instance.GetType()
             .GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)!
             .SetValue(instance, value);
+
+    private static object? InvokePrivateMethod(object instance, string methodName, params object?[]? parameters)
+        => instance.GetType()
+            .GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(instance, parameters);
 }
