@@ -265,6 +265,17 @@ public static class GridTransformService
     public static void ClearInvalidState(IReadOnlyList<TransformItemSnapshot> snapshots)
         => SetInvalidState(snapshots, isInvalid: false);
 
+    public static void SetDraggingState(IReadOnlyList<TransformItemSnapshot> snapshots, bool isDragging)
+    {
+        foreach (var snapshot in snapshots)
+        {
+            if (snapshot.Cell is not null)
+            {
+                snapshot.Cell.IsDragging = isDragging;
+            }
+        }
+    }
+
     private static Rect? GetCellSelectionBounds(IReadOnlyList<TransformItemSnapshot> snapshots)
     {
         Rect? bounds = null;

@@ -440,6 +440,39 @@ public sealed class MainWindowLegacyDragCleanupTests
     }
 
     [Fact]
+    public void MainWindow_TryStartTransformBodyMove_MarksSelectedCellsAsDraggingUntilTransformEnds()
+    {
+        var window = CreateWindowHarness(new MainWindowViewModel());
+        var cell = new CellViewModel
+        {
+            CanvasX = Constants.GridSize,
+            CanvasY = Constants.GridSize,
+            ColSpan = 2,
+            RowSpan = 1,
+            Type = CellType.Image,
+            IsSelected = true
+        };
+
+        window.Vm.GridCells.Add(cell);
+        GetSelectedCells(window).Add(cell);
+        window.UpdateSelectionState();
+        window.Vm.RefreshTransformState();
+
+        var startMethod = typeof(MainWindow).GetMethod("TryStartTransformBodyMove", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(startMethod);
+
+        var started = (bool)startMethod!.Invoke(window, new object?[] { new Point(Constants.GridSize + 20, Constants.GridSize + 20), true })!;
+
+        Assert.True(started);
+        Assert.True(cell.IsDragging);
+
+        var cancelled = (bool)InvokePrivateMethod(window, "CancelActiveTransform")!;
+
+        Assert.True(cancelled);
+        Assert.False(cell.IsDragging);
+    }
+
+    [Fact]
     public void MainWindow_TryStartTransformBodyMove_DoesNotStartMoveFromHandleRegion()
     {
         var window = CreateWindowHarness(new MainWindowViewModel());

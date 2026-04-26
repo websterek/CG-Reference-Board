@@ -57,3 +57,7 @@ Temp/**
 dist/**
 dist/linux/CGReferenceBoard
 .worktrees/
+
+# Local agent workflow artifacts
+docs/superpowers/
+.opencode/

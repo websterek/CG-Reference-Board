@@ -162,7 +162,11 @@ public class CellViewModel : ViewModelBase, IDisposable
     public bool IsSelected
     {
         get => _isSelected;
-        set => SetProperty(ref _isSelected, value);
+        set
+        {
+            if (SetProperty(ref _isSelected, value))
+                OnPropertyChanged(nameof(ZIndex));
+        }
     }
 
     private bool _hasMultipleSelection;

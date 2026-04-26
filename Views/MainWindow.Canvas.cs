@@ -276,6 +276,7 @@ public partial class MainWindow
         }
 
         GridTransformService.ClearInvalidState(transformService.ActiveSnapshots);
+        GridTransformService.SetDraggingState(transformService.ActiveSnapshots, isDragging: false);
         transformService.End();
         transformService.ClearSnapshots();
 
@@ -313,6 +314,7 @@ public partial class MainWindow
 
         GridTransformService.RestoreSnapshots(transformService.ActiveSnapshots);
         GridTransformService.ClearInvalidState(transformService.ActiveSnapshots);
+        GridTransformService.SetDraggingState(transformService.ActiveSnapshots, isDragging: false);
         transformService.Cancel();
         Vm.RefreshTransformState();
         UpdateTransformOverlayLayout();
@@ -403,6 +405,7 @@ public partial class MainWindow
         }
 
         Vm.TransformService.BeginMove(pointer, Vm.SelectionService, snapshots);
+        GridTransformService.SetDraggingState(Vm.TransformService.ActiveSnapshots, isDragging: Vm.TransformService.HasActiveOperation && !Vm.IsDrawMode);
         return Vm.TransformService.HasActiveOperation;
     }
 
