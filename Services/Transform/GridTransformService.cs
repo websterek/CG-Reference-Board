@@ -30,7 +30,13 @@ public static class GridTransformService
 
     public static void ApplyResize(IReadOnlyList<TransformItemSnapshot> snapshots, Rect originalSelectionBounds, Rect resizedSelectionBounds)
     {
+        _ = originalSelectionBounds;
         var snappedSelectionBounds = TransformMath.SnapRectToGrid(resizedSelectionBounds);
+        var originalCellBounds = GetCellSelectionBounds(snapshots);
+        if (originalCellBounds is null)
+        {
+            return;
+        }
 
         foreach (var snapshot in snapshots)
         {
@@ -40,8 +46,8 @@ public static class GridTransformService
                 continue;
             }
 
-            var mappedTopLeft = TransformMath.MapPointBetweenRects(snapshot.Bounds.TopLeft, originalSelectionBounds, snappedSelectionBounds);
-            var mappedBottomRight = TransformMath.MapPointBetweenRects(snapshot.Bounds.BottomRight, originalSelectionBounds, snappedSelectionBounds);
+            var mappedTopLeft = TransformMath.MapPointBetweenRects(snapshot.Bounds.TopLeft, originalCellBounds.Value, snappedSelectionBounds);
+            var mappedBottomRight = TransformMath.MapPointBetweenRects(snapshot.Bounds.BottomRight, originalCellBounds.Value, snappedSelectionBounds);
             var mappedRect = new Rect(
                 Math.Min(mappedTopLeft.X, mappedBottomRight.X),
                 Math.Min(mappedTopLeft.Y, mappedBottomRight.Y),
@@ -54,5 +60,31 @@ public static class GridTransformService
             cell.ColSpan = Math.Max(1, (int)Math.Round(snappedCellRect.Width / Constants.GridSize));
             cell.RowSpan = Math.Max(1, (int)Math.Round(snappedCellRect.Height / Constants.GridSize));
         }
+    }
+
+    private static Rect? GetCellSelectionBounds(IReadOnlyList<TransformItemSnapshot> snapshots)
+    {
+        Rect? bounds = null;
+
+        foreach (var snapshot in snapshots)
+        {
+            if (snapshot.Cell is null)
+            {
+                continue;
+            }
+
+            bounds = bounds is null ? snapshot.Bounds : Union(bounds.Value, snapshot.Bounds);
+        }
+
+        return bounds;
+    }
+
+    private static Rect Union(Rect left, Rect right)
+    {
+        var x1 = Math.Min(left.X, right.X);
+        var y1 = Math.Min(left.Y, right.Y);
+        var x2 = Math.Max(left.Right, right.Right);
+        var y2 = Math.Max(left.Bottom, right.Bottom);
+        return new Rect(x1, y1, x2 - x1, y2 - y1);
     }
 }
