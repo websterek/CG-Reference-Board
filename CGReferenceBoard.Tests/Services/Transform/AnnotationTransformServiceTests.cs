@@ -34,6 +34,9 @@ public sealed class AnnotationTransformServiceTests
         AnnotationTransformService.ApplyResize(snapshots, originalBounds, new Rect(10, 20, 200, 100));
 
         Assert.Equal(new Point(0, 0), annotation.Points[0]);
-        Assert.Equal(new Point(200, 100), annotation.Points[1]);
+        Assert.Equal(29.35483870967742, annotation.CanvasX, 10);
+        Assert.Equal(36.21621621621622, annotation.CanvasY, 10);
+        Assert.Equal(161.29032258064515, annotation.Points[1].X, 10);
+        Assert.Equal(67.56756756756756, annotation.Points[1].Y, 10);
     }
 }

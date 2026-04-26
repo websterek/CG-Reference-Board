@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using Avalonia;
 using CGReferenceBoard.ViewModels;
@@ -23,8 +22,6 @@ public static class AnnotationTransformService
 
     public static void ApplyResize(IReadOnlyList<TransformItemSnapshot> snapshots, Rect originalSelectionBounds, Rect resizedSelectionBounds)
     {
-        var sourceBounds = GetAnnotationContentBounds(snapshots) ?? originalSelectionBounds;
-
         foreach (var snapshot in snapshots)
         {
             var annotation = snapshot.Annotation;
@@ -40,7 +37,7 @@ public static class AnnotationTransformService
             for (int i = 0; i < annotation.Points.Count; i++)
             {
                 var absolutePoint = new Point(annotation.CanvasX + annotation.Points[i].X, annotation.CanvasY + annotation.Points[i].Y);
-                var mappedPoint = TransformMath.MapPointBetweenRects(absolutePoint, sourceBounds, resizedSelectionBounds);
+                var mappedPoint = TransformMath.MapPointBetweenRects(absolutePoint, originalSelectionBounds, resizedSelectionBounds);
                 mappedPoints[i] = mappedPoint;
 
                 if (mappedPoint.X < minX)
@@ -64,38 +61,5 @@ public static class AnnotationTransformService
 
             annotation.UpdateBoundsCache();
         }
-    }
-
-    private static Rect? GetAnnotationContentBounds(IReadOnlyList<TransformItemSnapshot> snapshots)
-    {
-        Rect? bounds = null;
-
-        foreach (var snapshot in snapshots)
-        {
-            var annotation = snapshot.Annotation;
-            if (annotation is null || annotation.Points.Count == 0)
-            {
-                continue;
-            }
-
-            foreach (var point in annotation.Points)
-            {
-                var absolutePoint = new Point(annotation.CanvasX + point.X, annotation.CanvasY + point.Y);
-                bounds = bounds is null
-                    ? new Rect(absolutePoint, absolutePoint)
-                    : UnionPoint(bounds.Value, absolutePoint);
-            }
-        }
-
-        return bounds;
-    }
-
-    private static Rect UnionPoint(Rect rect, Point point)
-    {
-        var left = Math.Min(rect.Left, point.X);
-        var top = Math.Min(rect.Top, point.Y);
-        var right = Math.Max(rect.Right, point.X);
-        var bottom = Math.Max(rect.Bottom, point.Y);
-        return new Rect(left, top, right - left, bottom - top);
     }
 }
