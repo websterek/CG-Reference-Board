@@ -1541,6 +1541,12 @@ public partial class MainWindow
             return;
         }
 
+        if (e.Key == Key.Escape && HandleEscapeShortcut())
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key == Key.N && isCtrl)
         { NewBoard_Click(null, null!); return; }
 

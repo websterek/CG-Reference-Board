@@ -56,11 +56,11 @@ public sealed partial class TransformService : ObservableObject
         OnPropertyChanged(nameof(HasActiveOperation));
     }
 
-    public void BeginMove(Point pointer, SelectionService selection)
-        => Begin(TransformOperation.Move, TransformHandle.Body, pointer, selection);
+    public void BeginMove(Point pointer, SelectionService selection, IReadOnlyList<TransformItemSnapshot>? snapshots = null)
+        => Begin(TransformOperation.Move, TransformHandle.Body, pointer, selection, snapshots);
 
     public void BeginResize(TransformHandle handle, Point pointer, SelectionService selection)
-        => Begin(TransformOperation.Resize, handle, pointer, selection);
+        => Begin(TransformOperation.Resize, handle, pointer, selection, snapshots: null);
 
     public Vector UpdatePreview(Point pointer, bool annotationMode)
     {
@@ -101,14 +101,19 @@ public sealed partial class TransformService : ObservableObject
         ClearSnapshots();
     }
 
-    private void Begin(TransformOperation operation, TransformHandle handle, Point pointer, SelectionService selection)
+    private void Begin(
+        TransformOperation operation,
+        TransformHandle handle,
+        Point pointer,
+        SelectionService selection,
+        IReadOnlyList<TransformItemSnapshot>? snapshots)
     {
         if (!Capabilities.AllowsOperation(operation))
         {
             return;
         }
 
-        var snapshots = TransformBoundsCalculator.CreateSnapshots(selection.SelectedCells, selection.SelectedAnnotations);
+        snapshots ??= TransformBoundsCalculator.CreateSnapshots(selection.SelectedCells, selection.SelectedAnnotations);
         if (snapshots.Count == 0)
         {
             End();

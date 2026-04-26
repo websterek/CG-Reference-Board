@@ -25,6 +25,56 @@ public sealed class GridTransformServiceTests
     }
 
     [Fact]
+    public void CreateExpandedMoveSnapshots_SelectedBackdropIncludesOverlappingCellsAndTheirAnnotations()
+    {
+        var backdrop = new CellViewModel { CanvasX = 160, CanvasY = 160, ColSpan = 2, RowSpan = 2, Type = CellType.Backdrop };
+        var overlappingCell = new CellViewModel { CanvasX = 160, CanvasY = 160, ColSpan = 1, RowSpan = 1, Type = CellType.Image };
+        var outsideCell = new CellViewModel { CanvasX = 800, CanvasY = 800, ColSpan = 1, RowSpan = 1, Type = CellType.Image };
+        var attachedAnnotation = new AnnotationViewModel { CanvasX = 180, CanvasY = 180, Type = "Brush" };
+        attachedAnnotation.Points.Add(new Point(0, 0));
+        attachedAnnotation.Points.Add(new Point(20, 20));
+        attachedAnnotation.UpdateBoundsCache();
+        var outsideAnnotation = new AnnotationViewModel { CanvasX = 900, CanvasY = 900, Type = "Brush" };
+        outsideAnnotation.Points.Add(new Point(0, 0));
+        outsideAnnotation.UpdateBoundsCache();
+
+        var snapshots = GridTransformService.CreateExpandedMoveSnapshots(
+            new[] { backdrop },
+            Array.Empty<AnnotationViewModel>(),
+            new[] { backdrop, overlappingCell, outsideCell },
+            new[] { attachedAnnotation, outsideAnnotation });
+
+        Assert.Contains(snapshots, snapshot => ReferenceEquals(snapshot.Cell, backdrop));
+        Assert.Contains(snapshots, snapshot => ReferenceEquals(snapshot.Cell, overlappingCell));
+        Assert.DoesNotContain(snapshots, snapshot => ReferenceEquals(snapshot.Cell, outsideCell));
+        Assert.Contains(snapshots, snapshot => ReferenceEquals(snapshot.Annotation, attachedAnnotation));
+        Assert.DoesNotContain(snapshots, snapshot => ReferenceEquals(snapshot.Annotation, outsideAnnotation));
+    }
+
+    [Fact]
+    public void CreateExpandedMoveSnapshots_SelectedCellIncludesAttachedAnnotations()
+    {
+        var cell = new CellViewModel { CanvasX = 320, CanvasY = 480, ColSpan = 1, RowSpan = 1, Type = CellType.Image };
+        var attachedAnnotation = new AnnotationViewModel { CanvasX = 340, CanvasY = 500, Type = "Brush" };
+        attachedAnnotation.Points.Add(new Point(0, 0));
+        attachedAnnotation.Points.Add(new Point(30, 10));
+        attachedAnnotation.UpdateBoundsCache();
+        var outsideAnnotation = new AnnotationViewModel { CanvasX = 640, CanvasY = 640, Type = "Brush" };
+        outsideAnnotation.Points.Add(new Point(0, 0));
+        outsideAnnotation.UpdateBoundsCache();
+
+        var snapshots = GridTransformService.CreateExpandedMoveSnapshots(
+            new[] { cell },
+            Array.Empty<AnnotationViewModel>(),
+            new[] { cell },
+            new[] { attachedAnnotation, outsideAnnotation });
+
+        Assert.Contains(snapshots, snapshot => ReferenceEquals(snapshot.Cell, cell));
+        Assert.Contains(snapshots, snapshot => ReferenceEquals(snapshot.Annotation, attachedAnnotation));
+        Assert.DoesNotContain(snapshots, snapshot => ReferenceEquals(snapshot.Annotation, outsideAnnotation));
+    }
+
+    [Fact]
     public void ApplySingleCellResize_SnapsToGridSpan()
     {
         var cell = new CellViewModel { CanvasX = 0, CanvasY = 0, ColSpan = 1, RowSpan = 1, Type = CellType.Image };

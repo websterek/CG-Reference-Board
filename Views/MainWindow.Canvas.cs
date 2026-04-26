@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
@@ -175,8 +176,10 @@ public partial class MainWindow
             return;
         }
 
-        Vm.TransformService.BeginMove(e.GetPosition(mainCanvas), Vm.SelectionService);
-        e.Pointer.Capture(_cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder"));
+        if (StartTransformMoveFromCurrentSelection(e.GetPosition(mainCanvas)))
+        {
+            e.Pointer.Capture(_cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder"));
+        }
         e.Handled = true;
     }
 
@@ -289,6 +292,35 @@ public partial class MainWindow
         Vm.RefreshTransformState();
         UpdateTransformOverlayLayout();
         return true;
+    }
+
+    private bool HandleEscapeShortcut()
+    {
+        if (CancelActiveTransform())
+        {
+            UpdateSelectionState();
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool StartTransformMoveFromCurrentSelection(Point pointer)
+    {
+        UpdateSelectionState();
+
+        IReadOnlyList<TransformItemSnapshot>? snapshots = null;
+        if (!Vm.IsDrawMode)
+        {
+            snapshots = GridTransformService.CreateExpandedMoveSnapshots(
+                Vm.SelectionService.SelectedCells,
+                Vm.SelectionService.SelectedAnnotations,
+                Vm.GridCells,
+                Vm.Annotations);
+        }
+
+        Vm.TransformService.BeginMove(pointer, Vm.SelectionService, snapshots);
+        return Vm.TransformService.HasActiveOperation;
     }
 
     private void ResetTransientPointerState(bool cancelActiveTransform)

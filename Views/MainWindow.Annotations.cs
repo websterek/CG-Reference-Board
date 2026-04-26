@@ -103,8 +103,10 @@ public partial class MainWindow
             var mainCanvas = this.FindControl<Canvas>("MainCanvas");
             if (mainCanvas != null)
             {
-                Vm.TransformService.BeginMove(e.GetPosition(mainCanvas), Vm.SelectionService);
-                e.Pointer.Capture(_cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder"));
+                if (StartTransformMoveFromCurrentSelection(e.GetPosition(mainCanvas)))
+                {
+                    e.Pointer.Capture(_cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder"));
+                }
             }
             e.Handled = true;
             return;
@@ -178,8 +180,10 @@ public partial class MainWindow
             var mainCanvas = this.FindControl<Canvas>("MainCanvas");
             if (mainCanvas != null)
             {
-                Vm.TransformService.BeginMove(e.GetPosition(mainCanvas), Vm.SelectionService);
-                e.Pointer.Capture(_cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder"));
+                if (StartTransformMoveFromCurrentSelection(e.GetPosition(mainCanvas)))
+                {
+                    e.Pointer.Capture(_cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder"));
+                }
             }
             e.Handled = true;
             return;

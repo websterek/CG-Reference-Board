@@ -69,6 +69,34 @@ public sealed class TransformCapabilitiesTests
     }
 
     [Fact]
+    public void BeginMove_UsesProvidedSnapshotsInsteadOfCurrentSelection()
+    {
+        var selection = new SelectionService();
+        var selectedAnnotation = CreateAnnotation();
+        selection.SelectAnnotation(selectedAnnotation);
+        var replacementCell = new CellViewModel
+        {
+            CanvasX = 320,
+            CanvasY = 480,
+            ColSpan = 1,
+            RowSpan = 1,
+            Type = CellType.Image
+        };
+        var replacementSnapshots = TransformBoundsCalculator.CreateSnapshots(new[] { replacementCell }, Array.Empty<AnnotationViewModel>());
+        var service = new TransformService
+        {
+            Capabilities = new TransformCapabilities(true, false, false, false)
+        };
+
+        service.BeginMove(new Point(25, 35), selection, replacementSnapshots);
+
+        var snapshot = Assert.Single(service.ActiveSnapshots);
+        Assert.Same(replacementCell, snapshot.Cell);
+        Assert.Null(snapshot.Annotation);
+        Assert.Equal(new Point(25, 35), service.StartPointer);
+    }
+
+    [Fact]
     public void BeginResize_StartsOperationWhenCapabilitiesAllowResize()
     {
         var selection = CreateSelectionWithCell();

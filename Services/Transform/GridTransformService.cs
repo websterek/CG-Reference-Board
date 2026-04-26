@@ -11,6 +11,89 @@ namespace CGReferenceBoard.Services.Transform;
 
 public static class GridTransformService
 {
+    public static IReadOnlyList<TransformItemSnapshot> CreateExpandedMoveSnapshots(
+        IEnumerable<CellViewModel> selectedCells,
+        IEnumerable<AnnotationViewModel> selectedAnnotations,
+        IEnumerable<CellViewModel> allCells,
+        IEnumerable<AnnotationViewModel> allAnnotations)
+    {
+        var cellsToMove = new List<CellViewModel>();
+        var annotationsToMove = new List<AnnotationViewModel>();
+
+        foreach (var cell in selectedCells)
+        {
+            if (cell.HasContent && !cellsToMove.Contains(cell))
+            {
+                cellsToMove.Add(cell);
+            }
+        }
+
+        foreach (var annotation in selectedAnnotations)
+        {
+            if (annotation.Points.Count > 0 && !annotationsToMove.Contains(annotation))
+            {
+                annotationsToMove.Add(annotation);
+            }
+        }
+
+        foreach (var backdrop in cellsToMove.Where(cell => cell.IsBackdrop).ToList())
+        {
+            double left = backdrop.CanvasX;
+            double top = backdrop.CanvasY;
+            double right = left + backdrop.ColSpan * Constants.GridSize;
+            double bottom = top + backdrop.RowSpan * Constants.GridSize;
+
+            foreach (var cell in allCells)
+            {
+                if (!cell.HasContent || cellsToMove.Contains(cell))
+                {
+                    continue;
+                }
+
+                double cx = cell.CanvasX;
+                double cy = cell.CanvasY;
+                double cw = cell.ColSpan * Constants.GridSize;
+                double ch = cell.RowSpan * Constants.GridSize;
+
+                bool intersects = cx < right && cx + cw > left && cy < bottom && cy + ch > top;
+                if (intersects)
+                {
+                    cellsToMove.Add(cell);
+                }
+            }
+        }
+
+        foreach (var cell in cellsToMove)
+        {
+            double left = cell.CanvasX;
+            double top = cell.CanvasY;
+            double right = left + cell.ColSpan * Constants.GridSize;
+            double bottom = top + cell.RowSpan * Constants.GridSize;
+
+            foreach (var annotation in allAnnotations)
+            {
+                if (annotationsToMove.Contains(annotation))
+                {
+                    continue;
+                }
+
+                bool intersects = annotation.Points.Any(point =>
+                {
+                    double px = point.X + annotation.CanvasX;
+                    double py = point.Y + annotation.CanvasY;
+                    return px >= left && px <= right && py >= top && py <= bottom;
+                });
+
+                if (intersects)
+                {
+                    annotationsToMove.Add(annotation);
+                }
+            }
+        }
+
+        return TransformBoundsCalculator.CreateSnapshots(cellsToMove, annotationsToMove);
+    }
+
     public static void ApplyMove(IReadOnlyList<TransformItemSnapshot> snapshots, Vector rawDelta)
     {
         var snappedDelta = TransformMath.SnapVectorToGrid(rawDelta);
