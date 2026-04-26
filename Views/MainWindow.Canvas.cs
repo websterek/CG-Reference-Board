@@ -237,7 +237,7 @@ public partial class MainWindow
             }
         }
 
-        UpdateGridTransformInvalidState(annotationMode);
+        UpdateGridTransformState(annotationMode);
         UpdateTransformOverlayLayout();
         return true;
     }
@@ -251,16 +251,17 @@ public partial class MainWindow
 
         var transformService = Vm.TransformService;
         bool annotationMode = Vm.IsDrawMode;
-        bool hasCollision = !annotationMode && HasGridTransformCollision();
+        bool hasCollision = !annotationMode && GridTransformService.HasCollision(transformService.ActiveSnapshots, transformService.Operation, Vm.GridCells, Vm.LayerManager);
 
         if (hasCollision)
         {
-            RestoreActiveTransformSnapshots();
+            GridTransformService.RestoreSnapshots(transformService.ActiveSnapshots);
             ShakeScreen();
         }
 
-        ClearGridTransformInvalidState();
+        GridTransformService.ClearInvalidState(transformService.ActiveSnapshots);
         transformService.End();
+        transformService.ClearSnapshots();
         Vm.RefreshTransformState();
         UpdateTransformOverlayLayout();
         e.Pointer.Capture(null);
@@ -274,91 +275,21 @@ public partial class MainWindow
         return true;
     }
 
-    private void RestoreActiveTransformSnapshots()
-    {
-        foreach (var snapshot in Vm.TransformService.ActiveSnapshots)
-        {
-            if (snapshot.Cell is not null)
-            {
-                snapshot.Cell.CanvasX = snapshot.CanvasX;
-                snapshot.Cell.CanvasY = snapshot.CanvasY;
-                snapshot.Cell.ColSpan = snapshot.ColSpan;
-                snapshot.Cell.RowSpan = snapshot.RowSpan;
-            }
-
-            if (snapshot.Annotation is not null)
-            {
-                snapshot.Annotation.CanvasX = snapshot.CanvasX;
-                snapshot.Annotation.CanvasY = snapshot.CanvasY;
-
-                for (int i = 0; i < snapshot.AnnotationPoints.Count; i++)
-                {
-                    snapshot.Annotation.Points[i] = snapshot.AnnotationPoints[i];
-                }
-
-                snapshot.Annotation.UpdateBoundsCache();
-            }
-        }
-    }
-
-    private void UpdateGridTransformInvalidState(bool annotationMode)
+    private void UpdateGridTransformState(bool annotationMode)
     {
         if (annotationMode)
         {
             return;
         }
 
-        bool hasCollision = HasGridTransformCollision();
-        foreach (var snapshot in Vm.TransformService.ActiveSnapshots)
+        bool hasCollision = GridTransformService.HasCollision(Vm.TransformService.ActiveSnapshots, Vm.TransformService.Operation, Vm.GridCells, Vm.LayerManager);
+        if (hasCollision)
         {
-            if (snapshot.Cell is not null)
-            {
-                snapshot.Cell.IsDragInvalid = hasCollision;
-            }
-        }
-    }
-
-    private void ClearGridTransformInvalidState()
-    {
-        foreach (var snapshot in Vm.TransformService.ActiveSnapshots)
-        {
-            if (snapshot.Cell is not null)
-            {
-                snapshot.Cell.IsDragInvalid = false;
-            }
-        }
-    }
-
-    private bool HasGridTransformCollision()
-    {
-        var activeCells = Vm.TransformService.ActiveSnapshots
-            .Where(snapshot => snapshot.Cell is not null)
-            .Select(snapshot => snapshot.Cell!)
-            .ToList();
-
-        if (activeCells.Count == 0)
-        {
-            return false;
+            GridTransformService.SetInvalidState(Vm.TransformService.ActiveSnapshots, isInvalid: true);
+            return;
         }
 
-        if (Vm.TransformService.Operation == TransformOperation.Move)
-        {
-            var reference = Vm.TransformService.ActiveSnapshots.First(snapshot => snapshot.Cell is not null);
-            double dx = reference.Cell!.CanvasX - reference.CanvasX;
-            double dy = reference.Cell.CanvasY - reference.CanvasY;
-            return GridLayoutService.HasGroupCollision(Vm.GridCells, activeCells, Vm.LayerManager, dx, dy);
-        }
-
-        foreach (var cell in activeCells)
-        {
-            var owningLayer = Vm.LayerManager.ResolveLayer(cell);
-            if (owningLayer != null && GridLayoutService.HasLayerCollision(Vm.GridCells, owningLayer, activeCells, cell.CanvasX, cell.CanvasY, cell.ColSpan, cell.RowSpan))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        GridTransformService.ClearInvalidState(Vm.TransformService.ActiveSnapshots);
     }
 
     private void RestorePanCursor(Border? canvasBorder)

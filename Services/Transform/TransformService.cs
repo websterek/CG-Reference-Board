@@ -85,10 +85,14 @@ public sealed partial class TransformService : ObservableObject
     {
         Operation = TransformOperation.None;
         ActiveHandle = TransformHandle.None;
-        ActiveSnapshots = Array.Empty<TransformItemSnapshot>();
         StartBounds = default;
         StartPointer = default;
         OnPropertyChanged(nameof(HasActiveOperation));
+    }
+
+    public void ClearSnapshots()
+    {
+        ActiveSnapshots = Array.Empty<TransformItemSnapshot>();
     }
 
     private void Begin(TransformOperation operation, TransformHandle handle, Point pointer, SelectionService selection)

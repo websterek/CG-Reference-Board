@@ -1,7 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia;
 using CGReferenceBoard.Helpers;
+using CGReferenceBoard.Layers.Infrastructure;
+using CGReferenceBoard.Services;
+using CGReferenceBoard.ViewModels;
 
 namespace CGReferenceBoard.Services.Transform;
 
@@ -59,6 +63,83 @@ public static class GridTransformService
             cell.RowSpan = Math.Max(1, (int)Math.Round(snappedCellRect.Height / Constants.GridSize));
         }
     }
+
+    public static bool HasCollision(
+        IReadOnlyList<TransformItemSnapshot> snapshots,
+        TransformOperation operation,
+        IReadOnlyList<CellViewModel> gridCells,
+        LayerManager layerManager)
+    {
+        var activeCells = snapshots
+            .Where(snapshot => snapshot.Cell is not null)
+            .Select(snapshot => snapshot.Cell!)
+            .ToList();
+
+        if (activeCells.Count == 0)
+        {
+            return false;
+        }
+
+        if (operation == TransformOperation.Move)
+        {
+            var reference = snapshots.First(snapshot => snapshot.Cell is not null);
+            double dx = reference.Cell!.CanvasX - reference.CanvasX;
+            double dy = reference.Cell.CanvasY - reference.CanvasY;
+            return GridLayoutService.HasGroupCollision(gridCells, activeCells, layerManager, dx, dy);
+        }
+
+        foreach (var cell in activeCells)
+        {
+            var owningLayer = layerManager.ResolveLayer(cell);
+            if (owningLayer != null && GridLayoutService.HasLayerCollision(gridCells, owningLayer, activeCells, cell.CanvasX, cell.CanvasY, cell.ColSpan, cell.RowSpan))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static void RestoreSnapshots(IReadOnlyList<TransformItemSnapshot> snapshots)
+    {
+        foreach (var snapshot in snapshots)
+        {
+            if (snapshot.Cell is not null)
+            {
+                snapshot.Cell.CanvasX = snapshot.CanvasX;
+                snapshot.Cell.CanvasY = snapshot.CanvasY;
+                snapshot.Cell.ColSpan = snapshot.ColSpan;
+                snapshot.Cell.RowSpan = snapshot.RowSpan;
+            }
+
+            if (snapshot.Annotation is not null)
+            {
+                snapshot.Annotation.CanvasX = snapshot.CanvasX;
+                snapshot.Annotation.CanvasY = snapshot.CanvasY;
+
+                for (int i = 0; i < snapshot.AnnotationPoints.Count; i++)
+                {
+                    snapshot.Annotation.Points[i] = snapshot.AnnotationPoints[i];
+                }
+
+                snapshot.Annotation.UpdateBoundsCache();
+            }
+        }
+    }
+
+    public static void SetInvalidState(IReadOnlyList<TransformItemSnapshot> snapshots, bool isInvalid)
+    {
+        foreach (var snapshot in snapshots)
+        {
+            if (snapshot.Cell is not null)
+            {
+                snapshot.Cell.IsDragInvalid = isInvalid;
+            }
+        }
+    }
+
+    public static void ClearInvalidState(IReadOnlyList<TransformItemSnapshot> snapshots)
+        => SetInvalidState(snapshots, isInvalid: false);
 
     private static Rect? GetCellSelectionBounds(IReadOnlyList<TransformItemSnapshot> snapshots)
     {
