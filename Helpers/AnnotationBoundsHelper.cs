@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Media;
@@ -64,8 +65,35 @@ internal static class AnnotationBoundsHelper
             localBounds.Height + pad * 2);
     }
 
+    public static Rect? GetRenderedBoundsUnion(IEnumerable<AnnotationViewModel> annotations)
+    {
+        Rect? bounds = null;
+
+        foreach (var annotation in annotations)
+        {
+            if (annotation.Points.Count == 0)
+            {
+                continue;
+            }
+
+            var renderedBounds = GetRenderedBounds(annotation);
+            bounds = bounds is null ? renderedBounds : Union(bounds.Value, renderedBounds);
+        }
+
+        return bounds;
+    }
+
     public static double GetRenderPadding(AnnotationViewModel annotation)
         => annotation.Thickness + Constants.AnnotationEffectPadding;
+
+    private static Rect Union(Rect left, Rect right)
+    {
+        var x1 = Math.Min(left.X, right.X);
+        var y1 = Math.Min(left.Y, right.Y);
+        var x2 = Math.Max(left.Right, right.Right);
+        var y2 = Math.Max(left.Bottom, right.Bottom);
+        return new Rect(x1, y1, x2 - x1, y2 - y1);
+    }
 
     private static Size MeasureText(AnnotationViewModel annotation)
     {

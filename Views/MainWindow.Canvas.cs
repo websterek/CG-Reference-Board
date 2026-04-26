@@ -879,12 +879,7 @@ public partial class MainWindow
 
                 foreach (var ann in Vm.Annotations)
                 {
-                    bool inRect = ann.Points.Any(p =>
-                    {
-                        double px = p.X + ann.CanvasX;
-                        double py = p.Y + ann.CanvasY;
-                        return px >= left && px <= right && py >= top && py <= bottom;
-                    });
+                    bool inRect = AnnotationBoundsHelper.IntersectsRenderedBounds(ann, new Rect(left, top, marquee.Width, marquee.Height));
 
                     if (inRect && !ann.IsSelected)
                     {
@@ -1015,13 +1010,7 @@ public partial class MainWindow
                     // Also select annotations in grid mode
                     foreach (var ann in Vm.Annotations)
                     {
-                        if (ann.Points.Count == 0)
-                            continue;
-
-                        double px = ann.Points[0].X + ann.CanvasX;
-                        double py = ann.Points[0].Y + ann.CanvasY;
-
-                        if (px >= left && px <= right && py >= top && py <= bottom && !ann.IsSelected)
+                        if (AnnotationBoundsHelper.IntersectsRenderedBounds(ann, new Rect(left, top, cellMarquee.Width, cellMarquee.Height)) && !ann.IsSelected)
                         {
                             ann.IsSelected = true;
                             _selectedAnnotations.Add(ann);
@@ -1139,24 +1128,17 @@ public partial class MainWindow
                 maxY = cell.CanvasY + cell.PixelHeight;
         }
 
-        foreach (var ann in Vm.Annotations)
+        var annotationBounds = AnnotationBoundsHelper.GetRenderedBoundsUnion(Vm.Annotations);
+        if (annotationBounds is { } allAnnotationBounds)
         {
-            if (ann != null)
-            {
-                foreach (var pt in ann.Points)
-                {
-                    double px = pt.X + ann.CanvasX;
-                    double py = pt.Y + ann.CanvasY;
-                    if (px < minX)
-                        minX = px;
-                    if (py < minY)
-                        minY = py;
-                    if (px > maxX)
-                        maxX = px;
-                    if (py > maxY)
-                        maxY = py;
-                }
-            }
+            if (allAnnotationBounds.X < minX)
+                minX = allAnnotationBounds.X;
+            if (allAnnotationBounds.Y < minY)
+                minY = allAnnotationBounds.Y;
+            if (allAnnotationBounds.Right > maxX)
+                maxX = allAnnotationBounds.Right;
+            if (allAnnotationBounds.Bottom > maxY)
+                maxY = allAnnotationBounds.Bottom;
         }
 
         double contentWidth = maxX - minX;
@@ -1197,24 +1179,17 @@ public partial class MainWindow
                 maxY = cell.CanvasY + cell.PixelHeight;
         }
 
-        foreach (var ann in _selectedAnnotations)
+        var selectedAnnotationBounds = AnnotationBoundsHelper.GetRenderedBoundsUnion(_selectedAnnotations);
+        if (selectedAnnotationBounds is { } annotationSelectionBounds)
         {
-            if (ann != null)
-            {
-                foreach (var pt in ann.Points)
-                {
-                    double px = pt.X + ann.CanvasX;
-                    double py = pt.Y + ann.CanvasY;
-                    if (px < minX)
-                        minX = px;
-                    if (py < minY)
-                        minY = py;
-                    if (px > maxX)
-                        maxX = px;
-                    if (py > maxY)
-                        maxY = py;
-                }
-            }
+            if (annotationSelectionBounds.X < minX)
+                minX = annotationSelectionBounds.X;
+            if (annotationSelectionBounds.Y < minY)
+                minY = annotationSelectionBounds.Y;
+            if (annotationSelectionBounds.Right > maxX)
+                maxX = annotationSelectionBounds.Right;
+            if (annotationSelectionBounds.Bottom > maxY)
+                maxY = annotationSelectionBounds.Bottom;
         }
 
         double contentWidth = Math.Max(0, maxX - minX);

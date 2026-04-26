@@ -223,6 +223,18 @@ public partial class MainWindow
             if (Math.Abs(pt.X - _pointerDownPos.X) > Constants.DragThreshold
                 || Math.Abs(pt.Y - _pointerDownPos.Y) > Constants.DragThreshold)
             {
+                if (!_isAltDuplicateDrag)
+                {
+                    var mainCanvas = _cachedMainCanvas ?? this.FindControl<Canvas>("MainCanvas");
+                    if (mainCanvas != null && StartTransformMoveFromCurrentSelection(e.GetPosition(mainCanvas)))
+                    {
+                        _isPointerDown = false;
+                        _lastPressedEventArgs = null;
+                        e.Pointer.Capture(_cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder"));
+                        return;
+                    }
+                }
+
                 _isDraggingCell = true;
                 _draggingCell = cell;
                 DisableCellHitTesting();

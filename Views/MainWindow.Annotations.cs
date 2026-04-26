@@ -150,13 +150,16 @@ public partial class MainWindow
 
                 ClearSelection();
                 _selectedAnnotations.Add(duplicate);
+                UpdateSelectionState();
 
                 BringToFront(_selectedAnnotations);
 
-                _isDraggingAnnotations = true;
-                _annotationDragCellOriginals = null;
-                _annotationDragStart = e.GetPosition(this.FindControl<Canvas>("MainCanvas"));
-                _isAltDuplicateDrag = true;
+                var canvas = _cachedMainCanvas ?? this.FindControl<Canvas>("MainCanvas");
+                if (canvas != null && StartTransformMoveFromCurrentSelection(e.GetPosition(canvas)))
+                {
+                    e.Pointer.Capture(_cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder"));
+                }
+
                 e.Handled = true;
                 return;
             }

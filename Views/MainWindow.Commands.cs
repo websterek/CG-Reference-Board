@@ -811,12 +811,7 @@ public partial class MainWindow
 
         foreach (var ann in Vm.Annotations)
         {
-            bool inRect = ann.Points.Any(p =>
-            {
-                double px = p.X + ann.CanvasX;
-                double py = p.Y + ann.CanvasY;
-                return px >= left && px <= right && py >= top && py <= bottom;
-            });
+            bool inRect = AnnotationBoundsHelper.IntersectsRenderedBounds(ann, new Rect(left, top, right - left, bottom - top));
 
             if (inRect)
             {
