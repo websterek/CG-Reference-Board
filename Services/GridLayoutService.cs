@@ -224,7 +224,7 @@ public static class GridLayoutService
             return new List<CellViewModel>();
 
         var children = new List<CellViewModel>();
-        var backdropRect = new Rect(backdrop.CanvasX, backdrop.CanvasY, backdrop.PixelWidth, backdrop.PixelHeight);
+        var backdropRect = new Rect(backdrop.VisualX, backdrop.VisualY, backdrop.PixelWidth, backdrop.PixelHeight);
 
         foreach (var cell in cells)
         {
@@ -249,7 +249,7 @@ public static class GridLayoutService
             return new List<AnnotationViewModel>();
 
         var result = new List<AnnotationViewModel>();
-        var backdropRect = new Rect(backdrop.CanvasX, backdrop.CanvasY, backdrop.PixelWidth, backdrop.PixelHeight);
+        var backdropRect = new Rect(backdrop.VisualX, backdrop.VisualY, backdrop.PixelWidth, backdrop.PixelHeight);
 
         foreach (var annotation in annotations)
         {
@@ -279,7 +279,11 @@ public static class GridLayoutService
             if (Math.Abs(deltaX) < 0.1 && Math.Abs(deltaY) < 0.1)
                 continue;
 
-            var cellRect = new Rect(oldPos.X, oldPos.Y, cell.PixelWidth, cell.PixelHeight);
+            var cellRect = new Rect(
+                cell.IsBackdrop ? oldPos.X - Constants.BackdropPadding : oldPos.X,
+                cell.IsBackdrop ? oldPos.Y - Constants.BackdropPadding : oldPos.Y,
+                cell.PixelWidth,
+                cell.PixelHeight);
 
             foreach (var annotation in annotations.ToList())
             {

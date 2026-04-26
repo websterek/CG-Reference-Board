@@ -294,6 +294,27 @@ public partial class MainWindow
         return true;
     }
 
+    internal bool CancelLegacyAltDuplicateDrag()
+    {
+        if (!_isDraggingCell || !_isAltDuplicateDrag || _draggingCell is null)
+        {
+            return false;
+        }
+
+        _draggingCell.IsDragInvalid = false;
+        _draggingCell.IsDragging = false;
+        Vm.GridCells.Remove(_draggingCell);
+        _selectedCells.Remove(_draggingCell);
+        _draggingCell = null;
+        _isDraggingCell = false;
+        _groupDragStarts = null;
+        _groupAnnotationDragStarts = null;
+        _isAltDuplicateDrag = false;
+        _isPointerDown = false;
+        _lastPressedEventArgs = null;
+        return true;
+    }
+
     private bool HandleEscapeShortcut()
     {
         if (CancelActiveTransform())
@@ -335,6 +356,7 @@ public partial class MainWindow
         if (cancelActiveTransform)
         {
             CancelActiveTransform();
+            CancelLegacyAltDuplicateDrag();
         }
 
         try

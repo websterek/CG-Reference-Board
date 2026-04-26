@@ -1,6 +1,7 @@
 using Avalonia;
 using CGReferenceBoard.Models;
 using CGReferenceBoard.Services.Transform;
+using CGReferenceBoard.Tests.TestInfrastructure;
 using CGReferenceBoard.ViewModels;
 using Xunit;
 
@@ -8,6 +9,11 @@ namespace CGReferenceBoard.Tests.Services.Transform;
 
 public sealed class GridTransformServiceTests
 {
+    static GridTransformServiceTests()
+    {
+        AvaloniaTestApp.EnsureInitialized();
+    }
+
     [Fact]
     public void ApplyMove_SnapsCellsAndMovesAnnotationsBySameDelta()
     {
@@ -49,6 +55,22 @@ public sealed class GridTransformServiceTests
         Assert.DoesNotContain(snapshots, snapshot => ReferenceEquals(snapshot.Cell, outsideCell));
         Assert.Contains(snapshots, snapshot => ReferenceEquals(snapshot.Annotation, attachedAnnotation));
         Assert.DoesNotContain(snapshots, snapshot => ReferenceEquals(snapshot.Annotation, outsideAnnotation));
+    }
+
+    [Fact]
+    public void CreateExpandedMoveSnapshots_BackdropUsesRenderedBoundsForOverlapExpansion()
+    {
+        var backdrop = new CellViewModel { CanvasX = 160, CanvasY = 160, ColSpan = 2, RowSpan = 2, Type = CellType.Backdrop };
+        var overlappingInPaddedBand = new CellViewModel { CanvasX = 0, CanvasY = 80, ColSpan = 1, RowSpan = 1, Type = CellType.Image };
+
+        var snapshots = GridTransformService.CreateExpandedMoveSnapshots(
+            new[] { backdrop },
+            Array.Empty<AnnotationViewModel>(),
+            new[] { backdrop, overlappingInPaddedBand },
+            Array.Empty<AnnotationViewModel>());
+
+        Assert.Contains(snapshots, snapshot => ReferenceEquals(snapshot.Cell, backdrop));
+        Assert.Contains(snapshots, snapshot => ReferenceEquals(snapshot.Cell, overlappingInPaddedBand));
     }
 
     [Fact]

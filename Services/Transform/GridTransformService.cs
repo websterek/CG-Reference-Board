@@ -38,10 +38,10 @@ public static class GridTransformService
 
         foreach (var backdrop in cellsToMove.Where(cell => cell.IsBackdrop).ToList())
         {
-            double left = backdrop.CanvasX;
-            double top = backdrop.CanvasY;
-            double right = left + backdrop.ColSpan * Constants.GridSize;
-            double bottom = top + backdrop.RowSpan * Constants.GridSize;
+            double left = backdrop.VisualX;
+            double top = backdrop.VisualY;
+            double right = left + backdrop.PixelWidth;
+            double bottom = top + backdrop.PixelHeight;
 
             foreach (var cell in allCells)
             {
@@ -65,7 +65,7 @@ public static class GridTransformService
 
         foreach (var cell in cellsToMove)
         {
-            var cellBounds = new Rect(cell.CanvasX, cell.CanvasY, cell.PixelWidth, cell.PixelHeight);
+            var cellBounds = new Rect(cell.VisualX, cell.VisualY, cell.PixelWidth, cell.PixelHeight);
 
             foreach (var annotation in allAnnotations)
             {
