@@ -264,7 +264,7 @@ public partial class MainWindow
         if (_editingTextAnnotation == null)
             return;
 
-        var editor = this.FindControl<TextBox>("AnnotationTextEditor");
+        var editor = TryFindControl<TextBox>("AnnotationTextEditor");
         if (editor != null)
         {
             editor.RemoveHandler(InputElement.KeyDownEvent, AnnotationTextEditor_KeyDown);
@@ -281,7 +281,7 @@ public partial class MainWindow
         _editingTextAnnotation = null;
         _editingTextAnnotationOriginalText = null;
 
-        this.FindControl<Border>("CanvasBorder")?.Focus();
+        TryFindControl<Border>("CanvasBorder")?.Focus();
     }
 
     private void CommitTextAnnotationEditing()
@@ -289,7 +289,9 @@ public partial class MainWindow
         if (_editingTextAnnotation == null)
             return;
 
-        var editor = this.FindControl<TextBox>("AnnotationTextEditor");
+        var annotation = _editingTextAnnotation;
+
+        var editor = TryFindControl<TextBox>("AnnotationTextEditor");
         if (editor != null)
         {
             editor.RemoveHandler(InputElement.KeyDownEvent, AnnotationTextEditor_KeyDown);
@@ -298,15 +300,36 @@ public partial class MainWindow
             editor.IsVisible = false;
         }
 
-        if (string.IsNullOrWhiteSpace(_editingTextAnnotation.Text))
-            Vm.Annotations.Remove(_editingTextAnnotation);
+        if (string.IsNullOrWhiteSpace(annotation.Text))
+        {
+            Vm.Annotations.Remove(annotation);
+            _selectedAnnotations.Remove(annotation);
+            Vm.SelectionService.RemoveFromSelection(annotation);
+            UpdateSelectionState();
+        }
 
         _editingTextAnnotation = null;
         _editingTextAnnotationOriginalText = null;
         Vm.MarkUnsaved();
         Vm.SaveBoardData();
 
-        this.FindControl<Border>("CanvasBorder")?.Focus();
+        TryFindControl<Border>("CanvasBorder")?.Focus();
+    }
+
+    private T? TryFindControl<T>(string name) where T : Control
+    {
+        try
+        {
+            return this.FindControl<T>(name);
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+        catch (NullReferenceException)
+        {
+            return null;
+        }
     }
 
     private void AnnotationTextEditor_LostFocus(object? sender, RoutedEventArgs e)

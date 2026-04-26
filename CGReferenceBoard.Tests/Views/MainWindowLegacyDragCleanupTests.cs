@@ -266,6 +266,43 @@ public sealed class MainWindowLegacyDragCleanupTests
     }
 
     [Fact]
+    public void CommitTextAnnotationEditing_EmptyText_RemovesDeletedAnnotationFromSelectionState()
+    {
+        var window = CreateWindowHarness(new MainWindowViewModel());
+        var annotation = new AnnotationViewModel
+        {
+            CanvasX = 120,
+            CanvasY = 80,
+            Type = "Text",
+            Text = "Delete me",
+            IsSelected = true,
+            IsInDrawMode = true
+        };
+        annotation.Points.Add(new Point(10, 20));
+        annotation.UpdateBoundsCache();
+
+        window.Vm.ModeService.SetMode("Annotation");
+        window.Vm.ModeService.AnnotationMode.CurrentTool = "Move";
+        window.Vm.Annotations.Add(annotation);
+        GetSelectedAnnotations(window).Add(annotation);
+        window.Vm.SelectionService.SelectAnnotation(annotation);
+        window.Vm.TransformService.Refresh(window.Vm.SelectionService, window.Vm.ModeService, window.Vm.IsViewMode);
+
+        annotation.Text = "";
+        SetPrivateField(window, "_editingTextAnnotation", annotation);
+        SetPrivateField(window, "_editingTextAnnotationOriginalText", "Delete me");
+
+        InvokePrivateMethod(window, "CommitTextAnnotationEditing");
+
+        Assert.DoesNotContain(annotation, window.Vm.Annotations);
+        Assert.DoesNotContain(annotation, GetSelectedAnnotations(window));
+        Assert.DoesNotContain(annotation, window.Vm.SelectionService.SelectedAnnotations);
+        Assert.False(window.Vm.SelectionService.HasSelection);
+        Assert.False(window.Vm.TransformService.IsVisible);
+        Assert.Equal(TransformCapabilities.None, window.Vm.TransformService.Capabilities);
+    }
+
+    [Fact]
     public void SelectContent_Click_UsesRenderedBackdropExtents()
     {
         var window = (MainWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(MainWindow));

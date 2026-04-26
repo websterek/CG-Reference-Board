@@ -91,4 +91,24 @@ public sealed class AnnotationTransformServiceTests
         Assert.Equal(2.0, annotation.TextScale, 10);
         Assert.Equal(new Point(10, 20), annotation.Points[0]);
     }
+
+    [Fact]
+    public void Resize_TextAnnotation_HorizontalOnlyShrink_UsesWidthScale()
+    {
+        var annotation = new AnnotationViewModel
+        {
+            CanvasX = 100,
+            CanvasY = 200,
+            Type = "Text",
+            Text = "Resize me"
+        };
+        annotation.Points.Add(new Point(10, 20));
+        annotation.UpdateBoundsCache();
+        var originalBounds = new Rect(100, 200, 80, 40);
+        var snapshots = new[] { TransformItemSnapshot.FromAnnotation(annotation, originalBounds) };
+
+        AnnotationTransformService.ApplyResize(snapshots, originalBounds, new Rect(originalBounds.X, originalBounds.Y, originalBounds.Width * 0.5, originalBounds.Height));
+
+        Assert.Equal(0.5, annotation.TextScale, 10);
+    }
 }

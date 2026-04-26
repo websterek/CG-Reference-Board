@@ -81,10 +81,15 @@ public static class AnnotationTransformService
 
         double widthScale = GetScale(resizedSelectionBounds.Width, originalSelectionBounds.Width);
         double heightScale = GetScale(resizedSelectionBounds.Height, originalSelectionBounds.Height);
-        double uniformScale = Math.Max(0.25, Math.Max(widthScale, heightScale));
+        double uniformScale = Math.Max(0.25, GetTextScale(widthScale, heightScale));
         annotation.TextScale = snapshot.TextScale * uniformScale;
         annotation.UpdateBoundsCache();
     }
+
+    private static double GetTextScale(double widthScale, double heightScale)
+        => Math.Abs(widthScale - 1.0) >= Math.Abs(heightScale - 1.0)
+            ? widthScale
+            : heightScale;
 
     private static double GetScale(double resized, double original)
         => original <= 0 ? 1.0 : resized / original;
