@@ -1,6 +1,11 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using CGReferenceBoard.Modes;
+using CGReferenceBoard.Services;
+using CGReferenceBoard.Services.Abstractions;
+using CGReferenceBoard.Services.Transform;
+using CGReferenceBoard.ViewModels;
 using CGReferenceBoard.Views;
 using System;
 using System.Diagnostics;
@@ -22,7 +27,16 @@ public partial class App : Application
             bool isViewMode = desktop.Args?.Contains("--view") == true;
             string? startFile = desktop.Args?.FirstOrDefault(arg => !arg.StartsWith("-"));
 
-            desktop.MainWindow = new MainWindow(isViewMode, startFile);
+            var boardService = new BoardService();
+            var modeService = new ModeService();
+            var selectionService = new SelectionService();
+            var transformService = new TransformService();
+            var vm = new MainWindowViewModel(isViewMode, modeService, selectionService, transformService, boardService);
+
+            var window = new MainWindow(vm);
+            if (!string.IsNullOrEmpty(startFile))
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => vm.LoadBoardFromFile(startFile));
+            desktop.MainWindow = window;
             desktop.Exit += OnDesktopExit;
         }
 

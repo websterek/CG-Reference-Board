@@ -15,6 +15,7 @@ using CGReferenceBoard.Helpers;
 using CGReferenceBoard.Layers.Infrastructure;
 using CGReferenceBoard.Modes;
 using CGReferenceBoard.Services;
+using CGReferenceBoard.Services.Abstractions;
 using CGReferenceBoard.Services.Transform;
 
 namespace CGReferenceBoard.ViewModels;
@@ -49,6 +50,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public SelectionService SelectionService { get; }
 
     public TransformService TransformService { get; }
+
+    private readonly IBoardService _boardService;
 
     /// <summary>
     /// Layer manager that owns the visual layer hierarchy.
@@ -271,12 +274,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// Pass <c>true</c> when the application is launched with the <c>--view</c> flag
     /// to disable all mutating operations (undo, save, drag, etc.).
     /// </param>
-    public MainWindowViewModel(bool isViewMode = false)
+    public MainWindowViewModel(
+        bool isViewMode,
+        ModeService modeService,
+        SelectionService selectionService,
+        TransformService transformService,
+        IBoardService boardService)
     {
         IsViewMode = isViewMode;
-        ModeService = new ModeService();
-        SelectionService = new SelectionService();
-        TransformService = new TransformService();
+        ModeService = modeService;
+        SelectionService = selectionService;
+        TransformService = transformService;
+        _boardService = boardService;
 
         WorkspaceDir = Path.Combine(Constants.ConfigDirectory, "Assets");
 
@@ -309,6 +318,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RecentBoards.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasRecentBoards));
         BoardFilesInDirectory.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasBoardFilesInDirectory));
     }
+
+    public MainWindowViewModel(bool isViewMode = false)
+        : this(isViewMode,
+               new ModeService(),
+               new SelectionService(),
+               new TransformService(),
+               new BoardService())
+    { }
 
     // ── Mode-change handler ───────────────────────────────────────────────────
 

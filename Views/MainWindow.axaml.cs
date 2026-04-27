@@ -217,6 +217,168 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         UpdateSelectionState();
     }
 
+    public MainWindow(MainWindowViewModel vm)
+    {
+        System.Runtime.GCSettings.LargeObjectHeapCompactionMode =
+            System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
+
+        Vm = vm;
+        DataContext = Vm;
+
+        InitializeComponent();
+
+        // Wire ViewModel events to View callbacks
+        Vm.AlwaysOnTopChanged += topmost => Topmost = topmost;
+        Vm.ToastRequested += ShowToast;
+        Vm.ViewportUpdateRequested += ScheduleViewportUpdate;
+        Vm.SelectionResetRequested += ClearLocalSelectionState;
+        Vm.TransformContextChanging += CancelActiveInteractionForContextChange;
+        Vm.TransformService.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(Vm.TransformService.IsVisible) or nameof(Vm.TransformService.Bounds))
+            {
+                UpdateTransformOverlayLayout();
+            }
+        };
+        Vm.StartupOverlayHideRequested += () =>
+        {
+            var overlay = this.FindControl<Border>("StartupOverlay");
+            if (overlay != null) overlay.IsVisible = false;
+        };
+
+        CacheCanvasControls();
+        UpdateTransformOverlayLayout();
+
+        try
+        {
+            var canvasBorder = this.FindControl<Border>("CanvasBorder");
+            if (canvasBorder != null)
+            {
+                canvasBorder.AddHandler(InputElement.PointerPressedEvent,
+                    new EventHandler<PointerPressedEventArgs>(CanvasBorder_Tunneled_PointerPressed),
+                    Avalonia.Interactivity.RoutingStrategies.Tunnel);
+            }
+        }
+        catch { }
+
+        Vm.LoadRecentBoards();
+        Vm.LoadUserSettings();
+        RecentBoardsList.ItemsSource = Vm.RecentBoards;
+
+        if (!Directory.Exists(Vm.WorkspaceDir))
+            Directory.CreateDirectory(Vm.WorkspaceDir);
+
+        Vm.GridCells.CollectionChanged += GridCells_CollectionChanged;
+
+        void GridCells_CollectionChanged(object? s, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            UpdateSelectionState();
+
+            if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
+            {
+                _cellSpatialIndex.Clear();
+                Vm.LayerManager.Clear();
+                foreach (var cell in Vm.GridCells)
+                {
+                    AddCellToSpatialIndex(cell);
+                    Vm.LayerManager.AddCell(cell);
+                }
+            }
+            else
+            {
+                if (e.OldItems != null)
+                {
+                    foreach (CellViewModel cell in e.OldItems)
+                    {
+                        RemoveCellFromSpatialIndex(cell);
+                        Vm.LayerManager.RemoveCell(cell);
+                        cell.PropertyChanged -= Cell_TypeChanged;
+                    }
+                }
+                if (e.NewItems != null)
+                {
+                    foreach (CellViewModel cell in e.NewItems)
+                    {
+                        AddCellToSpatialIndex(cell);
+                        if (Vm.LayerManager.AddCell(cell) == null && cell.Type == CellType.None)
+                        {
+                            cell.PropertyChanged += Cell_TypeChanged;
+                        }
+                    }
+                }
+            }
+        }
+
+        Vm.Annotations.CollectionChanged += Annotations_CollectionChanged;
+
+        void Annotations_CollectionChanged(object? s, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            UpdateSelectionState();
+
+            if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
+            {
+                Vm.LayerManager.Annotations.Items.Clear();
+                foreach (var ann in Vm.Annotations)
+                    Vm.LayerManager.Annotations.Items.Add(ann);
+            }
+            else
+            {
+                if (e.OldItems != null)
+                {
+                    foreach (AnnotationViewModel ann in e.OldItems)
+                        Vm.LayerManager.Annotations.Items.Remove(ann);
+                }
+                if (e.NewItems != null)
+                {
+                    foreach (AnnotationViewModel ann in e.NewItems)
+                        Vm.LayerManager.Annotations.Items.Add(ann);
+                }
+            }
+        }
+
+        // Wire layer visibility changes to cell visual state
+        foreach (var layer in Vm.LayerManager.ContentLayers)
+        {
+            if (layer is INotifyPropertyChanged inpc)
+                inpc.PropertyChanged += (_, e) => OnLayerPropertyChanged(layer, e);
+        }
+
+        // Set up pan/zoom transform
+        var tg = new TransformGroup();
+        tg.Children.Add(_translate);
+        tg.Children.Add(_scale);
+
+        var mainCanvas = this.FindControl<Canvas>("MainCanvas");
+        if (mainCanvas != null)
+            mainCanvas.RenderTransform = tg;
+
+        var cursorIcon = this.FindControl<Border>("CursorIconContainer");
+        if (cursorIcon != null)
+        {
+            Canvas.SetLeft(cursorIcon, -100);
+            Canvas.SetTop(cursorIcon, -100);
+        }
+
+        AddHandler(DragDrop.DragEnterEvent, OnDragEnter);
+        AddHandler(DragDrop.DragOverEvent, OnDragOver);
+        AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
+        AddHandler(DragDrop.DropEvent, OnDrop);
+
+        var canvasBorderDnd = this.FindControl<Border>("CanvasBorder");
+        if (canvasBorderDnd != null)
+        {
+            DragDrop.SetAllowDrop(canvasBorderDnd, true);
+            canvasBorderDnd.AddHandler(DragDrop.DragEnterEvent, OnDragEnter);
+            canvasBorderDnd.AddHandler(DragDrop.DragOverEvent, OnDragOver);
+            canvasBorderDnd.AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
+            canvasBorderDnd.AddHandler(DragDrop.DropEvent, OnDrop);
+        }
+
+        InitViewportLodTimer();
+
+        Closing += OnWindowClosing;
+    }
+
     public MainWindow(bool isViewMode, string? startFile)
     {
         System.Runtime.GCSettings.LargeObjectHeapCompactionMode =
