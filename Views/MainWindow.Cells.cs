@@ -472,7 +472,6 @@ public partial class MainWindow
             _isAltDuplicateDrag = false;
             EnableCellHitTesting();
             Vm.MarkUnsaved();
-            _ = Vm.SaveBoardDataAsync();
         }
         _isPointerDown = false;
         UpdateSelectionState();
@@ -535,7 +534,7 @@ public partial class MainWindow
             _isResizing = false;
             _resizingCell = null;
             e.Handled = true;
-            _ = Vm.SaveBoardDataAsync();
+            Vm.RequestSave();
         }
     }
 

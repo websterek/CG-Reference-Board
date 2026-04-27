@@ -1,6 +1,7 @@
 using Avalonia;
 using System;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using CGReferenceBoard.Services.Transform;
 using CGReferenceBoard.ViewModels;
@@ -10,6 +11,22 @@ namespace CGReferenceBoard.Tests.ViewModels;
 
 public sealed class MainWindowViewModelTransformStateTests
 {
+    static MainWindowViewModelTransformStateTests()
+    {
+        // Sweep stale /tmp/{Guid:N}.cgrb files left behind by aborted earlier runs
+        // of this test class (parameterless-ctor tests use temp paths; a crash
+        // between WriteAllText and File.Delete would orphan the file).
+        try
+        {
+            var rx = new Regex("^[0-9a-fA-F]{32}\\.cgrb$", RegexOptions.Compiled);
+            foreach (var f in Directory.EnumerateFiles(Path.GetTempPath(), "*.cgrb"))
+            {
+                if (!rx.IsMatch(Path.GetFileName(f))) continue;
+                try { File.Delete(f); } catch { /* best effort */ }
+            }
+        }
+        catch { /* best effort */ }
+    }
     [Fact]
     public void AnnotationToolChange_RefreshesTransformState()
     {

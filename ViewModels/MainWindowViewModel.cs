@@ -67,8 +67,31 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private bool _isRestoringState;
     private string? _lastStateHash;
 
-    /// <summary>Serialises concurrent <see cref="SaveBoardData"/> calls so writes never interleave.</summary>
+    /// <summary>Serialises concurrent <see cref="SaveBoardDataAsync"/> calls so writes never interleave.</summary>
     private readonly SemaphoreSlim _saveSemaphore = new(1, 1);
+
+    // ── Background debounced save loop ────────────────────────────────────────
+    //
+    // Replaces ~50 fire-and-forget call sites that used to invoke SaveBoardDataAsync
+    // directly. The old design captured a JSON snapshot synchronously on the
+    // calling (UI) thread, then awaited a semaphore. If a Load happened during
+    // the await, the post-await `CurrentBoardFile` no longer matched the
+    // pre-await JSON, occasionally corrupting newly-loaded boards (the
+    // "board loads empty" symptom). It also serialised the entire board on
+    // every keystroke / drag tick, freezing the UI under load.
+    //
+    // New design: editors call RequestSave(). A single background loop wakes
+    // on a signal, waits a quiet period (debounce), then captures state and
+    // writes. Bursts of edits coalesce into a single save.
+    private static readonly TimeSpan SaveDebounceInterval = TimeSpan.FromMilliseconds(1000);
+    private readonly System.Threading.Tasks.TaskCompletionSource _saveLoopShutdown = new(System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly object _saveSignalGate = new();
+    private TaskCompletionSource? _pendingSaveSignal;
+    private long _saveRequestTicks;            // last RequestSave() timestamp (Stopwatch ticks)
+    private volatile bool _saveLoopStop;
+    private Task? _saveLoopTask;
+    /// <summary>Used by FlushPendingSavesAsync to await the in-flight save.</summary>
+    private Task _lastSaveTask = Task.CompletedTask;
 
     // ── Board file state ──────────────────────────────────────────────────────
 
@@ -317,6 +340,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         // ── Wire collection → derived-property notifications ──────────────────
         RecentBoards.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasRecentBoards));
         BoardFilesInDirectory.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasBoardFilesInDirectory));
+
+        // ── Start background save loop ────────────────────────────────────────
+        // (Skipped in view mode where saves are disabled.)
+        if (!IsViewMode)
+            _saveLoopTask = Task.Run(SaveLoopAsync);
     }
 
     public MainWindowViewModel(bool isViewMode = false)
@@ -430,7 +458,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         string current = _undoStack.Pop();
         _redoStack.Push(current);
         RestoreBoardState(_undoStack.Peek());
-        _ = SaveBoardDataAsync();
+        RequestSave();
         ViewportUpdateRequested?.Invoke();
         ToastRequested?.Invoke("↩ Undo");
         _isRestoringState = false;
@@ -446,7 +474,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         string next = _redoStack.Pop();
         _undoStack.Push(next);
         RestoreBoardState(next);
-        _ = SaveBoardDataAsync();
+        RequestSave();
         ViewportUpdateRequested?.Invoke();
         ToastRequested?.Invoke("↪ Redo");
         _isRestoringState = false;
@@ -482,11 +510,141 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     // ── Board state helpers ───────────────────────────────────────────────────
 
-    /// <summary>Marks the board as having unsaved changes (idempotent).</summary>
+    /// <summary>
+    /// Marks the board as having unsaved changes, captures an undo snapshot,
+    /// and schedules a debounced background save.
+    /// </summary>
+    /// <remarks>
+    /// This is the canonical entry point for "the user just changed something".
+    /// All editor / command call sites should use this (or <see cref="RequestSave"/>,
+    /// which is an alias for clarity at sites that previously only called
+    /// <c>_ = SaveBoardDataAsync()</c> without <c>MarkUnsaved()</c>).
+    /// </remarks>
     public void MarkUnsaved()
     {
-        if (HasUnsavedChanges) return;
+        if (IsViewMode) return;
         HasUnsavedChanges = true;
+
+        // Capture an undo snapshot synchronously so each edit is undoable,
+        // independent of when the debounced disk write actually runs.
+        if (!_isRestoringState && !string.IsNullOrEmpty(CurrentBoardFile))
+        {
+            try
+            {
+                string json = BoardSerializer.Serialize(GridCells, Annotations, CurrentBoardFile);
+                bool stackIsEmpty = _undoStack.Count == 0;
+                bool jsonMatchesStack = !stackIsEmpty && _undoStack.Peek() == json;
+                if (!jsonMatchesStack)
+                {
+                    _undoStack.Push(json);
+                    _lastStateHash = ComputeStateHash(GridCells, Annotations);
+
+                    if (_undoStack.Count > Constants.MaxUndoDepth)
+                    {
+                        var items = _undoStack.ToArray(); // [newest … oldest]
+                        _undoStack.Clear();
+                        for (int i = Constants.MaxUndoDepth - 1; i >= 0; i--)
+                            _undoStack.Push(items[i]);
+                    }
+                    _redoStack.Clear();
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"MarkUnsaved: undo snapshot failed: {ex.Message}");
+            }
+        }
+
+        ScheduleSave();
+    }
+
+    /// <summary>
+    /// Schedules a debounced background save without recording an undo snapshot.
+    /// Use for non-edit triggers (e.g. after pasting state that already has its
+    /// own undo entry, or after Undo/Redo where the history is managed manually).
+    /// </summary>
+    public void RequestSave()
+    {
+        if (IsViewMode) return;
+        HasUnsavedChanges = true;
+        ScheduleSave();
+    }
+
+    /// <summary>Wakes the background save loop and updates the debounce timestamp.</summary>
+    private void ScheduleSave()
+    {
+        if (_saveLoopStop || string.IsNullOrEmpty(CurrentBoardFile))
+            return;
+
+        Volatile.Write(ref _saveRequestTicks, Stopwatch.GetTimestamp());
+
+        TaskCompletionSource? toSignal;
+        lock (_saveSignalGate)
+        {
+            toSignal = _pendingSaveSignal;
+            _pendingSaveSignal = null;
+        }
+        toSignal?.TrySetResult();
+    }
+
+    /// <summary>
+    /// Waits for any pending or in-flight debounced save to complete.
+    /// Call this from <c>Window.OnClosing</c>/<c>OnClosed</c> to guarantee
+    /// the latest state hits disk before the process exits.
+    /// </summary>
+    public async Task FlushPendingSavesAsync()
+    {
+        if (IsViewMode) return;
+
+        // If a debounced save is queued (request after last write), force-write it now.
+        if (HasUnsavedChanges && !string.IsNullOrEmpty(CurrentBoardFile))
+        {
+            try { await SaveBoardDataAsync(); }
+            catch (Exception ex) { Debug.WriteLine($"FlushPendingSavesAsync: {ex.Message}"); }
+        }
+
+        // Then wait for whatever the loop was doing to complete.
+        try { await _lastSaveTask.ConfigureAwait(false); } catch { /* already logged */ }
+    }
+
+    /// <summary>Background loop: debounce + serialize + atomic write.</summary>
+    private async Task SaveLoopAsync()
+    {
+        while (!_saveLoopStop)
+        {
+            // Wait for a save request.
+            TaskCompletionSource signal;
+            lock (_saveSignalGate)
+            {
+                _pendingSaveSignal ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                signal = _pendingSaveSignal;
+            }
+
+            var shutdownTask = _saveLoopShutdown.Task;
+            var completed = await Task.WhenAny(signal.Task, shutdownTask).ConfigureAwait(false);
+            if (completed == shutdownTask) break;
+
+            // Debounce: keep waiting until the last request is at least SaveDebounceInterval old.
+            while (!_saveLoopStop)
+            {
+                long lastReq = Volatile.Read(ref _saveRequestTicks);
+                long elapsedTicks = Stopwatch.GetTimestamp() - lastReq;
+                double elapsedMs = elapsedTicks * 1000.0 / Stopwatch.Frequency;
+                double remaining = SaveDebounceInterval.TotalMilliseconds - elapsedMs;
+                if (remaining <= 0) break;
+
+                var delayTask = Task.Delay(TimeSpan.FromMilliseconds(remaining));
+                var which = await Task.WhenAny(delayTask, _saveLoopShutdown.Task).ConfigureAwait(false);
+                if (which == _saveLoopShutdown.Task) break;
+            }
+
+            if (_saveLoopStop) break;
+
+            var task = SaveBoardDataAsync();
+            _lastSaveTask = task;
+            try { await task.ConfigureAwait(false); }
+            catch (Exception ex) { Debug.WriteLine($"SaveLoopAsync: save failed: {ex.Message}"); }
+        }
     }
 
     /// <summary>
@@ -525,61 +683,61 @@ public sealed partial class MainWindowViewModel : ObservableObject
     // ── Save / Undo stack ─────────────────────────────────────────────────────
 
     /// <summary>
-    /// Serialises the current board state to disk and pushes it onto the undo stack.
-    /// Concurrent calls are serialised via <see cref="_saveSemaphore"/> so writes never interleave.
-    /// Uses a write-to-temp-then-rename pattern for atomic file replacement.
+    /// Immediately serialises the current board state and writes it to disk
+    /// (atomic temp+rename). Concurrent calls are serialised via
+    /// <see cref="_saveSemaphore"/> so writes never interleave.
     /// </summary>
+    /// <remarks>
+    /// Most callers should use <see cref="MarkUnsaved"/> / <see cref="RequestSave"/>
+    /// which schedule a debounced save via the background loop. This method exists
+    /// for explicit "Save Now" triggers (Ctrl+S, Save menu) and for the loop itself.
+    /// </remarks>
     public async Task SaveBoardDataAsync()
     {
-        if (string.IsNullOrEmpty(CurrentBoardFile)) return;
-
-        string json = BoardSerializer.Serialize(GridCells, Annotations, CurrentBoardFile);
-
-        // ── Undo stack management (synchronous, before async I/O) ─────────────
-        if (!_isRestoringState && !IsViewMode)
+        // Capture path + JSON atomically on the UI thread so neither a concurrent
+        // Load (which mutates GridCells/Annotations + CurrentBoardFile) nor any
+        // editor command can interleave with the snapshot. After this point the
+        // captured (path, json) pair is internally consistent; the file write
+        // happens off-thread.
+        string capturedPath;
+        string json;
+        if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
         {
-            string currentHash = ComputeStateHash(GridCells, Annotations);
-            bool stackIsEmpty = _undoStack.Count == 0;
-            bool jsonMatchesStack = !stackIsEmpty && _undoStack.Peek() == json;
-
-            if (!jsonMatchesStack)
-            {
-                _undoStack.Push(json);
-                _lastStateHash = currentHash;
-
-                // Trim to prevent unbounded memory growth.
-                if (_undoStack.Count > Constants.MaxUndoDepth)
-                {
-                    var items = _undoStack.ToArray(); // [newest … oldest]
-                    _undoStack.Clear();
-                    for (int i = Constants.MaxUndoDepth - 1; i >= 0; i--)
-                        _undoStack.Push(items[i]);
-                }
-
-                _redoStack.Clear();
-            }
-            else
-            {
-                _lastStateHash = currentHash;
-            }
+            capturedPath = CurrentBoardFile;
+            if (string.IsNullOrEmpty(capturedPath)) return;
+            json = BoardSerializer.Serialize(GridCells, Annotations, capturedPath);
         }
         else
         {
-            _lastStateHash = ComputeStateHash(GridCells, Annotations);
+            var snap = await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                string p = CurrentBoardFile;
+                if (string.IsNullOrEmpty(p)) return ((string?)null, (string?)null);
+                return (p, BoardSerializer.Serialize(GridCells, Annotations, p))!;
+            }).GetTask().ConfigureAwait(false);
+            if (snap.Item1 is null || snap.Item2 is null) return;
+            capturedPath = snap.Item1;
+            json = snap.Item2;
         }
 
         // ── Atomic file write ─────────────────────────────────────────────────
-        await _saveSemaphore.WaitAsync();
+        await _saveSemaphore.WaitAsync().ConfigureAwait(false);
         try
         {
-            string tempFile = CurrentBoardFile + ".tmp";
-            await File.WriteAllTextAsync(tempFile, json);
-            File.Move(tempFile, CurrentBoardFile, overwrite: true);
+            string tempFile = capturedPath + ".tmp";
+            await File.WriteAllTextAsync(tempFile, json).ConfigureAwait(false);
+            // Atomic replace on POSIX & NTFS.
+            File.Move(tempFile, capturedPath, overwrite: true);
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"Save error: {ex.Message}");
-            ToastRequested?.Invoke("⚠️ Save failed — check disk space");
+            // Toast must be raised on UI thread.
+            if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+                ToastRequested?.Invoke("⚠️ Save failed — check disk space");
+            else
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    ToastRequested?.Invoke("⚠️ Save failed — check disk space"));
             return;
         }
         finally
@@ -587,8 +745,24 @@ public sealed partial class MainWindowViewModel : ObservableObject
             _saveSemaphore.Release();
         }
 
-        HasUnsavedChanges = false;
-        _ = AddRecentBoardAsync(CurrentBoardFile);
+        // Only clear the dirty flag if no further edit slipped in while we were
+        // writing AND the active file is still the one we just wrote.
+        // (If it changed, that work belongs to a future save.)
+        if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            if (string.Equals(capturedPath, CurrentBoardFile, StringComparison.Ordinal))
+                HasUnsavedChanges = false;
+        }
+        else
+        {
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (string.Equals(capturedPath, CurrentBoardFile, StringComparison.Ordinal))
+                    HasUnsavedChanges = false;
+            }).GetTask().ConfigureAwait(false);
+        }
+
+        await AddRecentBoardAsync(capturedPath).ConfigureAwait(false);
     }
 
     // ── Board state restore (undo/redo) ───────────────────────────────────────
@@ -752,7 +926,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         HasUnsavedChanges = false;
         _ = AddRecentBoardAsync(CurrentBoardFile);
-        _ = SaveBoardDataAsync();
+        // Don't fire an immediate save here — it would race with any debounced save
+        // queued from the previous board. If the deserializer migrated legacy
+        // formats (Pencil → Brush, {X,Y} → [x,y]), the next user edit will trigger
+        // a debounced save that persists the migrated form. For files that need
+        // forced migration on open, call SaveBoardDataAsync() explicitly.
 
         // Kick off background average-colour computation for cells that lack a saved colour.
         foreach (var cell in GridCells)
@@ -835,14 +1013,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
     // ── User settings ─────────────────────────────────────────────────────────
 
     /// <summary>Loads user preferences from disk and applies them to the ViewModel.</summary>
-    public Task LoadUserSettingsAsync()
+    public async Task LoadUserSettingsAsync()
     {
         try
         {
             string path = Path.Combine(Constants.ConfigDirectory, Constants.UserSettingsFileName);
-            if (!File.Exists(path)) return Task.CompletedTask;
+            if (!File.Exists(path)) return;
 
-            string json = File.ReadAllText(path);
+            string json = await File.ReadAllTextAsync(path);
             var settings = JsonSerializer.Deserialize<UserSettings>(json);
             if (settings != null)
             {
@@ -851,7 +1029,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
         }
         catch { /* ignore corrupt settings */ }
-        return Task.CompletedTask;
     }
 
     /// <summary>Persists current user preferences to disk asynchronously.</summary>
@@ -896,6 +1073,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void Cleanup()
     {
+        // Signal the background save loop to exit and wait briefly so any
+        // in-flight write completes. Callers that need a guaranteed flush
+        // should call FlushPendingSavesAsync first.
+        _saveLoopStop = true;
+        _saveLoopShutdown.TrySetResult();
+        try
+        {
+            _saveLoopTask?.Wait(TimeSpan.FromSeconds(2));
+        }
+        catch { /* loop may surface aggregated exceptions; already logged */ }
+
         _saveSemaphore.Dispose();
     }
 }

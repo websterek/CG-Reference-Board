@@ -389,13 +389,25 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private async void OnWindowClosing(object? sender, WindowClosingEventArgs e)
     {
         if (Vm.ClosingConfirmed || !Vm.HasUnsavedChanges || e.IsProgrammatic)
+        {
+            // No prompt needed, but a debounced save may still be pending —
+            // block close briefly so it actually hits disk before we exit.
+            if (Vm.HasUnsavedChanges && !e.IsProgrammatic)
+            {
+                e.Cancel = true;
+                try { await Vm.FlushPendingSavesAsync(); } catch { }
+                Vm.ClosingConfirmed = true;
+                Close();
+            }
             return;
+        }
 
         e.Cancel = true;
 
         bool discard = await ConfirmDiscardChanges();
         if (discard)
         {
+            // User chose to discard pending changes — close without flushing.
             Vm.ClosingConfirmed = true;
             Close();
         }
@@ -629,7 +641,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         cell.SetImage(destPath);
         Vm.MarkUnsaved();
-        _ = Vm.SaveBoardDataAsync();
     }
 
     private async Task DownloadMediaToCell(CellViewModel cell, string url)
@@ -685,7 +696,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 cell.SetImage(destPath);
             }
             Vm.MarkUnsaved();
-            _ = Vm.SaveBoardDataAsync();
         }
         else
         {
@@ -856,7 +866,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _pendingBackdrop.CanvasY = _previewY;
         Vm.GridCells.Add(_pendingBackdrop);
         Vm.MarkUnsaved();
-        _ = Vm.SaveBoardDataAsync();
         HidePlacementPreview();
         return true;
     }

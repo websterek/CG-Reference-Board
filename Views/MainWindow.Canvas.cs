@@ -304,7 +304,6 @@ public partial class MainWindow
         if (!hasCollision)
         {
             Vm.MarkUnsaved();
-            _ = Vm.SaveBoardDataAsync();
         }
 
         return true;
@@ -1015,7 +1014,6 @@ public partial class MainWindow
                 _isAltDuplicateDrag = false;
                 e.Pointer.Capture(null);
                 Vm.MarkUnsaved();
-                _ = Vm.SaveBoardDataAsync();
                 return;
             }
 
@@ -1061,7 +1059,6 @@ public partial class MainWindow
 
             e.Pointer.Capture(null);
             Vm.MarkUnsaved();
-            _ = Vm.SaveBoardDataAsync();
             return;
         }
 
@@ -1071,7 +1068,6 @@ public partial class MainWindow
             _currentAnnotation = null;
             e.Pointer.Capture(null);
             Vm.MarkUnsaved();
-            _ = Vm.SaveBoardDataAsync();
             return;
         }
 

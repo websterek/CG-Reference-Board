@@ -309,7 +309,6 @@ public partial class MainWindow
                 string? thumbPath = await YtDlpService.ExtractThumbnailAsync(destPath, thumbDir);
                 cell.SetVideo(destPath, thumbPath ?? destPath);
                 Vm.MarkUnsaved();
-                _ = Vm.SaveBoardDataAsync();
             }
             else
             {
@@ -485,7 +484,6 @@ public partial class MainWindow
         }
 
         Vm.MarkUnsaved();
-        _ = Vm.SaveBoardDataAsync();
     }
 
     private void ToggleImageFit_Click(object? sender, RoutedEventArgs e)
@@ -494,7 +492,6 @@ public partial class MainWindow
         {
             cell.ImageStretch = cell.ImageStretch == "UniformToFill" ? "Uniform" : "UniformToFill";
             Vm.MarkUnsaved();
-            _ = Vm.SaveBoardDataAsync();
         }
     }
 
@@ -504,7 +501,6 @@ public partial class MainWindow
         {
             cell.FontSize += 8;
             Vm.MarkUnsaved();
-            _ = Vm.SaveBoardDataAsync();
         }
     }
 
@@ -514,7 +510,6 @@ public partial class MainWindow
         {
             cell.FontSize -= 8;
             Vm.MarkUnsaved();
-            _ = Vm.SaveBoardDataAsync();
         }
     }
 
@@ -543,7 +538,6 @@ public partial class MainWindow
         cell.RowSpan = newRowSpan;
 
         Vm.MarkUnsaved();
-        _ = Vm.SaveBoardDataAsync();
     }
 
     private void DeleteCell_Click(object? sender, RoutedEventArgs e)
@@ -565,7 +559,6 @@ public partial class MainWindow
         if (anyDeleted)
         {
             Vm.MarkUnsaved();
-            _ = Vm.SaveBoardDataAsync();
             ShowToast("🗑 Deleted");
         }
     }
@@ -638,7 +631,6 @@ public partial class MainWindow
         Vm.GridCells.Add(newCell);
         HighlightCell(newCell);
         Vm.MarkUnsaved();
-        _ = Vm.SaveBoardDataAsync();
     }
 
     private void AddLabel_Click(object? sender, RoutedEventArgs e)
@@ -680,7 +672,6 @@ public partial class MainWindow
         Vm.GridCells.Add(newCell);
         HighlightCell(newCell);
         Vm.MarkUnsaved();
-        _ = Vm.SaveBoardDataAsync();
     }
 
     private void AddBackdrop_Click(object? sender, RoutedEventArgs e)
@@ -746,7 +737,6 @@ public partial class MainWindow
             Vm.GridCells.Add(backdrop);
             HighlightCell(backdrop);
             Vm.MarkUnsaved();
-            _ = Vm.SaveBoardDataAsync();
 
             // Pan view to backdrop if it was placed in a different location
             if (Math.Abs(finalPosition.Value.X - gridX) > 1 || Math.Abs(finalPosition.Value.Y - gridY) > 1)
@@ -881,7 +871,6 @@ public partial class MainWindow
 
         GridLayoutService.MoveAnnotationsWithCells(Vm.Annotations, oldPositions);
         Vm.MarkUnsaved();
-        _ = Vm.SaveBoardDataAsync();
     }
 
     private void ArrangeHorizontal_Click(object? sender, RoutedEventArgs e)
@@ -917,7 +906,6 @@ public partial class MainWindow
 
         GridLayoutService.MoveAnnotationsWithCells(Vm.Annotations, oldPositions);
         Vm.MarkUnsaved();
-        _ = Vm.SaveBoardDataAsync();
     }
 
     private void ArrangeVertical_Click(object? sender, RoutedEventArgs e)
@@ -953,7 +941,6 @@ public partial class MainWindow
 
         GridLayoutService.MoveAnnotationsWithCells(Vm.Annotations, oldPositions);
         Vm.MarkUnsaved();
-        _ = Vm.SaveBoardDataAsync();
     }
 
     #endregion
@@ -1405,7 +1392,6 @@ public partial class MainWindow
         if (placedCount > 0)
         {
             Vm.MarkUnsaved();
-            _ = Vm.SaveBoardDataAsync();
             ShowToast($"📥 Dropped {placedCount} item(s)");
             return;
         }
@@ -1468,7 +1454,6 @@ public partial class MainWindow
         if (placedCount > 0)
         {
             Vm.MarkUnsaved();
-            _ = Vm.SaveBoardDataAsync();
             ShowToast($"📥 Dropped {placedCount} item(s)");
             return;
         }
@@ -1490,7 +1475,6 @@ public partial class MainWindow
                 Vm.GridCells.Add(cell);
                 HighlightCell(cell);
                 Vm.MarkUnsaved();
-                _ = Vm.SaveBoardDataAsync();
                 ShowToast("📥 Dropped text");
             }
             return;
@@ -1518,7 +1502,6 @@ public partial class MainWindow
                     Vm.GridCells.Add(cell);
                     HighlightCell(cell);
                     Vm.MarkUnsaved();
-                    _ = Vm.SaveBoardDataAsync();
                     ShowToast("📥 Dropped text");
                 }
             }
@@ -1833,7 +1816,6 @@ public partial class MainWindow
                         pastedCells[0].CanvasY + pastedCells[0].RowSpan * Constants.GridSize / 2.0);
 
                     Vm.MarkUnsaved();
-                    _ = Vm.SaveBoardDataAsync();
                     ShowToast(pastedCells.Count == 1 ? "📋 Pasted" : $"📋 Pasted {pastedCells.Count} items");
                     return;
                 }
@@ -1864,7 +1846,6 @@ public partial class MainWindow
 
                     HighlightCell(newCell);
                     Vm.MarkUnsaved();
-                    _ = Vm.SaveBoardDataAsync();
                     ShowToast("📋 Pasted");
                     return;
                 }
@@ -1890,7 +1871,6 @@ public partial class MainWindow
 
                     HighlightCell(newCell);
                     Vm.MarkUnsaved();
-                    _ = Vm.SaveBoardDataAsync();
                     ShowToast("📋 Pasted");
                     return;
                 }
@@ -2000,7 +1980,6 @@ public partial class MainWindow
                     pastedCells[0].CanvasY + pastedCells[0].RowSpan * Constants.GridSize / 2.0);
 
                 Vm.MarkUnsaved();
-                _ = Vm.SaveBoardDataAsync();
                 ShowToast(pastedCells.Count == 1 ? "📋 Pasted" : $"📋 Pasted {pastedCells.Count} items");
                 return;
             }
@@ -2041,12 +2020,11 @@ public partial class MainWindow
                 SelectAndPanToCell(newCell);
                 HighlightCell(newCell);
                 Vm.MarkUnsaved();
-                _ = Vm.SaveBoardDataAsync();
                 ShowToast("📋 Pasted");
                 return;
             }
 
-            _ = Vm.SaveBoardDataAsync();
+            Vm.RequestSave();
             return;
         }
 
@@ -2137,7 +2115,6 @@ public partial class MainWindow
                 }
 
                 Vm.MarkUnsaved();
-                _ = Vm.SaveBoardDataAsync();
             }
             return;
         }
@@ -2159,7 +2136,6 @@ public partial class MainWindow
             if (anyDeleted)
             {
                 Vm.MarkUnsaved();
-                _ = Vm.SaveBoardDataAsync();
                 ShowToast("🗑 Deleted");
             }
             else if (_hoveredCell != null)
@@ -2168,7 +2144,6 @@ public partial class MainWindow
                 Vm.GridCells.Remove(_hoveredCell);
                 _hoveredCell = null;
                 Vm.MarkUnsaved();
-                _ = Vm.SaveBoardDataAsync();
                 ShowToast("🗑 Deleted");
             }
         }
@@ -2260,7 +2235,6 @@ public partial class MainWindow
             return;
         _editingTextCell.TextContent = FullText.Text;
         Vm.MarkUnsaved();
-        _ = Vm.SaveBoardDataAsync();
     }
 
     private void CloseFullMedia_Click(object? sender, RoutedEventArgs e)
