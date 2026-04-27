@@ -75,12 +75,14 @@ public static class BoardSerializer
 
     // ───────── Serialization ─────────
 
+    private const int CurrentSchemaVersion = 1;
+
     /// <summary>
     /// Serializes the current board state to a compact JSON string.
     /// </summary>
     public static string Serialize(IEnumerable<CellViewModel> cells, IEnumerable<AnnotationViewModel> annotations, string? basePath = null)
     {
-        var state = new
+        var content = new
         {
             Cells = cells.Where(c => c.Type != CellType.None).Select(c => new
             {
@@ -88,7 +90,7 @@ public static class BoardSerializer
                 c.CanvasY,
                 ColSpan = c.ColSpan > 1 ? c.ColSpan : (int?)null,
                 RowSpan = c.RowSpan > 1 ? c.RowSpan : (int?)null,
-                c.Type,
+                Type = c.Type.ToString().ToLowerInvariant(),
                 FilePath = GetRelativePath(c.FilePath, basePath),
                 VideoPath = GetRelativePath(c.VideoPath, basePath),
                 c.TextContent,
@@ -112,6 +114,12 @@ public static class BoardSerializer
             }).ToList()
         };
 
+        var state = new
+        {
+            schemaVersion = CurrentSchemaVersion,
+            content
+        };
+
         var options = new JsonSerializerOptions
         {
             WriteIndented = false,
@@ -125,7 +133,7 @@ public static class BoardSerializer
     /// <summary>
     /// Deserializes board state from a JSON string.
     /// Supports both the legacy format (top-level array of cells) and
-    /// the current format ({ Cells: [...], Annotations: [...] }).
+    /// the current format ({ schemaVersion, content: { Cells, Annotations } }).
     /// </summary>
     public static (List<CellViewModel> Cells, List<AnnotationViewModel> Annotations) Deserialize(string json, string? basePath = null)
     {
@@ -135,19 +143,38 @@ public static class BoardSerializer
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 
+        // Check for schemaVersion and migrate if needed
+        JsonElement contentElement = default;
+        int schemaVersion = 0;
+
+        if (root.TryGetProperty("schemaVersion", out var sv))
+        {
+            schemaVersion = sv.GetInt32();
+        }
+
+        // Get content - either from "content" wrapper or directly from root (legacy format)
+        if (root.TryGetProperty("content", out var content))
+        {
+            contentElement = content;
+        }
+        else
+        {
+            contentElement = root;
+        }
+
         JsonElement cellsElement = default;
         JsonElement annotationsElement = default;
 
         // Support legacy format (top-level array) and current format (object)
-        if (root.ValueKind == JsonValueKind.Array)
+        if (contentElement.ValueKind == JsonValueKind.Array)
         {
-            cellsElement = root;
+            cellsElement = contentElement;
         }
         else
         {
-            if (root.TryGetProperty("Cells", out var c))
+            if (contentElement.TryGetProperty("Cells", out var c))
                 cellsElement = c;
-            if (root.TryGetProperty("Annotations", out var a))
+            if (contentElement.TryGetProperty("Annotations", out var a))
                 annotationsElement = a;
         }
 
@@ -155,7 +182,7 @@ public static class BoardSerializer
         {
             foreach (var element in cellsElement.EnumerateArray())
             {
-                cells.Add(DeserializeCell(element, basePath));
+                cells.Add(DeserializeCell(element, basePath, schemaVersion));
             }
         }
 
@@ -195,7 +222,7 @@ public static class BoardSerializer
 
     // ───────── Cell deserialization ─────────
 
-    private static CellViewModel DeserializeCell(JsonElement element, string? basePath)
+    private static CellViewModel DeserializeCell(JsonElement element, string? basePath, int schemaVersion = 0)
     {
         try
         {
@@ -209,21 +236,48 @@ public static class BoardSerializer
                 System.Diagnostics.Debug.WriteLine("BoardSerializer: missing or invalid CanvasY");
                 return new CellViewModel();
             }
-            if (!element.TryGetProperty("Type", out var typeProp) || typeProp.ValueKind != JsonValueKind.Number)
+
+            // Handle both string type (v1+) and integer type (v0/legacy)
+            CellType type;
+            if (element.TryGetProperty("Type", out var typeProp))
             {
-                System.Diagnostics.Debug.WriteLine("BoardSerializer: missing or invalid Type");
-                return new CellViewModel();
+                if (typeProp.ValueKind == JsonValueKind.String)
+                {
+                    // New format: string type
+                    var typeStr = typeProp.GetString() ?? "image";
+                    type = typeStr.ToLowerInvariant() switch
+                    {
+                        "image" => CellType.Image,
+                        "text" => CellType.Text,
+                        "label" => CellType.Label,
+                        "backdrop" => CellType.Backdrop,
+                        "video" => CellType.Video,
+                        _ => CellType.Image
+                    };
+                }
+                else if (typeProp.ValueKind == JsonValueKind.Number)
+                {
+                    // Legacy format: integer type
+                    type = (CellType)typeProp.GetInt32();
+                }
+                else
+                {
+                    type = CellType.Image;
+                }
+            }
+            else
+            {
+                type = CellType.Image;
             }
 
         double cx = cxProp.GetDouble();
         double cy = cyProp.GetDouble();
-        int type = typeProp.GetInt32();
         int colSpan = element.TryGetProperty("ColSpan", out var col) ? col.GetInt32() : 1;
         int rowSpan = element.TryGetProperty("RowSpan", out var row) ? row.GetInt32() : 1;
 
-        var cell = new CellViewModel { CanvasX = cx, CanvasY = cy, ColSpan = colSpan, RowSpan = rowSpan };
+        var cell = new CellViewModel { CanvasX = cx, CanvasY = cy, ColSpan = colSpan, RowSpan = rowSpan, Type = type };
 
-        switch ((CellType)type)
+        switch (type)
         {
             case CellType.Image:
                 if (element.TryGetProperty("FilePath", out var imageFp) && imageFp.ValueKind == JsonValueKind.String)

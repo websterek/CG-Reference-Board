@@ -21,6 +21,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IHistoryService, HistoryService>();
         services.AddSingleton<IImageService, ImageServiceImpl>();
         services.AddSingleton<IViewportService, ViewportService>();
+        services.AddSingleton<IBoardMigrationRegistry, BoardMigrationRegistry>();
 
         services.AddSingleton<ModeService>();
         services.AddSingleton<SelectionService>();
