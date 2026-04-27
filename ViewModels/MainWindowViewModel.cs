@@ -400,7 +400,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// </summary>
     partial void OnGridBackgroundModeChanged(string value)
     {
-        SaveUserSettings();
+        _ = SaveUserSettingsAsync();
     }
 
     /// <summary>
@@ -415,7 +415,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             "Outline" => AnnotationEffect.Outline,
             _ => AnnotationEffect.None
         });
-        SaveUserSettings();
+        _ = SaveUserSettingsAsync();
     }
 
     // ── Commands ──────────────────────────────────────────────────────────────
@@ -430,7 +430,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         string current = _undoStack.Pop();
         _redoStack.Push(current);
         RestoreBoardState(_undoStack.Peek());
-        SaveBoardData();
+        _ = SaveBoardDataAsync();
         ViewportUpdateRequested?.Invoke();
         ToastRequested?.Invoke("↩ Undo");
         _isRestoringState = false;
@@ -446,7 +446,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         string next = _redoStack.Pop();
         _undoStack.Push(next);
         RestoreBoardState(next);
-        SaveBoardData();
+        _ = SaveBoardDataAsync();
         ViewportUpdateRequested?.Invoke();
         ToastRequested?.Invoke("↪ Redo");
         _isRestoringState = false;
@@ -529,7 +529,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// Concurrent calls are serialised via <see cref="_saveSemaphore"/> so writes never interleave.
     /// Uses a write-to-temp-then-rename pattern for atomic file replacement.
     /// </summary>
-    public async void SaveBoardData()
+    public async Task SaveBoardDataAsync()
     {
         if (string.IsNullOrEmpty(CurrentBoardFile)) return;
 
@@ -588,7 +588,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
 
         HasUnsavedChanges = false;
-        AddRecentBoard(CurrentBoardFile);
+        _ = AddRecentBoardAsync(CurrentBoardFile);
     }
 
     // ── Board state restore (undo/redo) ───────────────────────────────────────
@@ -697,7 +697,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// Reads the file before touching any state so that a read failure leaves
     /// the current board intact.
     /// </summary>
-    public async void LoadBoardFromFile(string filePath)
+    public async Task LoadBoardFromFileAsync(string filePath)
     {
         string json;
         try
@@ -716,7 +716,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         WorkspaceDir = Path.GetDirectoryName(CurrentBoardFile)!;
         CurrentBoardName = Path.GetFileNameWithoutExtension(CurrentBoardFile);
         OnPropertyChanged(nameof(WindowTitle));
-        UpdateBoardDirectoryList();
+        _ = UpdateBoardDirectoryListAsync();
 
         // Signal the View to hide the startup overlay.
         StartupOverlayHideRequested?.Invoke();
@@ -751,8 +751,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
 
         HasUnsavedChanges = false;
-        AddRecentBoard(CurrentBoardFile);
-        SaveBoardData();
+        _ = AddRecentBoardAsync(CurrentBoardFile);
+        _ = SaveBoardDataAsync();
 
         // Kick off background average-colour computation for cells that lack a saved colour.
         foreach (var cell in GridCells)
@@ -765,7 +765,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     // ── Recent boards ─────────────────────────────────────────────────────────
 
     /// <summary>Loads the recent boards list from disk into <see cref="RecentBoards"/>.</summary>
-    public async void LoadRecentBoards()
+    public async Task LoadRecentBoardsAsync()
     {
         string path = Path.Combine(Constants.ConfigDirectory, Constants.RecentBoardsFileName);
         if (!File.Exists(path)) return;
@@ -785,7 +785,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// Adds <paramref name="path"/> to the top of <see cref="RecentBoards"/> and persists the list.
     /// Deduplicates and trims to <see cref="Constants.MaxRecentBoards"/>.
     /// </summary>
-    public async void AddRecentBoard(string path)
+    public async Task AddRecentBoardAsync(string path)
     {
         if (RecentBoards.Contains(path)) RecentBoards.Remove(path);
         RecentBoards.Insert(0, path);
@@ -807,7 +807,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// <summary>
     /// Refreshes <see cref="BoardFilesInDirectory"/> from the current workspace directory.
     /// </summary>
-    public async void UpdateBoardDirectoryList()
+    public async Task UpdateBoardDirectoryListAsync()
     {
         BoardFilesInDirectory.Clear();
         if (string.IsNullOrEmpty(WorkspaceDir) || !Directory.Exists(WorkspaceDir)) return;
@@ -835,12 +835,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
     // ── User settings ─────────────────────────────────────────────────────────
 
     /// <summary>Loads user preferences from disk and applies them to the ViewModel.</summary>
-    public void LoadUserSettings()
+    public Task LoadUserSettingsAsync()
     {
         try
         {
             string path = Path.Combine(Constants.ConfigDirectory, Constants.UserSettingsFileName);
-            if (!File.Exists(path)) return;
+            if (!File.Exists(path)) return Task.CompletedTask;
 
             string json = File.ReadAllText(path);
             var settings = JsonSerializer.Deserialize<UserSettings>(json);
@@ -851,10 +851,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
         }
         catch { /* ignore corrupt settings */ }
+        return Task.CompletedTask;
     }
 
     /// <summary>Persists current user preferences to disk asynchronously.</summary>
-    public async void SaveUserSettings()
+    public async Task SaveUserSettingsAsync()
     {
         try
         {
@@ -890,7 +891,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         WorkspaceDir = Path.GetDirectoryName(filePath)!;
         CurrentBoardName = Path.GetFileNameWithoutExtension(filePath);
         OnPropertyChanged(nameof(WindowTitle));
-        UpdateBoardDirectoryList();
+        _ = UpdateBoardDirectoryListAsync();
     }
 
     public void Cleanup()

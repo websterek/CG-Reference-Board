@@ -81,7 +81,7 @@ public partial class MainWindow
 
         UpdateSelectionState();
         Vm.MarkUnsaved();
-        Vm.SaveBoardData();
+        _ = Vm.SaveBoardDataAsync();
     }
 
     private void Annotation_PointerPressed(object? sender, PointerPressedEventArgs e)
@@ -208,7 +208,7 @@ public partial class MainWindow
             Vm.Annotations.Remove(ann);
             UpdateSelectionState();
             Vm.MarkUnsaved();
-            Vm.SaveBoardData();
+            _ = Vm.SaveBoardDataAsync();
             e.Handled = true;
             return;
         }
@@ -311,7 +311,7 @@ public partial class MainWindow
         _editingTextAnnotation = null;
         _editingTextAnnotationOriginalText = null;
         Vm.MarkUnsaved();
-        Vm.SaveBoardData();
+        _ = Vm.SaveBoardDataAsync();
 
         TryFindControl<Border>("CanvasBorder")?.Focus();
     }
@@ -386,7 +386,7 @@ public partial class MainWindow
         {
             UpdateSelectionState();
             Vm.MarkUnsaved();
-            Vm.SaveBoardData();
+            _ = Vm.SaveBoardDataAsync();
             ShowToast("🗑 Deleted");
         }
     }

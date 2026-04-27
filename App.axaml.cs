@@ -35,7 +35,7 @@ public partial class App : Application
 
             var window = new MainWindow(vm);
             if (!string.IsNullOrEmpty(startFile))
-                Avalonia.Threading.Dispatcher.UIThread.Post(() => vm.LoadBoardFromFile(startFile));
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = vm.LoadBoardFromFileAsync(startFile));
             desktop.MainWindow = window;
             desktop.Exit += OnDesktopExit;
         }

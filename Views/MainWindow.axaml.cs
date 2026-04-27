@@ -261,8 +261,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
         catch { }
 
-        Vm.LoadRecentBoards();
-        Vm.LoadUserSettings();
+        _ = Vm.LoadRecentBoardsAsync();
+        _ = Vm.LoadUserSettingsAsync();
         RecentBoardsList.ItemsSource = Vm.RecentBoards;
 
         if (!Directory.Exists(Vm.WorkspaceDir))
@@ -383,7 +383,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         : this(new MainWindowViewModel(isViewMode))
     {
         if (!string.IsNullOrEmpty(startFile) && File.Exists(startFile))
-            Avalonia.Threading.Dispatcher.UIThread.Post(() => Vm.LoadBoardFromFile(startFile));
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Vm.LoadBoardFromFileAsync(startFile));
     }
 
     private async void OnWindowClosing(object? sender, WindowClosingEventArgs e)
@@ -629,7 +629,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         cell.SetImage(destPath);
         Vm.MarkUnsaved();
-        Vm.SaveBoardData();
+        _ = Vm.SaveBoardDataAsync();
     }
 
     private async Task DownloadMediaToCell(CellViewModel cell, string url)
@@ -685,7 +685,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 cell.SetImage(destPath);
             }
             Vm.MarkUnsaved();
-            Vm.SaveBoardData();
+            _ = Vm.SaveBoardDataAsync();
         }
         else
         {
@@ -856,7 +856,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _pendingBackdrop.CanvasY = _previewY;
         Vm.GridCells.Add(_pendingBackdrop);
         Vm.MarkUnsaved();
-        Vm.SaveBoardData();
+        _ = Vm.SaveBoardDataAsync();
         HidePlacementPreview();
         return true;
     }

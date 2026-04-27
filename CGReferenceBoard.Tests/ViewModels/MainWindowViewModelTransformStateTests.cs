@@ -79,7 +79,7 @@ public sealed class MainWindowViewModelTransformStateTests
             var resetRaised = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             viewModel.SelectionResetRequested += () => resetRaised.TrySetResult();
 
-            viewModel.LoadBoardFromFile(boardPath);
+            _ = viewModel.LoadBoardFromFileAsync(boardPath);
 
             var completed = await Task.WhenAny(resetRaised.Task, Task.Delay(TimeSpan.FromSeconds(5)));
 
