@@ -17,6 +17,7 @@ using CGReferenceBoard.Layers.Infrastructure;
 using CGReferenceBoard.Models;
 using CGReferenceBoard.Services;
 using CGReferenceBoard.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CGReferenceBoard.Views;
 
@@ -203,7 +204,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     // ── Constructor ───────────────────────────────────────────────────────────
 
     /// <summary>Parameterless constructor required by Avalonia designer.</summary>
-    public MainWindow() : this(false, null) { }
+    public MainWindow()
+        : this(MainWindowViewModel.CreateWithDI(false))
+    { }
+
+    public MainWindow(bool isViewMode, string? startFile)
+        : this(MainWindowViewModel.CreateWithDI(isViewMode))
+    {
+        if (!string.IsNullOrEmpty(startFile) && File.Exists(startFile))
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Vm.LoadBoardFromFileAsync(startFile));
+    }
 
     private void Window_Deactivated(object? sender, EventArgs e)
     {
@@ -377,13 +387,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         InitViewportLodTimer();
 
         Closing += OnWindowClosing;
-    }
-
-    public MainWindow(bool isViewMode, string? startFile)
-        : this(new MainWindowViewModel(isViewMode))
-    {
-        if (!string.IsNullOrEmpty(startFile) && File.Exists(startFile))
-            Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Vm.LoadBoardFromFileAsync(startFile));
     }
 
     private async void OnWindowClosing(object? sender, WindowClosingEventArgs e)

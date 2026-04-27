@@ -25,12 +25,20 @@ public enum AnnotationEffect
 /// </summary>
 public class AnnotationShape : Control
 {
+    private static Services.Abstractions.IAnnotationEffectService? _effectService;
+
+    public static void SetEffectService(Services.Abstractions.IAnnotationEffectService service)
+    {
+        _effectService = service;
+        _effectService.EffectModeChanged += () => EffectModeChanged?.Invoke();
+    }
+
     // ───────── Static effect state ─────────
 
     private static AnnotationEffect _currentEffect = AnnotationEffect.None;
 
     /// <summary>Current global effect mode for all annotation shapes.</summary>
-    public static AnnotationEffect CurrentEffect => _currentEffect;
+    public static AnnotationEffect CurrentEffect => _effectService?.CurrentEffect ?? _currentEffect;
 
     /// <summary>Raised when the effect mode changes so all instances can re-render.</summary>
     public static event Action? EffectModeChanged;
@@ -40,6 +48,12 @@ public class AnnotationShape : Control
     /// </summary>
     public static void SetEffectMode(AnnotationEffect mode)
     {
+        if (_effectService != null)
+        {
+            _effectService.SetEffectMode(mode);
+            return;
+        }
+
         if (_currentEffect == mode)
             return;
         _currentEffect = mode;
@@ -310,7 +324,7 @@ public class AnnotationShape : Control
             : null;
 
         // Skip expensive effects when zoomed out past 50% — visually irrelevant at that scale
-        var effect = _currentScale <= 0.51 ? AnnotationEffect.None : _currentEffect;
+        var effect = _currentScale <= 0.51 ? AnnotationEffect.None : CurrentEffect;
 
         // Map absolute points to local coordinate space
         double offsetX = Bounds.X;

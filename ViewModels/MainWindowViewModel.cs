@@ -17,6 +17,7 @@ using CGReferenceBoard.Modes;
 using CGReferenceBoard.Services;
 using CGReferenceBoard.Services.Abstractions;
 using CGReferenceBoard.Services.Transform;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CGReferenceBoard.ViewModels;
 
@@ -52,6 +53,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public TransformService TransformService { get; }
 
     private readonly IBoardService _boardService;
+    private readonly IHistoryService _historyService;
+    private readonly ILocalizationService _localizationService;
+    private readonly INotificationService _notificationService;
 
     /// <summary>
     /// Layer manager that owns the visual layer hierarchy.
@@ -299,19 +303,22 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// </param>
     public MainWindowViewModel(
         bool isViewMode,
-        ModeService modeService,
-        SelectionService selectionService,
-        TransformService transformService,
-        IBoardService boardService,
-        IHistoryService historyService,
-        ILocalizationService localizationService,
-        INotificationService notificationService)
+        ModeService? modeService,
+        SelectionService? selectionService,
+        TransformService? transformService,
+        IBoardService? boardService,
+        IHistoryService? historyService,
+        ILocalizationService? localizationService,
+        INotificationService? notificationService)
     {
         IsViewMode = isViewMode;
-        ModeService = modeService;
-        SelectionService = selectionService;
-        TransformService = transformService;
-        _boardService = boardService;
+        ModeService = modeService ?? new ModeService();
+        SelectionService = selectionService ?? new SelectionService();
+        TransformService = transformService ?? new TransformService();
+        _boardService = boardService ?? new BoardService();
+        _historyService = historyService ?? new HistoryService();
+        _localizationService = localizationService ?? new LocalizationService();
+        _notificationService = notificationService ?? new NotificationService();
 
         WorkspaceDir = Path.Combine(Constants.ConfigDirectory, "Assets");
 
@@ -350,16 +357,26 @@ public sealed partial class MainWindowViewModel : ObservableObject
             _saveLoopTask = Task.Run(SaveLoopAsync);
     }
 
-    public MainWindowViewModel(bool isViewMode = false)
-        : this(isViewMode,
-               new ModeService(),
-               new SelectionService(),
-               new TransformService(),
-               new BoardService(),
-               new HistoryService(),
-               new LocalizationService(),
-               new NotificationService())
+    public MainWindowViewModel()
+        : this(false, null, null, null, null, null, null, null)
     { }
+
+    public MainWindowViewModel(bool isViewMode)
+        : this(isViewMode, null, null, null, null, null, null, null)
+    { }
+
+    public static MainWindowViewModel CreateWithDI(bool isViewMode = false, IServiceProvider? services = null)
+    {
+        return new MainWindowViewModel(
+            isViewMode,
+            services?.GetService<ModeService>(),
+            services?.GetService<SelectionService>(),
+            services?.GetService<TransformService>(),
+            services?.GetService<IBoardService>(),
+            services?.GetService<IHistoryService>(),
+            services?.GetService<ILocalizationService>(),
+            services?.GetService<INotificationService>());
+    }
 
     // ── Mode-change handler ───────────────────────────────────────────────────
 

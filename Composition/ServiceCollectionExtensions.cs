@@ -19,12 +19,13 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ILocalizationService, LocalizationService>();
         services.AddSingleton<INotificationService, NotificationService>();
         services.AddSingleton<IHistoryService, HistoryService>();
-        services.AddSingleton<IImageService, ImageService>();
+        services.AddSingleton<IImageService, ImageServiceImpl>();
         services.AddSingleton<IViewportService, ViewportService>();
 
         services.AddSingleton<ModeService>();
         services.AddSingleton<SelectionService>();
         services.AddSingleton<TransformService>();
+        services.AddSingleton<Services.Abstractions.IAnnotationEffectService, AnnotationEffectService>();
 
         services.AddTransient<MainWindowViewModel>();
 

@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using CGReferenceBoard.Composition;
+using CGReferenceBoard.Controls;
 using CGReferenceBoard.Services.Abstractions;
 using CGReferenceBoard.ViewModels;
 using CGReferenceBoard.Views;
@@ -14,7 +15,7 @@ namespace CGReferenceBoard;
 
 public partial class App : Application
 {
-    public IServiceProvider? Services { get; private set; }
+    public static IServiceProvider? Services { get; private set; }
 
     public override void Initialize()
     {
@@ -28,6 +29,9 @@ public partial class App : Application
             var services = new ServiceCollection();
             services.AddCgReferenceBoard();
             Services = services.BuildServiceProvider();
+
+            var effectService = Services.GetRequiredService<IAnnotationEffectService>();
+            AnnotationShape.SetEffectService(effectService);
 
             bool isViewMode = desktop.Args?.Contains("--view") == true;
             string? startFile = desktop.Args?.FirstOrDefault(arg => !arg.StartsWith("-"));
