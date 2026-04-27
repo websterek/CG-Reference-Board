@@ -135,9 +135,10 @@ public class GroupResizeCommand : IUndoCommand
 
     public void Execute()
     {
-        foreach (var (_, _, _, newCols, newRows) in _resizes)
+        foreach (var (cell, _, _, newCols, newRows) in _resizes)
         {
-            // Need to find the cell by reference
+            cell.ColSpan = newCols;
+            cell.RowSpan = newRows;
         }
     }
 

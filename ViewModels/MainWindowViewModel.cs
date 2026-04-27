@@ -66,10 +66,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     // ── Undo / Redo infrastructure ────────────────────────────────────────────
 
-    private readonly Stack<string> _undoStack = new();
-    private readonly Stack<string> _redoStack = new();
     private bool _isRestoringState;
-    private string? _lastStateHash;
 
     /// <summary>Serialises concurrent <see cref="SaveBoardDataAsync"/> calls so writes never interleave.</summary>
     private readonly SemaphoreSlim _saveSemaphore = new(1, 1);
@@ -472,35 +469,24 @@ public sealed partial class MainWindowViewModel : ObservableObject
     // ── Commands ──────────────────────────────────────────────────────────────
 
     /// <summary>Pops the most recent state from the undo stack and restores it.</summary>
-    [RelayCommand]
+[RelayCommand]
     private void Undo()
     {
-        if (_undoStack.Count <= 1 || IsViewMode) return;
-
-        _isRestoringState = true;
-        string current = _undoStack.Pop();
-        _redoStack.Push(current);
-        RestoreBoardState(_undoStack.Peek());
+        if (IsViewMode) return;
+        _historyService.Undo();
         RequestSave();
         ViewportUpdateRequested?.Invoke();
         ToastRequested?.Invoke("↩ Undo");
-        _isRestoringState = false;
     }
 
-    /// <summary>Re-applies the most recently undone state.</summary>
     [RelayCommand]
     private void Redo()
     {
-        if (_redoStack.Count == 0 || IsViewMode) return;
-
-        _isRestoringState = true;
-        string next = _redoStack.Pop();
-        _undoStack.Push(next);
-        RestoreBoardState(next);
+        if (IsViewMode) return;
+        _historyService.Redo();
         RequestSave();
         ViewportUpdateRequested?.Invoke();
         ToastRequested?.Invoke("↪ Redo");
-        _isRestoringState = false;
     }
 
     /// <summary>Switches the application to Grid layout mode.</summary>
@@ -534,50 +520,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
     // ── Board state helpers ───────────────────────────────────────────────────
 
     /// <summary>
-    /// Marks the board as having unsaved changes, captures an undo snapshot,
-    /// and schedules a debounced background save.
+    /// Marks the board as having unsaved changes and schedules a debounced background save.
     /// </summary>
     /// <remarks>
     /// This is the canonical entry point for "the user just changed something".
-    /// All editor / command call sites should use this (or <see cref="RequestSave"/>,
-    /// which is an alias for clarity at sites that previously only called
-    /// <c>_ = SaveBoardDataAsync()</c> without <c>MarkUnsaved()</c>).
+    /// Undo/redo now uses command-based history via IHistoryService.
     /// </remarks>
     public void MarkUnsaved()
     {
         if (IsViewMode) return;
         HasUnsavedChanges = true;
-
-        // Capture an undo snapshot synchronously so each edit is undoable,
-        // independent of when the debounced disk write actually runs.
-        if (!_isRestoringState && !string.IsNullOrEmpty(CurrentBoardFile))
-        {
-            try
-            {
-                string json = BoardSerializer.Serialize(GridCells, Annotations, CurrentBoardFile);
-                bool stackIsEmpty = _undoStack.Count == 0;
-                bool jsonMatchesStack = !stackIsEmpty && _undoStack.Peek() == json;
-                if (!jsonMatchesStack)
-                {
-                    _undoStack.Push(json);
-                    _lastStateHash = ComputeStateHash(GridCells, Annotations);
-
-                    if (_undoStack.Count > Constants.MaxUndoDepth)
-                    {
-                        var items = _undoStack.ToArray(); // [newest … oldest]
-                        _undoStack.Clear();
-                        for (int i = Constants.MaxUndoDepth - 1; i >= 0; i--)
-                            _undoStack.Push(items[i]);
-                    }
-                    _redoStack.Clear();
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"MarkUnsaved: undo snapshot failed: {ex.Message}");
-            }
-        }
-
         ScheduleSave();
     }
 
@@ -667,39 +619,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             _lastSaveTask = task;
             try { await task.ConfigureAwait(false); }
             catch (Exception ex) { Debug.WriteLine($"SaveLoopAsync: save failed: {ex.Message}"); }
-        }
-    }
-
-    /// <summary>
-    /// Computes a fast integer hash of the current board state for change detection.
-    /// Used to avoid pushing duplicate entries onto the undo stack.
-    /// </summary>
-    private string ComputeStateHash(
-        IEnumerable<CellViewModel> cells,
-        IEnumerable<AnnotationViewModel> annotations)
-    {
-        unchecked
-        {
-            int hash = 19;
-            foreach (var c in cells)
-            {
-                hash = hash * 31 + c.CanvasX.GetHashCode();
-                hash = hash * 31 + c.CanvasY.GetHashCode();
-                hash = hash * 31 + c.ColSpan;
-                hash = hash * 31 + c.RowSpan;
-                hash = hash * 31 + c.Type.GetHashCode();
-                hash = hash * 31 + (c.TextContent?.GetHashCode() ?? 0);
-            }
-            foreach (var a in annotations)
-            {
-                hash = hash * 31 + (a.Type?.GetHashCode() ?? 0);
-                hash = hash * 31 + a.CanvasX.GetHashCode();
-                hash = hash * 31 + a.CanvasY.GetHashCode();
-                hash = hash * 31 + a.Points.Count;
-                hash = hash * 31 + (a.Text?.GetHashCode() ?? 0);
-                hash = hash * 31 + a.TextScale.GetHashCode();
-            }
-            return hash.ToString("X8");
         }
     }
 
@@ -925,9 +844,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ResetInteractionState();
         GridCells.Clear();
         Annotations.Clear();
-        _undoStack.Clear();
-        _redoStack.Clear();
-        _lastStateHash = null;
+        _historyService.Clear();
 
         try
         {
