@@ -21,6 +21,7 @@ insert_final_newline = true
 [*.cs]
 indent_size = 4
 max_line_length = 130
+dotnet_diagnostic.VSTHRD100.severity = error
 
 # ── Language & Nullable ──────────────────────────────────────────────────────
 dotnet_analyzer_diagnostic.category-Style.severity = suggestion

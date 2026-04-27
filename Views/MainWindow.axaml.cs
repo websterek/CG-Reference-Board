@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -16,8 +17,11 @@ using CGReferenceBoard.Layers.Abstractions;
 using CGReferenceBoard.Layers.Infrastructure;
 using CGReferenceBoard.Models;
 using CGReferenceBoard.Services;
+using CGReferenceBoard.Services.Abstractions;
 using CGReferenceBoard.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
+
+#pragma warning disable VSTHRD100 // XAML event handlers must be async void; see Tasks C2-C3
 
 namespace CGReferenceBoard.Views;
 
@@ -183,6 +187,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     // Toast notification
     private System.Threading.CancellationTokenSource? _toastCts;
+    private readonly INotificationService? _notifications;
 
     // Viewport-aware LOD management
     private Avalonia.Threading.DispatcherTimer? _viewportLodTimer;
@@ -232,14 +237,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         System.Runtime.GCSettings.LargeObjectHeapCompactionMode =
             System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
 
-        Vm = vm;
+Vm = vm;
         DataContext = Vm;
+
+        _notifications = App.Services?.GetService<INotificationService>() ?? new NotificationService();
 
         InitializeComponent();
 
         // Wire ViewModel events to View callbacks
         Vm.AlwaysOnTopChanged += topmost => Topmost = topmost;
-        Vm.ToastRequested += ShowToast;
+        Vm.ToastRequested += ToastEventHandler;
         Vm.ViewportUpdateRequested += ScheduleViewportUpdate;
         Vm.SelectionResetRequested += ClearLocalSelectionState;
         Vm.TransformContextChanging += CancelActiveInteractionForContextChange;
@@ -255,6 +262,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             var overlay = this.FindControl<Border>("StartupOverlay");
             if (overlay != null) overlay.IsVisible = false;
         };
+
+        // Wire async event handlers that cannot use XAML wiring
+        KeyDown += Window_KeyDown;
 
         CacheCanvasControls();
         UpdateTransformOverlayLayout();
@@ -386,15 +396,25 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         InitViewportLodTimer();
 
-        Closing += OnWindowClosing;
+        Closing += WindowClosingHandler;
     }
 
-    private async void OnWindowClosing(object? sender, WindowClosingEventArgs e)
+    private async void ToastEventHandler(string message)
+    {
+        try { await ShowToastAsync(message); }
+        catch (Exception ex) { Debug.WriteLine($"ToastEventHandler: {ex.Message}"); }
+    }
+
+    private async void WindowClosingHandler(object? sender, WindowClosingEventArgs e)
+    {
+        try { await OnWindowClosing(sender, e); }
+        catch (Exception ex) { Debug.WriteLine($"WindowClosingHandler: {ex.Message}"); }
+    }
+
+    private async Task OnWindowClosing(object? sender, WindowClosingEventArgs e)
     {
         if (Vm.ClosingConfirmed || !Vm.HasUnsavedChanges || e.IsProgrammatic)
         {
-            // No prompt needed, but a debounced save may still be pending —
-            // block close briefly so it actually hits disk before we exit.
             if (Vm.HasUnsavedChanges && !e.IsProgrammatic)
             {
                 e.Cancel = true;
@@ -410,7 +430,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         bool discard = await ConfirmDiscardChanges();
         if (discard)
         {
-            // User chose to discard pending changes — close without flushing.
             Vm.ClosingConfirmed = true;
             Close();
         }
@@ -625,7 +644,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     // ── Image / Video Loading ─────────────────────────────────────────────────
 
-    private async void LoadImageToCell(CellViewModel cell, string sourcePath)
+    private async Task LoadImageToCellAsync(CellViewModel cell, string sourcePath)
     {
         if (!File.Exists(sourcePath))
             return;
@@ -791,7 +810,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     // ── Highlight Helpers ─────────────────────────────────────────────────────
 
-    private async void HighlightCell(CellViewModel cell)
+    private async Task HighlightCellAsync(CellViewModel cell)
     {
         cell.IsHighlighted = true;
         await Task.Delay(800);
@@ -940,7 +959,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     // ── Toast Notification ────────────────────────────────────────────────────
 
-    private async void ShowToast(string message)
+    private async Task ShowToastAsync(string message)
     {
         var border = this.FindControl<Border>("ToastBorder");
         var text = this.FindControl<TextBlock>("ToastText");

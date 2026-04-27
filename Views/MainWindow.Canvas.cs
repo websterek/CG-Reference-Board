@@ -1,3 +1,5 @@
+#pragma warning disable VSTHRD100 // XAML event handlers must be async void; see Tasks C2-C3
+
 using System;
 using System.Collections.Generic;
 using System.Linq;

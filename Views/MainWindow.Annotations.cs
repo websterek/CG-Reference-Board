@@ -383,7 +383,7 @@ public partial class MainWindow
         {
             UpdateSelectionState();
             Vm.MarkUnsaved();
-            ShowToast("🗑 Deleted");
+            ShowToastAsync("🗑 Deleted");
         }
     }
 

@@ -1,3 +1,5 @@
+#pragma warning disable VSTHRD100 // XAML event handlers must be async void; see Tasks C2-C3
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -17,6 +19,7 @@ using CGReferenceBoard.Helpers;
 using CGReferenceBoard.Layers.Infrastructure;
 using CGReferenceBoard.Models;
 using CGReferenceBoard.Services;
+using CGReferenceBoard.Services.Abstractions;
 using CGReferenceBoard.Services.Transform;
 using CGReferenceBoard.ViewModels;
 
@@ -73,11 +76,17 @@ public partial class MainWindow
 
     private async void CloseWindow_Click(object? sender, RoutedEventArgs e)
     {
-        if (!await ConfirmDiscardChanges())
-            return;
-        // Set flag so OnWindowClosing does not show a second prompt.
-        Vm.ClosingConfirmed = true;
-        Close();
+        try
+        {
+            if (!await ConfirmDiscardChanges())
+                return;
+            Vm.ClosingConfirmed = true;
+            Close();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"CloseWindow_Click: {ex.Message}");
+        }
     }
 
     private void TopLeft_PointerPressed(object? sender, PointerPressedEventArgs e) => this.BeginResizeDrag(WindowEdge.NorthWest, e);
@@ -128,7 +137,7 @@ public partial class MainWindow
             startupOverlay.IsVisible = false;
 
         _ = Vm.SaveBoardDataAsync();
-        ShowToast("💾 Saved");
+        ShowToastAsync("💾 Saved");
     }
 
     private async void CreateDatabaseWizard_Click(object? sender, RoutedEventArgs e)
@@ -151,7 +160,7 @@ public partial class MainWindow
             await File.WriteAllTextAsync(boardPath, emptyBoard);
 
             _ = Vm.LoadBoardFromFileAsync(boardPath);
-            ShowToast("💾 Database created");
+            ShowToastAsync("💾 Database created");
         }
     }
 
@@ -178,7 +187,7 @@ public partial class MainWindow
         if (files is { Count: > 0 })
         {
             _ = Vm.LoadBoardFromFileAsync(files[0].Path.LocalPath);
-            ShowToast("📂 Opened");
+            ShowToastAsync("📂 Opened");
         }
     }
 
@@ -189,7 +198,7 @@ public partial class MainWindow
 
         if (string.IsNullOrEmpty(Vm.WorkspaceDir) || !Directory.Exists(Vm.WorkspaceDir))
         {
-            ShowToast("⚠️ Open a board first to create new boards");
+            ShowToastAsync("⚠️ Open a board first to create new boards");
             return;
         }
 
@@ -206,7 +215,7 @@ public partial class MainWindow
 
             if (File.Exists(boardPath))
             {
-                ShowToast("⚠️ Board already exists");
+                ShowToastAsync("⚠️ Board already exists");
                 return;
             }
 
@@ -214,7 +223,7 @@ public partial class MainWindow
             await File.WriteAllTextAsync(boardPath, emptyBoard);
 
             _ = Vm.LoadBoardFromFileAsync(boardPath);
-            ShowToast("📄 Board created");
+            ShowToastAsync("📄 Board created");
         }
     }
 
@@ -253,7 +262,7 @@ public partial class MainWindow
         if (startupOverlay != null)
             startupOverlay.IsVisible = false;
 
-        ShowToast("📄 New Board");
+        ShowToastAsync("📄 New Board");
         ShowAll_Click(null, null!);
     }
 
@@ -293,7 +302,7 @@ public partial class MainWindow
 
             var cell = new CellViewModel { CanvasX = x, CanvasY = y };
             Vm.GridCells.Add(cell);
-            HighlightCell(cell);
+            HighlightCellAsync(cell);
 
             string ext = Path.GetExtension(file.Path.LocalPath).ToLowerInvariant();
             if (videoExtensions.Contains(ext))
@@ -312,10 +321,10 @@ public partial class MainWindow
             }
             else
             {
-                LoadImageToCell(cell, file.Path.LocalPath);
+                await LoadImageToCellAsync(cell, file.Path.LocalPath);
             }
         }
-        ShowToast("📥 Imported");
+        ShowToastAsync("📥 Imported");
     }
 
     private void BoardDir_Click(object? sender, RoutedEventArgs e)
@@ -329,7 +338,7 @@ public partial class MainWindow
             if (File.Exists(path))
             {
                 _ = Vm.LoadBoardFromFileAsync(path);
-                ShowToast("📂 Opened");
+                ShowToastAsync("📂 Opened");
             }
         }
     }
@@ -339,7 +348,7 @@ public partial class MainWindow
         if (sender is Button btn && btn.DataContext is string path)
         {
             _ = Vm.LoadBoardFromFileAsync(path);
-            ShowToast("📂 Opened");
+            ShowToastAsync("📂 Opened");
         }
     }
 
@@ -390,7 +399,7 @@ public partial class MainWindow
             item.SetBitmap(bitmap);
             dt.Add(item);
             await clipboard.SetDataAsync(dt);
-            ShowToast("📋 Copied");
+            ShowToastAsync("📋 Copied");
         }
         catch (Exception ex)
         {
@@ -411,7 +420,7 @@ public partial class MainWindow
             item.SetText(cell.TextContent);
             dt.Add(item);
             await clipboard.SetDataAsync(dt);
-            ShowToast("📋 Copied");
+            ShowToastAsync("📋 Copied");
         }
     }
 
@@ -428,7 +437,7 @@ public partial class MainWindow
             item.SetText(cell.FilePath);
             dt.Add(item);
             await clipboard.SetDataAsync(dt);
-            ShowToast("📋 Copied");
+            ShowToastAsync("📋 Copied");
         }
     }
 
@@ -559,7 +568,7 @@ public partial class MainWindow
         if (anyDeleted)
         {
             Vm.MarkUnsaved();
-            ShowToast("🗑 Deleted");
+            ShowToastAsync("🗑 Deleted");
         }
     }
 
@@ -629,7 +638,7 @@ public partial class MainWindow
         newCell.SetText("New Text Block");
 
         Vm.GridCells.Add(newCell);
-        HighlightCell(newCell);
+        HighlightCellAsync(newCell);
         Vm.MarkUnsaved();
     }
 
@@ -670,7 +679,7 @@ public partial class MainWindow
         newCell.SetText("New Label");
 
         Vm.GridCells.Add(newCell);
-        HighlightCell(newCell);
+        HighlightCellAsync(newCell);
         Vm.MarkUnsaved();
     }
 
@@ -735,7 +744,7 @@ public partial class MainWindow
             };
 
             Vm.GridCells.Add(backdrop);
-            HighlightCell(backdrop);
+            HighlightCellAsync(backdrop);
             Vm.MarkUnsaved();
 
             // Pan view to backdrop if it was placed in a different location
@@ -1384,7 +1393,7 @@ public partial class MainWindow
             }
 
             Vm.GridCells.Add(cell);
-            HighlightCell(cell);
+            HighlightCellAsync(cell);
             placedCount++;
             nextX = space.Value.X + colSpan * Constants.GridSize;
         }
@@ -1392,7 +1401,7 @@ public partial class MainWindow
         if (placedCount > 0)
         {
             Vm.MarkUnsaved();
-            ShowToast($"📥 Dropped {placedCount} item(s)");
+            ShowToastAsync($"📥 Dropped {placedCount} item(s)");
             return;
         }
 
@@ -1437,13 +1446,13 @@ public partial class MainWindow
             if (isVideoUrl)
             {
                 Vm.GridCells.Add(cell);
-                HighlightCell(cell);
+                HighlightCellAsync(cell);
                 await DownloadMediaToCell(cell, url);
             }
             else
             {
                 Vm.GridCells.Add(cell);
-                HighlightCell(cell);
+                HighlightCellAsync(cell);
                 await DownloadMediaToCell(cell, url);
             }
 
@@ -1454,7 +1463,7 @@ public partial class MainWindow
         if (placedCount > 0)
         {
             Vm.MarkUnsaved();
-            ShowToast($"📥 Dropped {placedCount} item(s)");
+            ShowToastAsync($"📥 Dropped {placedCount} item(s)");
             return;
         }
 
@@ -1473,9 +1482,9 @@ public partial class MainWindow
                 };
                 cell.SetText(payload.PlainText.Trim());
                 Vm.GridCells.Add(cell);
-                HighlightCell(cell);
+                HighlightCellAsync(cell);
                 Vm.MarkUnsaved();
-                ShowToast("📥 Dropped text");
+                ShowToastAsync("📥 Dropped text");
             }
             return;
         }
@@ -1500,9 +1509,9 @@ public partial class MainWindow
                     };
                     cell.SetText(stripped);
                     Vm.GridCells.Add(cell);
-                    HighlightCell(cell);
+                    HighlightCellAsync(cell);
                     Vm.MarkUnsaved();
-                    ShowToast("📥 Dropped text");
+                    ShowToastAsync("📥 Dropped text");
                 }
             }
         }
@@ -1547,7 +1556,7 @@ public partial class MainWindow
             if (!string.IsNullOrEmpty(Vm.CurrentBoardFile))
             {
                 _ = Vm.SaveBoardDataAsync();
-                ShowToast("💾 Saved");
+                ShowToastAsync("💾 Saved");
             }
             else
                 SaveBoard_Click(null, null!);
@@ -1586,7 +1595,7 @@ public partial class MainWindow
                     var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
                     if (clipboard != null)
                         await clipboard.SetDataAsync(dt);
-                    ShowToast("📋 Image copied");
+                    ShowToastAsync("📋 Image copied");
                 }
                 catch (Exception ex)
                 {
@@ -1612,7 +1621,7 @@ public partial class MainWindow
                 item.SetText(fileCell.FilePath!);
                 dt.Add(item);
                 await clipboard.SetDataAsync(dt);
-                ShowToast("📋 Path copied");
+                ShowToastAsync("📋 Path copied");
                 return;
             }
 
@@ -1625,7 +1634,7 @@ public partial class MainWindow
                 item.SetText(textCell.TextContent!);
                 dt.Add(item);
                 await clipboard.SetDataAsync(dt);
-                ShowToast("📋 Text copied");
+                ShowToastAsync("📋 Text copied");
                 return;
             }
             return;
@@ -1788,7 +1797,7 @@ public partial class MainWindow
                                 continue; // corrupt / unreadable file
 
                             Vm.GridCells.Add(newCell);
-                            HighlightCell(newCell);
+                            HighlightCellAsync(newCell);
                             pastedCells.Add(newCell);
 
                             // Advance the preferred origin so the next file lands to the right.
@@ -1799,7 +1808,7 @@ public partial class MainWindow
 
                     if (pastedCells.Count == 0)
                     {
-                        ShowToast("⚠️ No supported files to paste");
+                        ShowToastAsync("⚠️ No supported files to paste");
                         return;
                     }
 
@@ -1816,7 +1825,7 @@ public partial class MainWindow
                         pastedCells[0].CanvasY + pastedCells[0].RowSpan * Constants.GridSize / 2.0);
 
                     Vm.MarkUnsaved();
-                    ShowToast(pastedCells.Count == 1 ? "📋 Pasted" : $"📋 Pasted {pastedCells.Count} items");
+                    ShowToastAsync(pastedCells.Count == 1 ? "📋 Pasted" : $"📋 Pasted {pastedCells.Count} items");
                     return;
                 }
 
@@ -1844,9 +1853,9 @@ public partial class MainWindow
 
                     await DownloadMediaToCell(newCell, single);
 
-                    HighlightCell(newCell);
+                    HighlightCellAsync(newCell);
                     Vm.MarkUnsaved();
-                    ShowToast("📋 Pasted");
+                    ShowToastAsync("📋 Pasted");
                     return;
                 }
                 else
@@ -1869,9 +1878,9 @@ public partial class MainWindow
                     Vm.GridCells.Add(newCell);
                     SelectAndPanToCell(newCell);
 
-                    HighlightCell(newCell);
+                    HighlightCellAsync(newCell);
                     Vm.MarkUnsaved();
-                    ShowToast("📋 Pasted");
+                    ShowToastAsync("📋 Pasted");
                     return;
                 }
             }
@@ -1952,7 +1961,7 @@ public partial class MainWindow
                             continue; // corrupt / unreadable file
 
                         Vm.GridCells.Add(newCell);
-                        HighlightCell(newCell);
+                        HighlightCellAsync(newCell);
                         pastedCells.Add(newCell);
 
                         // Advance the preferred origin so the next file lands to the right.
@@ -1963,7 +1972,7 @@ public partial class MainWindow
 
                 if (pastedCells.Count == 0)
                 {
-                    ShowToast("⚠️ No supported files to paste");
+                    ShowToastAsync("⚠️ No supported files to paste");
                     return;
                 }
 
@@ -1980,7 +1989,7 @@ public partial class MainWindow
                     pastedCells[0].CanvasY + pastedCells[0].RowSpan * Constants.GridSize / 2.0);
 
                 Vm.MarkUnsaved();
-                ShowToast(pastedCells.Count == 1 ? "📋 Pasted" : $"📋 Pasted {pastedCells.Count} items");
+                ShowToastAsync(pastedCells.Count == 1 ? "📋 Pasted" : $"📋 Pasted {pastedCells.Count} items");
                 return;
             }
 
@@ -2018,9 +2027,9 @@ public partial class MainWindow
                 newCell.SetImage(path);
                 Vm.GridCells.Add(newCell);
                 SelectAndPanToCell(newCell);
-                HighlightCell(newCell);
+                HighlightCellAsync(newCell);
                 Vm.MarkUnsaved();
-                ShowToast("📋 Pasted");
+                ShowToastAsync("📋 Pasted");
                 return;
             }
 
@@ -2053,31 +2062,31 @@ public partial class MainWindow
             {
                 case Key.B:
                     Vm.ModeService.AnnotationMode.CurrentTool = "Brush";
-                    ShowToast("🖌️ Brush");
+                    ShowToastAsync("🖌️ Brush");
                     return;
                 case Key.E:
                     Vm.ModeService.AnnotationMode.CurrentTool = "Eraser";
-                    ShowToast("🧹 Eraser");
+                    ShowToastAsync("🧹 Eraser");
                     return;
                 case Key.T:
                     Vm.ModeService.AnnotationMode.CurrentTool = "Text";
-                    ShowToast("🔤 Text");
+                    ShowToastAsync("🔤 Text");
                     return;
                 case Key.L:
                     Vm.ModeService.AnnotationMode.CurrentTool = "Arrow";
-                    ShowToast("➡️ Arrow");
+                    ShowToastAsync("➡️ Arrow");
                     return;
                 case Key.U:
                     Vm.ModeService.AnnotationMode.CurrentTool = "Rectangle";
-                    ShowToast("▪️ Rectangle");
+                    ShowToastAsync("▪️ Rectangle");
                     return;
                 case Key.O:
                     Vm.ModeService.AnnotationMode.CurrentTool = "Ellipse";
-                    ShowToast("⚪ Ellipse");
+                    ShowToastAsync("⚪ Ellipse");
                     return;
                 case Key.V:
                     Vm.ModeService.AnnotationMode.CurrentTool = "Move";
-                    ShowToast("✥ Select/Move");
+                    ShowToastAsync("✥ Select/Move");
                     return;
             }
         }
@@ -2136,7 +2145,7 @@ public partial class MainWindow
             if (anyDeleted)
             {
                 Vm.MarkUnsaved();
-                ShowToast("🗑 Deleted");
+                ShowToastAsync("🗑 Deleted");
             }
             else if (_hoveredCell != null)
             {
@@ -2144,7 +2153,7 @@ public partial class MainWindow
                 Vm.GridCells.Remove(_hoveredCell);
                 _hoveredCell = null;
                 Vm.MarkUnsaved();
-                ShowToast("🗑 Deleted");
+                ShowToastAsync("🗑 Deleted");
             }
         }
     }
