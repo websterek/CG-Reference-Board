@@ -13,6 +13,14 @@ public partial class TextInputDialog : Window, INotifyPropertyChanged
         get => _dialogTitle;
         set { _dialogTitle = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DialogTitle))); }
     }
+
+    private string _inputText = "";
+    public string InputText
+    {
+        get => _inputText;
+        set { _inputText = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(InputText))); }
+    }
+
     private bool _canClose;
 
     public string Result { get; private set; } = "";
@@ -23,6 +31,16 @@ public partial class TextInputDialog : Window, INotifyPropertyChanged
     {
         InitializeComponent();
         Closing += OnClosing;
+        DataContext = this;
+    }
+
+    public TextInputDialog(string title, string initialText)
+    {
+        DialogTitle = title;
+        InputText = initialText;
+        InitializeComponent();
+        Closing += OnClosing;
+        DataContext = this;
     }
 
     private void OnClosing(object? sender, WindowClosingEventArgs e)

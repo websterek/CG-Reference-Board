@@ -4,7 +4,7 @@
     xmlns:views="clr-namespace:CGReferenceBoard.Views"
     x:Class="CGReferenceBoard.Views.TextInputDialog"
     x:DataType="views:TextInputDialog"
-    Title="New Board"
+    Title="{Binding DialogTitle}"
     Width="360"
     Height="160"
     WindowStartupLocation="CenterOwner"
