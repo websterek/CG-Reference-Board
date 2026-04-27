@@ -1,20 +1,21 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using CGReferenceBoard.Modes;
-using CGReferenceBoard.Services;
+using CGReferenceBoard.Composition;
 using CGReferenceBoard.Services.Abstractions;
-using CGReferenceBoard.Services.Transform;
 using CGReferenceBoard.ViewModels;
 using CGReferenceBoard.Views;
 using System;
 using System.Diagnostics;
 using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CGReferenceBoard;
 
 public partial class App : Application
 {
+    public IServiceProvider? Services { get; private set; }
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -24,18 +25,19 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            var services = new ServiceCollection();
+            services.AddCgReferenceBoard();
+            Services = services.BuildServiceProvider();
+
             bool isViewMode = desktop.Args?.Contains("--view") == true;
             string? startFile = desktop.Args?.FirstOrDefault(arg => !arg.StartsWith("-"));
 
-            var boardService = new BoardService();
-            var modeService = new ModeService();
-            var selectionService = new SelectionService();
-            var transformService = new TransformService();
-            var vm = new MainWindowViewModel(isViewMode, modeService, selectionService, transformService, boardService);
-
-            var window = new MainWindow(vm);
+            var vm = Services.GetRequiredService<MainWindowViewModel>();
+            var window = Services.GetRequiredService<MainWindow>();
+            
             if (!string.IsNullOrEmpty(startFile))
                 Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = vm.LoadBoardFromFileAsync(startFile));
+            
             desktop.MainWindow = window;
             desktop.Exit += OnDesktopExit;
         }

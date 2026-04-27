@@ -302,7 +302,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ModeService modeService,
         SelectionService selectionService,
         TransformService transformService,
-        IBoardService boardService)
+        IBoardService boardService,
+        IHistoryService historyService,
+        ILocalizationService localizationService,
+        INotificationService notificationService)
     {
         IsViewMode = isViewMode;
         ModeService = modeService;
@@ -352,7 +355,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
                new ModeService(),
                new SelectionService(),
                new TransformService(),
-               new BoardService())
+               new BoardService(),
+               new HistoryService(),
+               new LocalizationService(),
+               new NotificationService())
     { }
 
     // ── Mode-change handler ───────────────────────────────────────────────────

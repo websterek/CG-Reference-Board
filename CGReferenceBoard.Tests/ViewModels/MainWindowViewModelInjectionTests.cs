@@ -14,6 +14,9 @@ public class MainWindowViewModelInjectionTests
     public void InjectedCtor_AcceptsBoardService()
     {
         IBoardService boardSvc = new BoardService();
+        IHistoryService historySvc = new HistoryService();
+        ILocalizationService localizationSvc = new LocalizationService();
+        INotificationService notificationSvc = new NotificationService();
         var modeService = new ModeService();
         var selectionService = new SelectionService();
         var transformService = new TransformService();
@@ -23,7 +26,10 @@ public class MainWindowViewModelInjectionTests
             modeService: modeService,
             selectionService: selectionService,
             transformService: transformService,
-            boardService: boardSvc);
+            boardService: boardSvc,
+            historyService: historySvc,
+            localizationService: localizationSvc,
+            notificationService: notificationSvc);
 
         Assert.NotNull(vm);
     }
