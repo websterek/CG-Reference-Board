@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using CGReferenceBoard.Helpers;
 using CGReferenceBoard.Services.Transform;
 using CGReferenceBoard.ViewModels;
 
@@ -13,16 +14,6 @@ namespace CGReferenceBoard.Views;
 public partial class MainWindow
 {
     #region Annotation Interaction
-
-    private double DistanceToSegment(Point p, Point v, Point w)
-    {
-        double l2 = Math.Pow(v.X - w.X, 2) + Math.Pow(v.Y - w.Y, 2);
-        if (l2 == 0)
-            return Math.Sqrt(Math.Pow(p.X - v.X, 2) + Math.Pow(p.Y - v.Y, 2));
-        double t = Math.Max(0, Math.Min(1, ((p.X - v.X) * (w.X - v.X) + (p.Y - v.Y) * (w.Y - v.Y)) / l2));
-        Point projection = new Point(v.X + t * (w.X - v.X), v.Y + t * (w.Y - v.Y));
-        return Math.Sqrt(Math.Pow(p.X - projection.X, 2) + Math.Pow(p.Y - projection.Y, 2));
-    }
 
     private void EraseIntersectingAnnotations(Point pt)
     {
@@ -63,7 +54,7 @@ public partial class MainWindow
             {
                 var p1 = new Point(ann.Points[i].X + ann.CanvasX, ann.Points[i].Y + ann.CanvasY);
                 var p2 = new Point(ann.Points[i + 1].X + ann.CanvasX, ann.Points[i + 1].Y + ann.CanvasY);
-                if (DistanceToSegment(pt, p1, p2) < threshold)
+                if (GeometryHelper.DistanceToSegment(pt, p1, p2) < threshold)
                     return true;
             }
             return false;
