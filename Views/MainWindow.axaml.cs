@@ -1161,8 +1161,6 @@ Vm = vm;
                 await Task.WhenAll(tasks);
             }
 
-            if (unloads.Count > 0 || loads.Count > 0)
-                GC.Collect(2, GCCollectionMode.Optimized, false);
 
             double annMargin = Constants.GridSize * 3;
             double annVpLeft = vpLeft - annMargin;
