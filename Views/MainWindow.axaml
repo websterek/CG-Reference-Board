@@ -4,6 +4,7 @@
     xmlns:local="clr-namespace:CGReferenceBoard.Controls"
     xmlns:vm="clr-namespace:CGReferenceBoard.ViewModels"
     xmlns:views="clr-namespace:CGReferenceBoard.Views"
+    xmlns:markup="clr-namespace:CGReferenceBoard.Markup"
     x:Class="CGReferenceBoard.Views.MainWindow"
     x:DataType="vm:MainWindowViewModel"
     Title="CG Reference Board"
@@ -30,7 +31,6 @@
                 BorderThickness="{Binding ZoomIndependentBorderThickness, RelativeSource={RelativeSource AncestorType=views:MainWindow}}"
                 Cursor="Hand"
                 PointerEntered="Cell_PointerEntered"
-                PointerExited="Cell_PointerExited"
                 PointerPressed="Cell_PointerPressed"
                 PointerMoved="Cell_PointerMoved"
                 PointerReleased="Cell_PointerReleased"
@@ -1102,7 +1102,7 @@
                             </Border.ContextMenu>
 
                             <!-- Canvas background layers – one visible at a time -->
-                            <Panel IsVisible="{Binding IsCanvasBackgroundVisible, RelativeSource={RelativeSource AncestorType=views:MainWindow}}" IsHitTestVisible="False">
+                            <Panel IsVisible="{Binding IsCanvasBackgroundVisible}" IsHitTestVisible="False">
                                 <!-- Dots: subtle grid lines + centred dot in each cell -->
                                 <Border IsVisible="{Binding IsGridBackgroundDots}">
                                     <Border.Background>
@@ -1240,10 +1240,7 @@
                             <Border
                                 x:Name="TransformBody"
                                 BorderBrush="{StaticResource AccentBrush}"
-                                BorderThickness="{Binding ZoomIndependentBorderThickness, RelativeSource={RelativeSource AncestorType=views:MainWindow}}"
-                                Background="Transparent"
-                                Cursor="SizeAll"
-                                IsHitTestVisible="False"
+                                BorderThickness="{Binding ZoomIndependentBorderThickness}"
                             />
                             <Border
                                 x:Name="TransformTopLeft"
@@ -1672,7 +1669,7 @@
                     <!-- Selection count -->
                     <TextBlock
                         Grid.Column="4"
-                        Text="{Binding SelectionCountText, RelativeSource={RelativeSource AncestorType=views:MainWindow}}"
+                        Text="{Binding SelectionCountText}"
                         Classes="statusText"
                         Foreground="{StaticResource AccentBrush}"
                     />
@@ -1682,7 +1679,7 @@
                     <!-- Zoom level -->
                     <TextBlock
                         Grid.Column="6"
-                        Text="{Binding ZoomLevelText, RelativeSource={RelativeSource AncestorType=views:MainWindow}}"
+                        Text="{Binding ZoomLevelText}"
                         Classes="statusText"
                         FontWeight="SemiBold"
                         MinWidth="40"
@@ -1810,5 +1807,7 @@
             PointerPressed="Left_PointerPressed"
             Background="Transparent"
         />
+        <!-- i18n pipeline verification (hidden) -->
+        <TextBlock Text="{markup:Localize App_Title}" IsVisible="False" />
     </Grid>
 </Window>
