@@ -274,7 +274,6 @@
                             Source="{Binding Image}"
                             Stretch="{Binding ImageStretch}"
                             DoubleTapped="CanvasImage_DoubleTapped"
-                            RenderOptions.BitmapInterpolationMode="MediumQuality"
                         />
                     </Border>
 
@@ -284,7 +283,6 @@
                             Source="{Binding Image}"
                             Stretch="UniformToFill"
                             DoubleTapped="CanvasImage_DoubleTapped"
-                            RenderOptions.BitmapInterpolationMode="MediumQuality"
                         />
                         <!-- Play icon overlay (shown on hover via style) -->
                         <Border
