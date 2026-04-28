@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -107,6 +108,28 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     /// <summary>True when the application was launched in read-only view mode (--view flag).</summary>
     public bool IsViewMode { get; }
+
+    // ── Zoom-dependent display properties (updated by the View on zoom change) ──
+
+    /// <summary>Border thickness that remains constant regardless of zoom level.</summary>
+    [ObservableProperty]
+    private Thickness _zoomIndependentBorderThickness = new(2.0);
+
+    /// <summary>Corner radius that remains constant regardless of zoom level.</summary>
+    [ObservableProperty]
+    private CornerRadius _zoomIndependentCornerRadius = new(0);
+
+    /// <summary>Whether the canvas background (dots/grid) should be visible at current zoom.</summary>
+    [ObservableProperty]
+    private bool _isCanvasBackgroundVisible = true;
+
+    /// <summary>Current zoom level as a percentage string for the status bar.</summary>
+    [ObservableProperty]
+    private string _zoomLevelText = "100%";
+
+    /// <summary>Number of currently selected items for the status bar.</summary>
+    [ObservableProperty]
+    private string _selectionCountText = "";
 
     /// <summary>
     /// Set to true once the user has confirmed they want to close/discard unsaved changes.
