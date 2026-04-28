@@ -27,6 +27,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<SelectionService>();
         services.AddSingleton<TransformService>();
         services.AddSingleton<Services.Abstractions.IAnnotationEffectService, AnnotationEffectService>();
+        services.AddSingleton<IWindowChromeService>(new NullWindowChromeService());
 
         services.AddTransient<MainWindowViewModel>();
 
