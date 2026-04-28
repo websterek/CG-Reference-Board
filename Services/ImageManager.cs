@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
@@ -52,8 +52,11 @@ public static class ImageManager
     public const int MaxMediumDecodeWidth = 512;
 
     // ───────── caches ─────────
-    // Average color cache: filePath → hex string  e.g. "#FF3A2B1C"
-    private static readonly ConcurrentDictionary<string, string> _colorCache = new();
+    // Average color LRU cache: filePath → hex string  e.g. "#FF3A2B1C"
+    private const int MaxCacheSize = 256;
+    private static readonly Dictionary<string, LinkedListNode<(string key, string value)>> _colorCacheMap = new();
+    private static readonly LinkedList<(string key, string value)> _colorCacheOrder = new();
+    private static readonly object _cacheLock = new();
 
     // ───────── thumbnail generation ─────────
 
@@ -211,8 +214,16 @@ public static class ImageManager
         if (string.IsNullOrEmpty(imagePath) || !File.Exists(imagePath))
             return fallback;
 
-        if (_colorCache.TryGetValue(imagePath, out var cached))
-            return cached;
+        lock (_cacheLock)
+        {
+            if (_colorCacheMap.TryGetValue(imagePath, out var node))
+            {
+                // Touch: move to front
+                _colorCacheOrder.Remove(node);
+                _colorCacheOrder.AddFirst(node);
+                return node.Value.value;
+            }
+        }
 
         try
         {
@@ -237,16 +248,21 @@ public static class ImageManager
             long r = 0, g = 0, b = 0;
             int count = 0;
 
-            for (int y = 0; y < bitmap.Height; y++)
+            // Use direct pixel span for fast access (avoid per-pixel managed call overhead)
+            unsafe
             {
-                for (int x = 0; x < bitmap.Width; x++)
+                int pixelCount = bitmap.Width * bitmap.Height;
+                byte* ptr = (byte*)bitmap.GetPixels().ToPointer();
+                for (int i = 0; i < pixelCount; i++)
                 {
-                    var px = bitmap.GetPixel(x, y);
-                    if (px.Alpha < 30)
-                        continue; // skip near-transparent
-                    r += px.Red;
-                    g += px.Green;
-                    b += px.Blue;
+                    byte pr = ptr[i * 4];
+                    byte pg = ptr[i * 4 + 1];
+                    byte pb = ptr[i * 4 + 2];
+                    byte pa = ptr[i * 4 + 3];
+                    if (pa < 30) continue;
+                    r += pr;
+                    g += pg;
+                    b += pb;
                     count++;
                 }
             }
@@ -254,20 +270,31 @@ public static class ImageManager
             if (count == 0)
                 return fallback;
 
-            int avgR = (int)(r / count);
-            int avgG = (int)(g / count);
-            int avgB = (int)(b / count);
+            string hex = $"#FF{(int)(r / count):X2}{(int)(g / count):X2}{(int)(b / count):X2}";
 
-            string hex = $"#FF{avgR:X2}{avgG:X2}{avgB:X2}";
-
-            // Evict oldest-accessible entries when the cache grows too large.
-            const int maxCacheSize = 500;
-            if (_colorCache.Count >= maxCacheSize)
+            lock (_cacheLock)
             {
-                foreach (var k in _colorCache.Keys.Take(50).ToList())
-                    _colorCache.TryRemove(k, out _);
+                if (_colorCacheMap.ContainsKey(imagePath))
+                {
+                    // Another thread beat us; touch and return that value
+                    var existing = _colorCacheMap[imagePath];
+                    _colorCacheOrder.Remove(existing);
+                    _colorCacheOrder.AddFirst(existing);
+                    return existing.Value.value;
+                }
+
+                // Evict LRU entries if at capacity
+                while (_colorCacheOrder.Count >= MaxCacheSize && _colorCacheOrder.Last != null)
+                {
+                    var lru = _colorCacheOrder.Last!;
+                    _colorCacheOrder.RemoveLast();
+                    _colorCacheMap.Remove(lru.Value.key);
+                }
+
+                var newNode = _colorCacheOrder.AddFirst((imagePath, hex));
+                _colorCacheMap[imagePath] = newNode;
             }
-            _colorCache[imagePath] = hex;
+
             return hex;
         }
         catch
@@ -568,7 +595,11 @@ public static class ImageManager
     /// </summary>
     public static void ClearCaches()
     {
-        _colorCache.Clear();
+        lock (_cacheLock)
+        {
+            _colorCacheMap.Clear();
+            _colorCacheOrder.Clear();
+        }
     }
 
     // ───────── helpers ─────────
