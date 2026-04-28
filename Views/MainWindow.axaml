@@ -20,7 +20,7 @@
 
     <Window.Resources>
         <!-- Shared cell DataTemplate used by all three layer ItemsControls -->
-        <DataTemplate x:Key="CellTemplate" DataType="vm:CellViewModel">
+        <DataTemplate x:Key="CellTemplate" x:DataType="vm:CellViewModel">
             <Border
                 Classes="CellRoot"
                 Width="{Binding PixelWidth}"
@@ -609,7 +609,7 @@
                                 </ControlTheme>
                             </MenuItem.ItemContainerTheme>
                             <MenuItem.ItemTemplate>
-                                <DataTemplate DataType="vm:BoardMenuItemViewModel">
+                                <DataTemplate x:DataType="vm:BoardMenuItemViewModel">
                                     <TextBlock Text="{Binding FileName}" />
                                 </DataTemplate>
                             </MenuItem.ItemTemplate>
@@ -1072,7 +1072,7 @@
                                                         </ItemsPanelTemplate>
                                                     </ListBox.ItemsPanel>
                                                     <ListBox.ItemTemplate>
-                                                        <DataTemplate>
+                                                            <DataTemplate x:DataType="x:String">
                                                             <Rectangle
                                                                 Width="20"
                                                                 Height="20"
@@ -1180,7 +1180,7 @@
                                 </ControlTheme>
                             </ItemsControl.ItemContainerTheme>
                             <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="vm:AnnotationViewModel">
+                                <DataTemplate x:DataType="vm:AnnotationViewModel">
                                     <local:AnnotationShape
                                         Annotation="{Binding}"
                                         PointerPressed="Annotation_PointerPressed"
