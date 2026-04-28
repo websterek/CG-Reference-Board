@@ -283,7 +283,7 @@ Vm = vm;
 
         _ = Vm.LoadRecentBoardsAsync();
         _ = Vm.LoadUserSettingsAsync();
-        RecentBoardsList.ItemsSource = Vm.RecentBoards;
+        // RecentBoards is now bound via ItemsSource="{Binding RecentBoards}" in XAML
 
         if (!Directory.Exists(Vm.WorkspaceDir))
             Directory.CreateDirectory(Vm.WorkspaceDir);
@@ -548,6 +548,12 @@ Vm = vm;
         OnPropertyChanged(nameof(IsCanvasBackgroundVisible));
         UpdateTransformOverlayLayout();
 
+        // Push zoom-dependent values into the ViewModel for compiled DataTemplate bindings.
+        Vm.ZoomIndependentBorderThickness = ZoomIndependentBorderThickness;
+        Vm.ZoomIndependentCornerRadius = ZoomIndependentCornerRadius;
+        Vm.IsCanvasBackgroundVisible = IsCanvasBackgroundVisible;
+        Vm.ZoomLevelText = ZoomLevelText;
+
         CGReferenceBoard.Controls.AnnotationShape.SetScale(_scale.ScaleX);
 
         var canvas = this.FindControl<Avalonia.Controls.Canvas>("MainCanvas");
@@ -798,6 +804,7 @@ Vm = vm;
         OnPropertyChanged(nameof(SelectionCountText));
         OnPropertyChanged(nameof(HasMultipleSelection));
         OnPropertyChanged(nameof(HasSingleSelection));
+        Vm.SelectionCountText = SelectionCountText;
 
         bool multi = HasMultipleSelection;
         bool single = HasSingleSelection;
