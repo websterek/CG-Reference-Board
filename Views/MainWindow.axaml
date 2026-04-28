@@ -571,7 +571,7 @@
                             <Separator />
                             <MenuItem
                                 Header="Undo"
-                                Click="Undo_Click"
+                                Command="{Binding UndoCommand}"
                                 InputGesture="Ctrl+Z"
                             >
                                 <MenuItem.Icon>
@@ -580,7 +580,7 @@
                             </MenuItem>
                             <MenuItem
                                 Header="Redo"
-                                Click="Redo_Click"
+                                Command="{Binding RedoCommand}"
                                 InputGesture="Ctrl+Shift+Z"
                             >
                                 <MenuItem.Icon>
@@ -664,7 +664,7 @@
                         <MenuItem Header="_Mode" IsEnabled="{Binding !#StartupOverlay.IsVisible}">
                             <MenuItem
                                 Header="Grid"
-                                Click="GridMode_Click"
+                                Command="{Binding SwitchToGridModeCommand}"
                                 ToggleType="Radio"
                                 IsChecked="{Binding !IsDrawMode}"
                                 InputGesture="Ctrl+D1"
@@ -675,7 +675,7 @@
                             </MenuItem>
                             <MenuItem
                                 Header="Annotation"
-                                Click="AnnotationMode_Click"
+                                Command="{Binding SwitchToAnnotationModeCommand}"
                                 ToggleType="Radio"
                                 IsChecked="{Binding IsDrawMode}"
                                 InputGesture="Ctrl+D2"
@@ -1597,6 +1597,7 @@
                     <ItemsControl
                         x:Name="RecentBoardsList"
                         HorizontalAlignment="Center"
+                        ItemsSource="{Binding RecentBoards}"
                     >
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="x:String">

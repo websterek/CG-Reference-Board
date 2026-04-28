@@ -102,10 +102,6 @@ public partial class MainWindow
 
     #region Menu Click Handlers
 
-    private void Undo_Click(object? sender, RoutedEventArgs e) => Vm.UndoCommand.Execute(null);
-    private void Redo_Click(object? sender, RoutedEventArgs e) => Vm.RedoCommand.Execute(null);
-    private void GridMode_Click(object? sender, RoutedEventArgs e) => Vm.ModeService.SetMode("Grid");
-    private void AnnotationMode_Click(object? sender, RoutedEventArgs e) => Vm.ModeService.SetMode("Annotation");
     private void Exit_Click(object? sender, RoutedEventArgs e) => Close();
 
     private async void SaveBoard_Click(object? sender, RoutedEventArgs e)
