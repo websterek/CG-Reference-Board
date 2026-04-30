@@ -65,7 +65,6 @@ public partial class MainWindow
 
         foreach (var ann in toRemove)
         {
-            _selectedAnnotations.Remove(ann);
             Vm.SelectionService.RemoveFromSelection(ann);
             Vm.Annotations.Remove(ann);
         }
@@ -86,8 +85,7 @@ public partial class MainWindow
             
             if (isCtrl && annGrid.IsSelected)
             {
-                annGrid.IsSelected = false;
-                _selectedAnnotations.Remove(annGrid);
+                Vm.SelectionService.RemoveFromSelection(annGrid);
                 UpdateSelectionState();
                 e.Handled = true;
                 return;
@@ -139,12 +137,12 @@ public partial class MainWindow
                 Vm.Annotations.Add(duplicate);
 
                 ClearSelection();
-                _selectedAnnotations.Add(duplicate);
+                Vm.SelectionService.SelectAnnotation(duplicate);
                 UpdateSelectionState();
                 _isAltDuplicateDrag = true;
                 _pendingAltDuplicateAnnotation = duplicate;
 
-                BringToFront(_selectedAnnotations);
+                BringToFront(Vm.SelectionService.SelectedAnnotations);
 
                 var canvas = _cachedMainCanvas ?? this.FindControl<Canvas>("MainCanvas");
                 if (canvas != null && StartTransformMoveFromCurrentSelection(e.GetPosition(canvas)))
@@ -158,25 +156,21 @@ public partial class MainWindow
 
             if (isCtrl)
             {
-                annMove.IsSelected = !annMove.IsSelected;
                 if (annMove.IsSelected)
-                    _selectedAnnotations.Add(annMove);
+                    Vm.SelectionService.RemoveFromSelection(annMove);
                 else
-                    _selectedAnnotations.Remove(annMove);
+                    Vm.SelectionService.SelectAnnotation(annMove, additive: true);
                 UpdateSelectionState();
                 e.Handled = true;
                 return;
             }
-            else if (!_selectedAnnotations.Contains(annMove))
+            else if (!Vm.SelectionService.SelectedAnnotations.Contains(annMove))
             {
-                _selectedAnnotations.Clear();
-                foreach (var a in Vm.Annotations)
-                    a.IsSelected = false;
-                _selectedAnnotations.Add(annMove);
-                annMove.IsSelected = true;
+                ClearSelection();
+                Vm.SelectionService.SelectAnnotation(annMove);
             }
 
-            BringToFront(_selectedAnnotations);
+            BringToFront(Vm.SelectionService.SelectedAnnotations);
 
             var mainCanvas = this.FindControl<Canvas>("MainCanvas");
             if (mainCanvas != null)
@@ -193,7 +187,6 @@ public partial class MainWindow
         // Eraser mode: delete clicked annotation
         if (Vm.IsEraserMode && sender is Control { DataContext: AnnotationViewModel ann })
         {
-            _selectedAnnotations.Remove(ann);
             Vm.SelectionService.RemoveFromSelection(ann);
             Vm.Annotations.Remove(ann);
             UpdateSelectionState();
@@ -292,7 +285,6 @@ public partial class MainWindow
         if (string.IsNullOrWhiteSpace(annotation.Text))
         {
             Vm.Annotations.Remove(annotation);
-            _selectedAnnotations.Remove(annotation);
             Vm.SelectionService.RemoveFromSelection(annotation);
             UpdateSelectionState();
         }
@@ -342,24 +334,26 @@ public partial class MainWindow
         bool anyDeleted = false;
 
         // Delete selected cells
-        if (_selectedCells.Count > 0)
+        var selectedCells = Vm.SelectionService.SelectedCells.ToList();
+        if (selectedCells.Count > 0)
         {
-            foreach (var cell in _selectedCells.ToList())
+            foreach (var cell in selectedCells)
             {
                 cell.Clear();
                 Vm.GridCells.Remove(cell);
             }
-            _selectedCells.Clear();
+            Vm.SelectionService.ClearSelection();
             _hoveredCell = null;
             anyDeleted = true;
         }
 
         // Delete selected annotations
-        if (_selectedAnnotations.Count > 0)
+        var selectedAnnotations = Vm.SelectionService.SelectedAnnotations.ToList();
+        if (selectedAnnotations.Count > 0)
         {
-            foreach (var ann in _selectedAnnotations.ToList())
+            foreach (var ann in selectedAnnotations)
                 Vm.Annotations.Remove(ann);
-            _selectedAnnotations.Clear();
+            Vm.SelectionService.ClearSelection();
             anyDeleted = true;
         }
 

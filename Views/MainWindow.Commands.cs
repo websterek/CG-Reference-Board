@@ -572,9 +572,10 @@ public partial class MainWindow
     {
         bool anyDeleted = false;
 
-        if (_selectedCells.Count > 0)
+        var selectedCells = Vm.SelectionService.SelectedCells.ToList();
+        if (selectedCells.Count > 0)
         {
-            foreach (var cell in _selectedCells.ToList())
+            foreach (var cell in selectedCells)
             {
                 if (disposeCells)
                     cell.Dispose();
@@ -583,17 +584,18 @@ public partial class MainWindow
                 Vm.GridCells.Remove(cell);
             }
 
-            _selectedCells.Clear();
+            Vm.SelectionService.ClearSelection();
             _hoveredCell = null;
             anyDeleted = true;
         }
 
-        if (_selectedAnnotations.Count > 0)
+        var selectedAnnotations = Vm.SelectionService.SelectedAnnotations.ToList();
+        if (selectedAnnotations.Count > 0)
         {
-            foreach (var ann in _selectedAnnotations.ToList())
+            foreach (var ann in selectedAnnotations)
                 Vm.Annotations.Remove(ann);
 
-            _selectedAnnotations.Clear();
+            Vm.SelectionService.ClearSelection();
             anyDeleted = true;
         }
 
@@ -684,13 +686,13 @@ public partial class MainWindow
         if (Vm.IsViewMode)
             return;
 
-        if (_selectedCells.Count > 0)
+        if (Vm.SelectionService.SelectedCells.Count > 0)
         {
             // Create backdrop around selected cells
-            double minX = _selectedCells.Min(c => c.CanvasX);
-            double minY = _selectedCells.Min(c => c.CanvasY);
-            double maxX = _selectedCells.Max(c => c.CanvasX + c.PixelWidth);
-            double maxY = _selectedCells.Max(c => c.CanvasY + c.PixelHeight);
+            double minX = Vm.SelectionService.SelectedCells.Min(c => c.CanvasX);
+            double minY = Vm.SelectionService.SelectedCells.Min(c => c.CanvasY);
+            double maxX = Vm.SelectionService.SelectedCells.Max(c => c.CanvasX + c.PixelWidth);
+            double maxY = Vm.SelectionService.SelectedCells.Max(c => c.CanvasY + c.PixelHeight);
 
             int gridX = (int)(Math.Floor(minX / Constants.GridSize) * Constants.GridSize);
             int gridY = (int)(Math.Floor(minY / Constants.GridSize) * Constants.GridSize);
@@ -810,8 +812,7 @@ public partial class MainWindow
                            && cy < bottom && cy + ch > top;
             if (intersects)
             {
-                c.IsSelected = true;
-                _selectedCells.Add(c);
+                Vm.SelectionService.SelectCell(c, additive: true);
             }
         }
 
@@ -821,8 +822,7 @@ public partial class MainWindow
 
             if (inRect)
             {
-                ann.IsSelected = true;
-                _selectedAnnotations.Add(ann);
+                Vm.SelectionService.SelectAnnotation(ann, additive: true);
             }
         }
 
@@ -831,13 +831,13 @@ public partial class MainWindow
 
     private void ArrangeSelected_Click(object? sender, RoutedEventArgs e)
     {
-        if (_selectedCells.Count == 0)
+        if (Vm.SelectionService.SelectedCells.Count == 0)
             return;
 
-        double minX = _selectedCells.Min(c => c.CanvasX);
-        double minY = _selectedCells.Min(c => c.CanvasY);
+        double minX = Vm.SelectionService.SelectedCells.Min(c => c.CanvasX);
+        double minY = Vm.SelectionService.SelectedCells.Min(c => c.CanvasY);
 
-        var sortedCells = _selectedCells.OrderBy(c => c.CanvasY).ThenBy(c => c.CanvasX).ToList();
+        var sortedCells = Vm.SelectionService.SelectedCells.OrderBy(c => c.CanvasY).ThenBy(c => c.CanvasX).ToList();
 
         var oldPositions = new Dictionary<CellViewModel, Point>();
         foreach (var cell in sortedCells)
@@ -880,13 +880,13 @@ public partial class MainWindow
 
     private void ArrangeHorizontal_Click(object? sender, RoutedEventArgs e)
     {
-        if (_selectedCells.Count == 0)
+        if (Vm.SelectionService.SelectedCells.Count == 0)
             return;
 
-        double minX = _selectedCells.Min(c => c.CanvasX);
-        double minY = _selectedCells.Min(c => c.CanvasY);
+        double minX = Vm.SelectionService.SelectedCells.Min(c => c.CanvasX);
+        double minY = Vm.SelectionService.SelectedCells.Min(c => c.CanvasY);
 
-        var sortedCells = _selectedCells.OrderBy(c => c.CanvasX).ThenBy(c => c.CanvasY).ToList();
+        var sortedCells = Vm.SelectionService.SelectedCells.OrderBy(c => c.CanvasX).ThenBy(c => c.CanvasY).ToList();
 
         var oldPositions = new Dictionary<CellViewModel, Point>();
         foreach (var cell in sortedCells)
@@ -915,13 +915,13 @@ public partial class MainWindow
 
     private void ArrangeVertical_Click(object? sender, RoutedEventArgs e)
     {
-        if (_selectedCells.Count == 0)
+        if (Vm.SelectionService.SelectedCells.Count == 0)
             return;
 
-        double minX = _selectedCells.Min(c => c.CanvasX);
-        double minY = _selectedCells.Min(c => c.CanvasY);
+        double minX = Vm.SelectionService.SelectedCells.Min(c => c.CanvasX);
+        double minY = Vm.SelectionService.SelectedCells.Min(c => c.CanvasY);
 
-        var sortedCells = _selectedCells.OrderBy(c => c.CanvasY).ThenBy(c => c.CanvasX).ToList();
+        var sortedCells = Vm.SelectionService.SelectedCells.OrderBy(c => c.CanvasY).ThenBy(c => c.CanvasX).ToList();
 
         var oldPositions = new Dictionary<CellViewModel, Point>();
         foreach (var cell in sortedCells)
@@ -1577,7 +1577,7 @@ public partial class MainWindow
         // Ctrl+Shift+C: Copy image to clipboard
         if (e.Key == Key.C && isCtrl && isShift)
         {
-            var targetCell = _selectedCells.FirstOrDefault(c => c.IsImage || c.IsVideo);
+            var targetCell = Vm.SelectionService.SelectedCells.FirstOrDefault(c => c.IsImage || c.IsVideo);
             if (targetCell != null && !string.IsNullOrEmpty(targetCell.FilePath) && File.Exists(targetCell.FilePath))
             {
                 try
@@ -1609,7 +1609,7 @@ public partial class MainWindow
                 return;
 
             // Prefer file path for image/video cells
-            var fileCell = _selectedCells.FirstOrDefault(c => c.IsFile && !string.IsNullOrEmpty(c.FilePath));
+            var fileCell = Vm.SelectionService.SelectedCells.FirstOrDefault(c => c.IsFile && !string.IsNullOrEmpty(c.FilePath));
             if (fileCell != null)
             {
                 var dt = new DataTransfer();
@@ -1622,7 +1622,7 @@ public partial class MainWindow
             }
 
             // Fall back to text content
-            var textCell = _selectedCells.FirstOrDefault(c => c.HasTextContent && !string.IsNullOrEmpty(c.TextContent));
+            var textCell = Vm.SelectionService.SelectedCells.FirstOrDefault(c => c.HasTextContent && !string.IsNullOrEmpty(c.TextContent));
             if (textCell != null)
             {
                 var dt = new DataTransfer();
@@ -1811,10 +1811,7 @@ public partial class MainWindow
                     // Select all pasted cells and pan to the first one.
                     ClearSelection();
                     foreach (var c in pastedCells)
-                    {
-                        c.IsSelected = true;
-                        _selectedCells.Add(c);
-                    }
+                        Vm.SelectionService.SelectCell(c, additive: true);
                     UpdateSelectionState();
                     PanToPosition(
                         pastedCells[0].CanvasX + pastedCells[0].ColSpan * Constants.GridSize / 2.0,
@@ -1975,10 +1972,7 @@ public partial class MainWindow
                 // Select all pasted cells and pan to the first one.
                 ClearSelection();
                 foreach (var c in pastedCells)
-                {
-                    c.IsSelected = true;
-                    _selectedCells.Add(c);
-                }
+                    Vm.SelectionService.SelectCell(c, additive: true);
                 UpdateSelectionState();
                 PanToPosition(
                     pastedCells[0].CanvasX + pastedCells[0].ColSpan * Constants.GridSize / 2.0,
@@ -2097,9 +2091,9 @@ public partial class MainWindow
 
         if (e.Key == Key.F && isCtrl && isShift)
         {
-            if (_selectedCells.Count > 0)
+            if (Vm.SelectionService.SelectedCells.Count > 0)
             {
-                foreach (var cell in _selectedCells.ToList())
+                foreach (var cell in Vm.SelectionService.SelectedCells.ToList())
                 {
                     if (!cell.IsImage && !cell.IsVideo)
                         continue;
@@ -2178,8 +2172,7 @@ public partial class MainWindow
             {
                 // Normal double-click: Zoom to fill screen completely
                 ClearSelection();
-                cell.IsSelected = true;
-                _selectedCells.Add(cell);
+                Vm.SelectionService.SelectCell(cell, additive: true);
                 UpdateSelectionState();
                 ZoomToCell(cell);
             }
@@ -2197,8 +2190,7 @@ public partial class MainWindow
             {
                 // Normal double-click: Zoom to fill screen completely
                 ClearSelection();
-                cell.IsSelected = true;
-                _selectedCells.Add(cell);
+                Vm.SelectionService.SelectCell(cell, additive: true);
                 UpdateSelectionState();
                 ZoomToCell(cell);
             }
@@ -2227,8 +2219,7 @@ public partial class MainWindow
         {
             // Normal double-click: Zoom to fill screen completely
             ClearSelection();
-            cell.IsSelected = true;
-            _selectedCells.Add(cell);
+            Vm.SelectionService.SelectCell(cell, additive: true);
             UpdateSelectionState();
             ZoomToCell(cell);
         }

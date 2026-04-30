@@ -67,7 +67,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         get
         {
-            int count = _selectedCells.Count + _selectedAnnotations.Count;
+            int count = Vm.SelectionService.SelectionCount;
             return count > 0 ? $"{count} selected" : "";
         }
     }
@@ -85,8 +85,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
 
-    public bool HasMultipleSelection => (_selectedCells.Count + _selectedAnnotations.Count) > 1;
-    public bool HasSingleSelection => (_selectedCells.Count + _selectedAnnotations.Count) == 1;
+    public bool HasMultipleSelection => Vm.SelectionService.HasMultipleSelection;
+    public bool HasSingleSelection => Vm.SelectionService.HasSingleSelection;
 
     // Cached process handle used by MemoryUsageText.
     private static readonly System.Diagnostics.Process _thisProcess =
@@ -103,7 +103,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     // Annotation drawing
     private AnnotationViewModel? _currentAnnotation;
-    private readonly List<AnnotationViewModel> _selectedAnnotations = new();
     private bool _isDraggingAnnotations;
     private bool _isDraggingFromSystem;
     private bool _isSelectingAnnotations;
@@ -140,7 +139,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private bool _middleZoomAnchorSet;
 
     // Multi-selection
-    private readonly List<CellViewModel> _selectedCells = new();
     private bool _isSelectingCells;
     private Point _cellSelectionStart;
     private bool _selectionAdditive;
@@ -760,12 +758,7 @@ Vm = vm;
 
     private void ClearLocalSelectionState()
     {
-        foreach (var c in _selectedCells)
-            c.IsSelected = false;
-        _selectedCells.Clear();
-        foreach (var a in _selectedAnnotations)
-            a.IsSelected = false;
-        _selectedAnnotations.Clear();
+        Vm.SelectionService.ClearSelection();
     }
 
     private void CanvasBorder_Tunneled_PointerPressed(object? sender, PointerPressedEventArgs e)
@@ -797,8 +790,6 @@ Vm = vm;
 
     public void UpdateSelectionState()
     {
-        // Sync to SelectionService
-        Vm.SelectionService.SelectRange(_selectedCells, _selectedAnnotations);
         UpdateTransformOverlayLayout();
 
         OnPropertyChanged(nameof(SelectionCountText));
@@ -827,8 +818,7 @@ Vm = vm;
     private void SelectAndPanToCell(CellViewModel cell)
     {
         ClearSelection();
-        cell.IsSelected = true;
-        _selectedCells.Add(cell);
+        Vm.SelectionService.SelectCell(cell);
         UpdateSelectionState();
 
         double centerX = cell.CanvasX + cell.ColSpan * Constants.GridSize / 2.0;

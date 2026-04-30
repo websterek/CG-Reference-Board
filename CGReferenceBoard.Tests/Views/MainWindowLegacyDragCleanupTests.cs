@@ -108,8 +108,8 @@ public sealed class MainWindowLegacyDragCleanupTests
     public void CancelLegacyAltDuplicateDrag_RemovesPendingDuplicateAndClearsFlags()
     {
         var window = (MainWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(MainWindow));
-        SetPrivateField(window, "<Vm>k__BackingField", new MainWindowViewModel());
-        SetPrivateField(window, "_selectedCells", new System.Collections.Generic.List<CellViewModel>());
+        var viewModel = new MainWindowViewModel();
+        SetPrivateField(window, "<Vm>k__BackingField", viewModel);
         var duplicate = new CellViewModel
         {
             CanvasX = 160,
@@ -123,18 +123,16 @@ public sealed class MainWindowLegacyDragCleanupTests
         };
 
         window.Vm.GridCells.Add(duplicate);
+        viewModel.SelectionService.SelectCell(duplicate);
         SetPrivateField(window, "_draggingCell", duplicate);
         SetPrivateField(window, "_isDraggingCell", true);
         SetPrivateField(window, "_isAltDuplicateDrag", true);
-
-        var selectedCells = (IList)GetPrivateField(window, "_selectedCells")!;
-        selectedCells.Add(duplicate);
 
         var cancelled = window.CancelLegacyAltDuplicateDrag();
 
         Assert.True(cancelled);
         Assert.DoesNotContain(duplicate, window.Vm.GridCells);
-        Assert.DoesNotContain(duplicate, selectedCells.Cast<object>());
+        Assert.DoesNotContain(duplicate, viewModel.SelectionService.SelectedCells);
         Assert.False(duplicate.IsDragging);
         Assert.False(duplicate.IsDragInvalid);
         Assert.False((bool)GetPrivateField(window, "_isDraggingCell")!);
@@ -160,8 +158,9 @@ public sealed class MainWindowLegacyDragCleanupTests
         duplicate.UpdateBoundsCache();
 
         SetPrivateField(window, "<Vm>k__BackingField", viewModel);
-        SetPrivateField(window, "_selectedCells", new System.Collections.Generic.List<CellViewModel>());
-        SetPrivateField(window, "_selectedAnnotations", new System.Collections.Generic.List<AnnotationViewModel> { duplicate });
+        SetPrivateField(window, "_cachedTransformOverlay", new Canvas());
+        SetPrivateField(window, "_cachedTransformBody", new Border());
+        SetPrivateField(window, "_scale", new ScaleTransform(1, 1));
 
         viewModel.Annotations.Add(duplicate);
         viewModel.ModeService.SetMode("Annotation");
@@ -183,7 +182,6 @@ public sealed class MainWindowLegacyDragCleanupTests
         Assert.True(cancelled);
         Assert.DoesNotContain(duplicate, viewModel.Annotations);
         Assert.DoesNotContain(duplicate, viewModel.SelectionService.SelectedAnnotations);
-        Assert.DoesNotContain(duplicate, ((IList)GetPrivateField(window, "_selectedAnnotations")!).Cast<object>());
         Assert.False((bool)GetPrivateField(window, "_isAltDuplicateDrag")!);
         Assert.Null(GetPrivateField(window, "_pendingAltDuplicateAnnotation"));
         Assert.False(viewModel.TransformService.HasActiveOperation);
@@ -276,8 +274,6 @@ public sealed class MainWindowLegacyDragCleanupTests
         annotation.UpdateBoundsCache();
 
         SetPrivateField(window, "<Vm>k__BackingField", viewModel);
-        SetPrivateField(window, "_selectedCells", new System.Collections.Generic.List<CellViewModel>());
-        SetPrivateField(window, "_selectedAnnotations", new System.Collections.Generic.List<AnnotationViewModel> { annotation });
         SetPrivateField(window, "_cachedTransformOverlay", new Canvas());
         SetPrivateField(window, "_cachedTransformBody", new Border());
         SetPrivateField(window, "_scale", new ScaleTransform(1, 1));
@@ -361,8 +357,6 @@ public sealed class MainWindowLegacyDragCleanupTests
         cellInBackdropPadding.SetText("inside rendered backdrop padding");
 
         SetPrivateField(window, "<Vm>k__BackingField", viewModel);
-        SetPrivateField(window, "_selectedCells", new System.Collections.Generic.List<CellViewModel>());
-        SetPrivateField(window, "_selectedAnnotations", new System.Collections.Generic.List<AnnotationViewModel>());
         SetPrivateField(window, "_cachedTransformOverlay", new Canvas());
         SetPrivateField(window, "_cachedTransformBody", new Border());
         SetPrivateField(window, "_scale", new ScaleTransform(1, 1));
@@ -510,19 +504,17 @@ public sealed class MainWindowLegacyDragCleanupTests
     {
         var window = (MainWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(MainWindow));
         SetPrivateField(window, "<Vm>k__BackingField", viewModel);
-        SetPrivateField(window, "_selectedCells", new List<CellViewModel>());
-        SetPrivateField(window, "_selectedAnnotations", new List<AnnotationViewModel>());
         SetPrivateField(window, "_cachedTransformOverlay", new Canvas());
         SetPrivateField(window, "_cachedTransformBody", new Border());
         SetPrivateField(window, "_scale", new ScaleTransform(1, 1));
         return window;
     }
 
-    private static List<CellViewModel> GetSelectedCells(MainWindow window)
-        => (List<CellViewModel>)GetPrivateField(window, "_selectedCells")!;
+    private static System.Collections.ObjectModel.ObservableCollection<CellViewModel> GetSelectedCells(MainWindow window)
+        => window.Vm.SelectionService.SelectedCells;
 
-    private static List<AnnotationViewModel> GetSelectedAnnotations(MainWindow window)
-        => (List<AnnotationViewModel>)GetPrivateField(window, "_selectedAnnotations")!;
+    private static System.Collections.ObjectModel.ObservableCollection<AnnotationViewModel> GetSelectedAnnotations(MainWindow window)
+        => window.Vm.SelectionService.SelectedAnnotations;
 
     private static void SetPrivateField(object instance, string fieldName, object? value)
         => instance.GetType()

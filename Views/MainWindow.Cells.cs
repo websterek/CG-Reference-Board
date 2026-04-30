@@ -76,8 +76,7 @@ public partial class MainWindow
 
             // Clear current selection and select the duplicate
             ClearSelection();
-            duplicate.IsSelected = true;
-            _selectedCells.Add(duplicate);
+            Vm.SelectionService.SelectCell(duplicate);
             UpdateSelectionState();
 
             // Immediately start dragging the duplicate
@@ -112,8 +111,7 @@ public partial class MainWindow
             if (!cell.IsSelected)
             {
                 ClearSelection();
-                cell.IsSelected = true;
-                _selectedCells.Add(cell);
+                Vm.SelectionService.SelectCell(cell);
                 UpdateSelectionState();
             }
             return;
@@ -133,18 +131,16 @@ public partial class MainWindow
 
                 if (isCtrlPressed)
                 {
-                    cell.IsSelected = !cell.IsSelected;
                     if (cell.IsSelected)
-                        _selectedCells.Add(cell);
+                        Vm.SelectionService.RemoveFromSelection(cell);
                     else
-                        _selectedCells.Remove(cell);
+                        Vm.SelectionService.SelectCell(cell, additive: true);
                     UpdateSelectionState();
                 }
                 else if (!cell.IsSelected)
                 {
                     ClearSelection();
-                    cell.IsSelected = true;
-                    _selectedCells.Add(cell);
+                    Vm.SelectionService.SelectCell(cell);
                     UpdateSelectionState();
                 }
 
@@ -158,8 +154,7 @@ public partial class MainWindow
             if (!cell.IsBackdrop && !cell.IsSelected && !e.KeyModifiers.HasFlag(KeyModifiers.Control))
             {
                 ClearSelection();
-                cell.IsSelected = true;
-                _selectedCells.Add(cell);
+                Vm.SelectionService.SelectCell(cell);
                 UpdateSelectionState();
             }
 
@@ -167,11 +162,10 @@ public partial class MainWindow
 
             if (isCtrl)
             {
-                cell.IsSelected = !cell.IsSelected;
                 if (cell.IsSelected)
-                    _selectedCells.Add(cell);
+                    Vm.SelectionService.RemoveFromSelection(cell);
                 else
-                    _selectedCells.Remove(cell);
+                    Vm.SelectionService.SelectCell(cell, additive: true);
                 UpdateSelectionState();
             }
             else
@@ -179,8 +173,7 @@ public partial class MainWindow
                 if (!cell.IsSelected)
                 {
                     ClearSelection();
-                    cell.IsSelected = true;
-                    _selectedCells.Add(cell);
+                    Vm.SelectionService.SelectCell(cell);
                 }
             }
 
@@ -231,10 +224,10 @@ public partial class MainWindow
                 _draggingCell = cell;
                 DisableCellHitTesting();
 
-                var cellsToMove = new List<CellViewModel>(_selectedCells);
+                var cellsToMove = new List<CellViewModel>(Vm.SelectionService.SelectedCells);
                 var annotationsToMove = new List<AnnotationViewModel>();
 
-                foreach (var backdrop in _selectedCells.Where(c => c.IsBackdrop).ToList())
+                foreach (var backdrop in Vm.SelectionService.SelectedCells.Where(c => c.IsBackdrop).ToList())
                 {
                     double left = backdrop.CanvasX;
                     double top = backdrop.CanvasY;
@@ -282,7 +275,7 @@ public partial class MainWindow
                     }
                 }
 
-                foreach (var ann in _selectedAnnotations)
+                foreach (var ann in Vm.SelectionService.SelectedAnnotations)
                 {
                     if (!annotationsToMove.Contains(ann))
                         annotationsToMove.Add(ann);
@@ -446,7 +439,7 @@ public partial class MainWindow
                         _draggingCell.IsDragInvalid = false;
                         _draggingCell.IsDragging = false;
                         Vm.GridCells.Remove(_draggingCell);
-                        _selectedCells.Remove(_draggingCell);
+                        Vm.SelectionService.RemoveFromSelection(_draggingCell);
                         // Skip the IsDragInvalid/IsDragging lines below —
                         // _draggingCell is already cleaned up and removed.
                         _draggingCell = null;

@@ -347,9 +347,7 @@ public partial class MainWindow
             CancelActiveTransform();
         }
 
-        _selectedAnnotations.Remove(pendingDuplicate);
         Vm.SelectionService.RemoveFromSelection(pendingDuplicate);
-        pendingDuplicate.IsSelected = false;
         Vm.Annotations.Remove(pendingDuplicate);
         ClearPendingAnnotationAltDuplicateState();
         Vm.RefreshTransformState();
@@ -367,7 +365,7 @@ public partial class MainWindow
         _draggingCell.IsDragInvalid = false;
         _draggingCell.IsDragging = false;
         Vm.GridCells.Remove(_draggingCell);
-        _selectedCells.Remove(_draggingCell);
+        Vm.SelectionService.RemoveFromSelection(_draggingCell);
         _draggingCell = null;
         _isDraggingCell = false;
         _groupDragStarts = null;
@@ -576,9 +574,7 @@ public partial class MainWindow
 
             if (!_selectionAdditive)
             {
-                _selectedAnnotations.Clear();
-                foreach (var a in Vm.Annotations)
-                    a.IsSelected = false;
+                Vm.SelectionService.ClearSelection();
             }
             e.Pointer.Capture(sender as IInputElement);
             return;
@@ -739,7 +735,7 @@ public partial class MainWindow
         }
 
         // Annotation drag
-        if (_isDraggingAnnotations && _selectedAnnotations.Count > 0)
+        if (_isDraggingAnnotations && Vm.SelectionService.SelectedAnnotations.Count > 0)
         {
             StartEdgeScrollIfNeeded(_lastPointerPosition);
 
@@ -747,7 +743,7 @@ public partial class MainWindow
             {
                 double dx = pt.X - _annotationDragStart.X;
                 double dy = pt.Y - _annotationDragStart.Y;
-                foreach (var ann in _selectedAnnotations)
+                foreach (var ann in Vm.SelectionService.SelectedAnnotations)
                 {
                     ann.CanvasX += dx;
                     ann.CanvasY += dy;
@@ -779,7 +775,7 @@ public partial class MainWindow
                         }
                     }
 
-                    foreach (var ann in _selectedAnnotations)
+                    foreach (var ann in Vm.SelectionService.SelectedAnnotations)
                     {
                         ann.CanvasX += dx;
                         ann.CanvasY += dy;
@@ -986,9 +982,7 @@ public partial class MainWindow
 
                 if (!_selectionAdditive)
                 {
-                    _selectedAnnotations.Clear();
-                    foreach (var ann in Vm.Annotations)
-                        ann.IsSelected = false;
+                    Vm.SelectionService.ClearSelection();
                 }
 
                 foreach (var ann in Vm.Annotations)
@@ -997,8 +991,7 @@ public partial class MainWindow
 
                     if (inRect && !ann.IsSelected)
                     {
-                        ann.IsSelected = true;
-                        _selectedAnnotations.Add(ann);
+                        Vm.SelectionService.SelectAnnotation(ann, additive: true);
                     }
                 }
             }
@@ -1043,7 +1036,7 @@ public partial class MainWindow
                         c.CanvasY = startY;
                     }
 
-                    foreach (var ann in _selectedAnnotations)
+                    foreach (var ann in Vm.SelectionService.SelectedAnnotations)
                     {
                         ann.CanvasX += revertDx;
                         ann.CanvasY += revertDy;
@@ -1092,12 +1085,7 @@ public partial class MainWindow
                 {
                     if (!_selectionAdditive)
                     {
-                        _selectedCells.Clear();
-                        foreach (var cell in Vm.GridCells)
-                            cell.IsSelected = false;
-                        _selectedAnnotations.Clear();
-                        foreach (var ann in Vm.Annotations)
-                            ann.IsSelected = false;
+                        Vm.SelectionService.ClearSelection();
                     }
 
                     foreach (var cell in Vm.GridCells)
@@ -1114,8 +1102,7 @@ public partial class MainWindow
                                        && cy < bottom && cy + ch > top;
                         if (intersects && !cell.IsSelected)
                         {
-                            cell.IsSelected = true;
-                            _selectedCells.Add(cell);
+                            Vm.SelectionService.SelectCell(cell, additive: true);
                         }
                     }
 
@@ -1124,8 +1111,7 @@ public partial class MainWindow
                     {
                         if (AnnotationBoundsHelper.IntersectsRenderedGeometry(ann, new Rect(left, top, cellMarquee.Width, cellMarquee.Height)) && !ann.IsSelected)
                         {
-                            ann.IsSelected = true;
-                            _selectedAnnotations.Add(ann);
+                            Vm.SelectionService.SelectAnnotation(ann, additive: true);
                         }
                     }
                 }
@@ -1274,13 +1260,13 @@ public partial class MainWindow
 
     private void ShowSelected_Click(object? sender, RoutedEventArgs e)
     {
-        if (_selectedCells.Count == 0 && _selectedAnnotations.Count == 0)
+        if (Vm.SelectionService.SelectedCells.Count == 0 && Vm.SelectionService.SelectedAnnotations.Count == 0)
         { ShowAll_Click(sender, e); return; }
 
         double minX = double.MaxValue, minY = double.MaxValue;
         double maxX = double.MinValue, maxY = double.MinValue;
 
-        foreach (var cell in _selectedCells)
+        foreach (var cell in Vm.SelectionService.SelectedCells)
         {
             var cellBounds = TransformBoundsCalculator.GetCellBounds(cell);
             if (cellBounds.X < minX)
@@ -1293,7 +1279,7 @@ public partial class MainWindow
                 maxY = cellBounds.Bottom;
         }
 
-        var selectedAnnotationBounds = AnnotationBoundsHelper.GetRenderedBoundsUnion(_selectedAnnotations);
+        var selectedAnnotationBounds = AnnotationBoundsHelper.GetRenderedBoundsUnion(Vm.SelectionService.SelectedAnnotations);
         if (selectedAnnotationBounds is { } annotationSelectionBounds)
         {
             if (annotationSelectionBounds.X < minX)
