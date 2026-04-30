@@ -3,6 +3,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
@@ -133,5 +134,13 @@ public partial class CreateDatabaseWizardDialog : Window
 
         _canClose = true;
         Close(true);
+    }
+
+    public async Task<(bool Success, string? Path)> ShowAsync(Window owner)
+    {
+        var result = await this.ShowDialog<bool>(owner);
+        if (result && DatabasePath is not null)
+            return (true, BoardPath);
+        return (false, null);
     }
 }

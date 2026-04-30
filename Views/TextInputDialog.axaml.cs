@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 
@@ -63,5 +64,11 @@ public partial class TextInputDialog : Window, INotifyPropertyChanged
             _canClose = true;
             Close(Result);
         }
+    }
+
+    public async Task<string?> ShowAsync(Window owner, string prompt)
+    {
+        DialogTitle = prompt;
+        return await this.ShowDialog<string?>(owner);
     }
 }
