@@ -453,6 +453,24 @@
         </DataTemplate>
     </Window.Resources>
 
+    <!-- ── Keyboard shortcuts wired to MainWindowViewModel commands ───────── -->
+    <Window.KeyBindings>
+        <!-- Undo / Redo -->
+        <KeyBinding Gesture="Ctrl+Z"          Command="{Binding UndoCommand}" />
+        <KeyBinding Gesture="Ctrl+Shift+Z"    Command="{Binding RedoCommand}" />
+        <KeyBinding Gesture="Ctrl+Y"          Command="{Binding RedoCommand}" />
+
+        <!-- Mode switching -->
+        <KeyBinding Gesture="Ctrl+1"          Command="{Binding SwitchToGridModeCommand}" />
+        <KeyBinding Gesture="Ctrl+2"          Command="{Binding SwitchToAnnotationModeCommand}" />
+
+        <!-- Annotations layer toggle -->
+        <KeyBinding Gesture="Shift+A"         Command="{Binding ToggleAnnotationsVisibleCommand}" />
+
+        <!-- Always-on-top -->
+        <KeyBinding Gesture="Ctrl+Shift+T"    Command="{Binding ToggleAlwaysOnTopCommand}" />
+    </Window.KeyBindings>
+
     <Grid>
         <Grid RowDefinitions="Auto, *, Auto">
 

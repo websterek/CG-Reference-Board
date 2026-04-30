@@ -1563,13 +1563,7 @@ public partial class MainWindow
         if (focused is TextBox { IsVisible: true })
             return;
 
-        if (e.Key == Key.Z && isCtrl && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
-        { Vm.RedoCommand.Execute(null); return; }
-        if (e.Key == Key.Y && isCtrl)
-        { Vm.RedoCommand.Execute(null); return; }
-
-        if (e.Key == Key.Z && isCtrl)
-        { Vm.UndoCommand.Execute(null); return; }
+        // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y are handled via Window.KeyBindings in MainWindow.axaml.
 
         if (e.Key == Key.I && isCtrl)
         { ImportMedia_Click(null, null!); return; }
@@ -2036,14 +2030,9 @@ public partial class MainWindow
         if (e.Key == Key.Home && noModifiers)
         { ZoomReset_Click(null, null!); return; }
 
-        if (e.Key == Key.D1 && isCtrl)
-        { Vm.ModeService.SetMode("Grid"); return; }
+        // Ctrl+1 / Ctrl+2 are handled via Window.KeyBindings in MainWindow.axaml.
 
-        if (e.Key == Key.D2 && isCtrl)
-        { Vm.ModeService.SetMode("Annotation"); return; }
-
-        if (e.Key == Key.A && isShift && !isCtrl)
-        { Vm.IsAnnotationsVisible = !Vm.IsAnnotationsVisible; return; }
+        // Shift+A is handled via Window.KeyBindings in MainWindow.axaml.
 
         // Annotation tool shortcuts (Photoshop-style)
         if (Vm.IsDrawMode && noModifiers)
@@ -2118,12 +2107,7 @@ public partial class MainWindow
             return;
         }
 
-        if (e.Key == Key.T && e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift))
-        {
-            Vm.IsAlwaysOnTop = !Vm.IsAlwaysOnTop;
-            e.Handled = true;
-            return;
-        }
+        // Ctrl+Shift+T is handled via Window.KeyBindings in MainWindow.axaml.
 
         if (e.Key == Key.Delete || e.Key == Key.Back)
         {
