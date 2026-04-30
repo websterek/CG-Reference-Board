@@ -26,8 +26,8 @@ namespace CGReferenceBoard.ViewModels;
 /// Primary ViewModel for <see cref="CGReferenceBoard.Views.MainWindow"/>.
 ///
 /// Owns all observable state that was previously scattered across the MainWindow
-/// partial class files. The View subscribes to events (<see cref="AlwaysOnTopChanged"/>,
-/// <see cref="ToastRequested"/>, etc.) for operations that require direct UI access.
+/// partial class files. The View subscribes to events (<see cref="ViewportUpdateRequested"/>,
+/// <see cref="TransformContextChanging"/>, etc.) for operations that require direct UI access.
 ///
 /// This class is intentionally a <c>partial</c> class so that CommunityToolkit.Mvvm
 /// source generators can emit the backing property/command code into a companion file.
@@ -196,27 +196,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     // ── View-integration events ───────────────────────────────────────────────
 
-    /// <summary>
-    /// Fired when <see cref="IsAlwaysOnTop"/> changes. The View subscribes and sets
-    /// <c>Window.Topmost</c> accordingly (requires direct Window access).
-    /// </summary>
-    public event Action<bool>? AlwaysOnTopChanged;
-
-    /// <summary>Fired when a toast notification should be displayed.</summary>
-    public event Action<string>? ToastRequested;
-
     /// <summary>Fired when the viewport LOD system should schedule an update.</summary>
     public event Action? ViewportUpdateRequested;
-
-    /// <summary>
-    /// Fired when the startup overlay should be hidden (after a board is loaded).
-    /// </summary>
-    public event Action? StartupOverlayHideRequested;
-
-    /// <summary>
-    /// Fired when the view must clear any local selection mirrors before a mode switch completes.
-    /// </summary>
-    public event Action? SelectionResetRequested;
 
     /// <summary>
     /// Fired before mode/tool changes refresh transform state so the View can cancel live drags cleanly.
@@ -419,7 +400,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ann.IsInDrawMode = isAnnotationMode;
 
         // Clear selection when switching modes to avoid stale references.
-        SelectionResetRequested?.Invoke();
         SelectionService.ClearSelection();
 
         // Notify all mode-derived computed properties.
@@ -439,7 +419,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     internal void ResetInteractionState()
     {
-        SelectionResetRequested?.Invoke();
         SelectionService.ClearSelection();
         TransformService.Cancel();
         RefreshTransformState();
@@ -458,11 +437,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     /// <summary>
     /// Called by the source-generated <c>IsAlwaysOnTop</c> setter.
-    /// Fires <see cref="AlwaysOnTopChanged"/> so the View can set <c>Window.Topmost</c>.
     /// </summary>
     partial void OnIsAlwaysOnTopChanged(bool value)
     {
-        AlwaysOnTopChanged?.Invoke(value);
     }
 
     /// <summary>
@@ -499,7 +476,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _historyService.Undo();
         RequestSave();
         ViewportUpdateRequested?.Invoke();
-        ToastRequested?.Invoke("↩ Undo");
+        _notificationService.ShowToast("↩ Undo");
     }
 
     [RelayCommand]
@@ -509,7 +486,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _historyService.Redo();
         RequestSave();
         ViewportUpdateRequested?.Invoke();
-        ToastRequested?.Invoke("↪ Redo");
+        _notificationService.ShowToast("↪ Redo");
     }
 
     /// <summary>Switches the application to Grid layout mode.</summary>
@@ -699,10 +676,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
             Debug.WriteLine($"Save error: {ex.Message}");
             // Toast must be raised on UI thread.
             if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
-                ToastRequested?.Invoke("⚠️ Save failed — check disk space");
+                _notificationService.ShowToast("⚠️ Save failed — check disk space");
             else
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                    ToastRequested?.Invoke("⚠️ Save failed — check disk space"));
+                    _notificationService.ShowToast("⚠️ Save failed — check disk space"));
             return;
         }
         finally
@@ -846,7 +823,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         catch (Exception ex)
         {
             Debug.WriteLine($"Load error (read): {ex.Message}");
-            ToastRequested?.Invoke("⚠️ Could not open board file");
+            _notificationService.ShowToast("⚠️ Could not open board file");
             return;
         }
 
@@ -857,8 +834,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(WindowTitle));
         _ = UpdateBoardDirectoryListAsync();
 
-        // Signal the View to hide the startup overlay.
-        StartupOverlayHideRequested?.Invoke();
+        // Signal the View to hide the startup overlay via IsStartupOverlayVisible binding.
 
         // Dispose existing bitmaps and clear caches before replacing the collection.
         foreach (var c in GridCells) c.UnloadImage();
@@ -882,7 +858,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         catch (Exception ex)
         {
             Debug.WriteLine($"Load error (deserialize): {ex.Message}");
-            ToastRequested?.Invoke("⚠️ Board file is corrupt or unreadable");
+            _notificationService.ShowToast("⚠️ Board file is corrupt or unreadable");
             HasUnsavedChanges = false;
             return;
         }

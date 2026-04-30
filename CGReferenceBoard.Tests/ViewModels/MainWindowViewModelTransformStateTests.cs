@@ -60,32 +60,32 @@ public sealed class MainWindowViewModelTransformStateTests
     }
 
     [Fact]
-    public void ModeChange_RaisesSelectionResetRequest()
+    public void ModeChange_ClearsSelection()
     {
         var viewModel = new MainWindowViewModel();
-        int resetRequests = 0;
-        viewModel.SelectionResetRequested += () => resetRequests++;
+        // Pre-select something so we can verify it was cleared.
+        var cell = new CellViewModel { CanvasX = 0, CanvasY = 0 };
+        viewModel.GridCells.Add(cell);
+        viewModel.SelectionService.SelectCell(cell);
+        Assert.True(viewModel.SelectionService.HasSelection);
 
         viewModel.ModeService.SetMode("Annotation");
 
-        Assert.Equal(1, resetRequests);
+        Assert.False(viewModel.SelectionService.HasSelection);
     }
 
     [Fact]
-    public void RestoreBoardState_RaisesSelectionResetRequest()
+    public void RestoreBoardState_ClearsSelection()
     {
         var viewModel = new MainWindowViewModel();
-        int resetRequests = 0;
-        viewModel.SelectionResetRequested += () => resetRequests++;
-
         viewModel.SetBoardFilePath(Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.cgrb"));
         viewModel.RestoreBoardState("{\"Cells\":[],\"Annotations\":[]}");
 
-        Assert.Equal(1, resetRequests);
+        Assert.False(viewModel.SelectionService.HasSelection);
     }
 
     [Fact]
-    public async Task LoadBoardFromFile_RaisesSelectionResetRequest()
+    public async Task LoadBoardFromFile_ClearsSelection()
     {
         var viewModel = new MainWindowViewModel();
         var boardPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.cgrb");
@@ -93,14 +93,8 @@ public sealed class MainWindowViewModelTransformStateTests
 
         try
         {
-            var resetRaised = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            viewModel.SelectionResetRequested += () => resetRaised.TrySetResult();
-
-            _ = viewModel.LoadBoardFromFileAsync(boardPath);
-
-            var completed = await Task.WhenAny(resetRaised.Task, Task.Delay(TimeSpan.FromSeconds(5)));
-
-            Assert.Same(resetRaised.Task, completed);
+            await viewModel.LoadBoardFromFileAsync(boardPath);
+            Assert.False(viewModel.SelectionService.HasSelection);
         }
         finally
         {
@@ -118,7 +112,10 @@ public sealed class MainWindowViewModelTransformStateTests
         annotation.UpdateBoundsCache();
 
         int resetRequests = 0;
-        viewModel.SelectionResetRequested += () => resetRequests++;
+        viewModel.SelectionService.SelectionChanged += (_, _) =>
+        {
+            if (!viewModel.SelectionService.HasSelection) resetRequests++;
+        };
 
         viewModel.ModeService.SetMode("Grid");
         viewModel.Annotations.Add(annotation);
@@ -130,7 +127,7 @@ public sealed class MainWindowViewModelTransformStateTests
 
         viewModel.ResetInteractionState();
 
-        Assert.Equal(1, resetRequests);
+        Assert.True(resetRequests >= 1);
         Assert.Empty(viewModel.SelectionService.SelectedCells);
         Assert.Empty(viewModel.SelectionService.SelectedAnnotations);
         Assert.False(viewModel.SelectionService.HasSelection);

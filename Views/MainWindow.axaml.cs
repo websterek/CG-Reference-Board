@@ -187,6 +187,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private System.Threading.CancellationTokenSource? _toastCts;
     private readonly INotificationService? _notifications;
 
+    // Interaction controller (wired in constructor; does not yet route events)
+    private CGReferenceBoard.Interaction.IInteractionController? _interactionController;
+
     // Viewport-aware LOD management
     private Avalonia.Threading.DispatcherTimer? _viewportLodTimer;
     private Avalonia.Threading.DispatcherTimer? _lodDebounceTimer;
@@ -238,15 +241,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 Vm = vm;
         DataContext = Vm;
 
-        _notifications = App.Services?.GetService<INotificationService>() ?? new NotificationService();
-
         InitializeComponent();
 
         // Wire ViewModel events to View callbacks
-        Vm.AlwaysOnTopChanged += topmost => Topmost = topmost;
-        Vm.ToastRequested += ToastEventHandler;
+        Vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(Vm.IsAlwaysOnTop))
+                Topmost = Vm.IsAlwaysOnTop;
+        };
         Vm.ViewportUpdateRequested += ScheduleViewportUpdate;
-        Vm.SelectionResetRequested += ClearLocalSelectionState;
         Vm.TransformContextChanging += CancelActiveInteractionForContextChange;
         Vm.TransformService.PropertyChanged += (_, e) =>
         {
@@ -255,11 +258,14 @@ Vm = vm;
                 UpdateTransformOverlayLayout();
             }
         };
-        Vm.StartupOverlayHideRequested += () =>
-        {
-            var overlay = this.FindControl<Border>("StartupOverlay");
-            if (overlay != null) overlay.IsVisible = false;
-        };
+
+        // Wire services into View
+        if (App.Services?.GetService<INotificationService>() is NotificationService ns)
+            ns.ToastNotified += ToastEventHandler;
+        if (App.Services?.GetService<IDialogService>() is DialogService ds)
+            ds.SetOwnerProvider(() => this);
+        if (App.Services?.GetService<IClipboardService>() is ClipboardService cs)
+            cs.SetTopLevelProvider(() => TopLevel.GetTopLevel(this));
 
         // Wire async event handlers that cannot use XAML wiring
         KeyDown += Window_KeyDown;
@@ -393,6 +399,13 @@ Vm = vm;
         }
 
         InitViewportLodTimer();
+
+        // Wire up interaction controller (preparatory — old handlers still fire)
+        var viewportSvc = App.Services?.GetService<IViewportService>()
+            ?? new CGReferenceBoard.Services.ViewportService();
+        var interactionCtx = new CGReferenceBoard.Interaction.MainWindowInteractionContext(this, viewportSvc);
+        _interactionController = new CGReferenceBoard.Interaction.InteractionController(
+            interactionCtx, new CGReferenceBoard.Interaction.States.IdleState());
 
         Closing += WindowClosingHandler;
     }
