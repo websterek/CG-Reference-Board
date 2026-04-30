@@ -21,6 +21,13 @@ public interface IInteractionContext
     /// <summary>Translates a screen-space point to canvas coordinates.</summary>
     Point ScreenToCanvas(Point screenPt);
 
+    /// <summary>
+    /// Returns the canvas-space position of a pointer event.
+    /// Equivalent to ScreenToCanvas(e.GetPosition(null)), but allows
+    /// test fakes to inject arbitrary positions without real event args.
+    /// </summary>
+    Point GetCanvasPosition(PointerEventArgs e);
+
     IHistoryService History { get; }
 
     CellViewModel? HitTestCell(Point canvasPt);

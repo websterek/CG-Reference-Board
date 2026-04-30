@@ -37,6 +37,11 @@ public sealed class MainWindowInteractionContext : IInteractionContext
             (screenPt.Y - _viewport.OffsetY) / _viewport.Zoom);
     }
 
+    public Point GetCanvasPosition(PointerEventArgs e)
+    {
+        return ScreenToCanvas(e.GetPosition(null));
+    }
+
     public CellViewModel? HitTestCell(Point canvasPt)
     {
         return null; // TODO: wire to spatial index
