@@ -31,6 +31,11 @@ public static class ServiceCollectionExtensions
 
         services.AddTransient<MainWindowViewModel>();
 
+        services.AddTransient<IDropImportService>(sp =>
+            new DropImportService(
+                sp.GetRequiredService<MainWindowViewModel>(),
+                sp.GetRequiredService<INotificationService>()));
+
         services.AddTransient<MainWindow>();
 
         return services;

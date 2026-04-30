@@ -52,7 +52,7 @@ public sealed class DropImportService : IDropImportService
         // collection path; fall back to the sync (Windows) path otherwise.
         DropPayload payload = data is IAsyncDataTransfer asyncTransfer
             ? await CollectDropPayloadAsync(asyncTransfer)
-            : CollectDropPayload(data);
+            : CollectDropPayload((IDataTransfer)data);
 
         int placedCount = 0;
 
@@ -344,7 +344,7 @@ public sealed class DropImportService : IDropImportService
         return new DropPayload(localPaths, webUrls, plainText, htmlContent);
     }
 
-    private static DropPayload CollectDropPayload(IDataObject data)
+    private static DropPayload CollectDropPayload(IDataTransfer data)
     {
         var localPaths = new List<string>();
         var webUrls = new List<string>();
