@@ -77,4 +77,13 @@ public sealed class MainWindowInteractionContext : IInteractionContext
         _window.ScheduleViewportUpdate();
 
     public void NotifyZoomChanged() { }
+
+    public bool BeginTransformMove(Point canvasPt) =>
+        _window.StartTransformMoveFromCurrentSelection(canvasPt);
+
+    public void UpdateTransformMove(Point canvasPt) =>
+        _window.UpdateActiveTransform(canvasPt);
+
+    public void FinishTransformMove() =>
+        _window.FinishActiveTransformFromState();
 }

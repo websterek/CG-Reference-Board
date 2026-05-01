@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Input;
 
 namespace CGReferenceBoard.Interaction.States;
@@ -16,7 +17,10 @@ public sealed class IdleState : IInteractionState
         var props = e.GetCurrentPoint(null).Properties;
 
         if (props.IsMiddleButtonPressed)
-            return StateTransition.GoTo(new MiddleZoomState());
+        {
+            var screenPt = e.GetPosition(null);
+            return StateTransition.GoTo(new MiddleZoomState(anchor: screenPt, screenY: screenPt.Y));
+        }
 
         if (props.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
             return StateTransition.GoTo(new PanState());

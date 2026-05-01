@@ -39,4 +39,11 @@ public interface IInteractionContext
     void SetPointerCapture(IPointer? pointer, bool capture);
     void RequestViewportUpdate();
     void NotifyZoomChanged();
+
+    /// <summary>Begins a transform-move operation from the current selection.</summary>
+    bool BeginTransformMove(Point canvasPt);
+    /// <summary>Updates position during an active transform-move operation.</summary>
+    void UpdateTransformMove(Point canvasPt);
+    /// <summary>Commits or reverts the active transform operation on pointer release.</summary>
+    void FinishTransformMove();
 }

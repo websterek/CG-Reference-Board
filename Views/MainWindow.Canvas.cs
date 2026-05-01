@@ -221,7 +221,7 @@ public partial class MainWindow
         e.Handled = true;
     }
 
-    private bool UpdateActiveTransform(Point pointer)
+    internal bool UpdateActiveTransform(Point pointer)
     {
         if (!Vm.TransformService.HasActiveOperation)
         {
@@ -307,6 +307,48 @@ public partial class MainWindow
         {
             Vm.MarkUnsaved();
         }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Parameterless variant for use by the interaction state machine
+    /// (pointer capture is managed externally by the controller).
+    /// </summary>
+    internal bool FinishActiveTransformFromState()
+    {
+        if (!Vm.TransformService.HasActiveOperation)
+            return false;
+
+        var transformService = Vm.TransformService;
+        bool annotationMode = Vm.IsDrawMode;
+        bool hasCollision = !annotationMode && GridTransformService.HasCollision(transformService.ActiveSnapshots, transformService.Operation, Vm.GridCells, Vm.LayerManager);
+
+        if (hasCollision)
+        {
+            GridTransformService.RestoreSnapshots(transformService.ActiveSnapshots);
+            ShakeScreen();
+        }
+
+        GridTransformService.ClearInvalidState(transformService.ActiveSnapshots);
+        GridTransformService.SetDraggingState(transformService.ActiveSnapshots, isDragging: false);
+
+        bool actuallyMoved = !hasCollision && transformService.Bounds != transformService.StartBounds;
+
+        transformService.End();
+        transformService.ClearSnapshots();
+
+        if (!hasCollision && annotationMode && _pendingAltDuplicateAnnotation is not null)
+            ClearPendingAnnotationAltDuplicateState();
+
+        if (actuallyMoved)
+            InvalidateZoomRestore();
+
+        Vm.RefreshTransformState();
+        UpdateTransformOverlayLayout();
+
+        if (!hasCollision)
+            Vm.MarkUnsaved();
 
         return true;
     }
@@ -401,7 +443,7 @@ public partial class MainWindow
         return false;
     }
 
-    private bool StartTransformMoveFromCurrentSelection(Point pointer)
+    internal bool StartTransformMoveFromCurrentSelection(Point pointer)
     {
         UpdateSelectionState();
 

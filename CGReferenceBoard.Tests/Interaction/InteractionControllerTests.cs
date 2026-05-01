@@ -45,7 +45,7 @@ public class InteractionControllerTests
     }
 }
 
-internal sealed class FakeInteractionContext : IInteractionContext
+internal class FakeInteractionContext : IInteractionContext
 {
     public IViewportService ViewportOverride { get; set; } = new ViewportService();
     public MainWindowViewModel Vm { get; } = MainWindowViewModel.CreateWithDI(false);
@@ -63,6 +63,9 @@ internal sealed class FakeInteractionContext : IInteractionContext
     public void SetPointerCapture(IPointer? p, bool c) { }
     public void RequestViewportUpdate() { }
     public void NotifyZoomChanged() { }
+    public virtual bool BeginTransformMove(Point pt) => false;
+    public virtual void UpdateTransformMove(Point pt) { }
+    public virtual void FinishTransformMove() { }
 }
 
 internal sealed class FakeState : IInteractionState
