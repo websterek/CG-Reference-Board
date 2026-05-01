@@ -1069,6 +1069,8 @@ public partial class MainWindow
 
     private async void Window_KeyDown(object? sender, KeyEventArgs e)
     {
+        _interactionController?.OnKeyDown(e);
+
         var startupOverlay = this.FindControl<Border>("StartupOverlay");
         if (FullMediaOverlay.IsVisible || (startupOverlay?.IsVisible == true))
             return;

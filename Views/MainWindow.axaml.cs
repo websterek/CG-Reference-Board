@@ -229,6 +229,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void CanvasBorder_PointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
     {
+        _interactionController?.OnPointerCaptureLost(e);
         ResetTransientPointerState(cancelActiveTransform: true);
         UpdateSelectionState();
     }

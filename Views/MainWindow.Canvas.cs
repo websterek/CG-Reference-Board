@@ -545,6 +545,8 @@ public partial class MainWindow
 
     private void Canvas_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
+        _interactionController?.OnPointerPressed(e);
+
         var props = e.GetCurrentPoint(this).Properties;
         var mainCanvas = _cachedMainCanvas ?? this.FindControl<Canvas>("MainCanvas");
 
@@ -708,6 +710,8 @@ public partial class MainWindow
 
     private void Canvas_PointerMoved(object? sender, PointerEventArgs e)
     {
+        _interactionController?.OnPointerMoved(e);
+
         var mainCanvas = this.FindControl<Canvas>("MainCanvas");
         var pt = e.GetPosition(mainCanvas);
 
@@ -995,6 +999,8 @@ public partial class MainWindow
 
     private void Canvas_PointerReleased(object? sender, PointerReleasedEventArgs e)
     {
+        _interactionController?.OnPointerReleased(e);
+
         // Stop edge scrolling when mouse is released
         StopEdgeScroll();
 
