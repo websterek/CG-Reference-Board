@@ -68,8 +68,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     // ── Undo / Redo infrastructure ────────────────────────────────────────────
 
-    private bool _isRestoringState;
-
     /// <summary>Serialises concurrent <see cref="SaveBoardDataAsync"/> calls so writes never interleave.</summary>
     private readonly SemaphoreSlim _saveSemaphore = new(1, 1);
 

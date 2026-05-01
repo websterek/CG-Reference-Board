@@ -105,7 +105,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private AnnotationViewModel? _currentAnnotation;
     private bool _isDraggingAnnotations;
     private bool _isDraggingFromSystem;
-    private bool _isSelectingAnnotations;
     private Point _annotationSelectionStart;
     private Point _annotationDragStart;
     private List<(CellViewModel Cell, double StartX, double StartY)>? _annotationDragCellOriginals;
@@ -120,7 +119,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     // Pan/Zoom — owned by ViewportService; _scale/_translate are the render objects kept in sync
     private IViewportService _viewport = new ViewportService();
     private bool _isPanning;
-    private bool _isShiftPanPending;
     private Point _panStartPoint;
     private readonly TranslateTransform _translate = new(0, 0);
     private readonly ScaleTransform _scale = new(1, 1);
@@ -134,13 +132,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     // Middle-button drag-to-zoom (Nuke-style)
     private double _middleZoomStartY;
-    private double _middleZoomOriginY;
-    private bool _middleZoomActive;
-    private Point _middleZoomAnchor;
-    private bool _middleZoomAnchorSet;
 
     // Multi-selection
-    private bool _isSelectingCells;
     private Point _cellSelectionStart;
     private bool _selectionAdditive;
 
@@ -186,7 +179,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     // Toast notification
     private System.Threading.CancellationTokenSource? _toastCts;
-    private readonly INotificationService? _notifications;
 
     // Interaction controller (wired in constructor; does not yet route events)
     private CGReferenceBoard.Interaction.IInteractionController? _interactionController;
@@ -895,7 +887,7 @@ Vm = vm;
         previewBorder.IsVisible = true;
     }
 
-    private void HidePlacementPreview()
+    internal void HidePlacementPreview()
     {
         var previewBorder = this.FindControl<Border>("PlacementPreviewBorder");
         if (previewBorder == null)
@@ -906,7 +898,7 @@ Vm = vm;
         _pendingBackdrop = null;
     }
 
-    private void UpdatePlacementPreview(Point canvasPoint)
+    internal void UpdatePlacementPreview(Point canvasPoint)
     {
         if (!_isShowingPlacementPreview || _pendingBackdrop == null)
             return;
@@ -917,7 +909,7 @@ Vm = vm;
         ShowPlacementPreview(gridX, gridY, _previewColSpan, _previewRowSpan, Vm.LayerManager.Backdrops);
     }
 
-    private bool TryPlacePendingBackdrop()
+    internal bool TryPlacePendingBackdrop()
     {
         if (!_isShowingPlacementPreview || _pendingBackdrop == null || !_previewIsValid)
             return false;
@@ -929,6 +921,9 @@ Vm = vm;
         HidePlacementPreview();
         return true;
     }
+
+    internal bool IsShowingPlacementPreview => _isShowingPlacementPreview;
+
 
     // ── Edge Scroll Helpers ───────────────────────────────────────────────────
 

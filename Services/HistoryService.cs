@@ -8,7 +8,7 @@ public class HistoryService : HistoryManager, IHistoryService
     {
     }
 
-    public new void Execute(IUndoCommand command)
+    public void Execute(IUndoCommand command)
     {
         Commit(command);
     }

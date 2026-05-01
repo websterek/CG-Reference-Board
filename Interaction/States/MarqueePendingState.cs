@@ -40,10 +40,25 @@ public sealed class MarqueePendingState : IInteractionState
         if (dist > DragThreshold)
         {
             bool ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
-            if (ctrl)
-                return StateTransition.GoTo(new MarqueeSelectState(additive: true));
+            var canvasPt = ctx.GetCanvasPosition(e);
+
+            if (ctx.Vm.IsDrawMode && ctx.Vm.IsMoveMode)
+            {
+                // Annotation mode: ctrl = additive marquee, otherwise also start marquee
+                return StateTransition.GoTo(new MarqueeSelectState(canvasPt, additive: ctrl || _additive, annotationMode: true));
+            }
+            else if (!ctx.Vm.IsDrawMode)
+            {
+                if (ctrl || _additive)
+                    return StateTransition.GoTo(new MarqueeSelectState(canvasPt, additive: true, annotationMode: false));
+                else
+                    return StateTransition.GoTo(new PanState(_startPoint));
+            }
             else
+            {
+                // Draw mode (non-move): shouldn't reach here — pan fallback
                 return StateTransition.GoTo(new PanState(_startPoint));
+            }
         }
         return StateTransition.Stay;
     }

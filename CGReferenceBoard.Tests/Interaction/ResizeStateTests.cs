@@ -69,4 +69,46 @@ public class ResizeStateTests
 
         Assert.Equal(TransitionKind.Pop, t.Kind);
     }
+
+    [Fact]
+    public void Resize_Exit_ClearsDragInvalidAndRequestsSave()
+    {
+        var ctx = new FakeInteractionContext();
+        var cell = new CellViewModel { IsDragInvalid = true };
+
+        var state = new ResizeState(cell, 1, 1);
+        state.Enter(ctx);
+        state.Exit(ctx);
+
+        Assert.False(cell.IsDragInvalid);
+    }
+
+    [Fact]
+    public void Resize_OnKeyDown_ReturnsStay()
+    {
+        var ctx = new FakeInteractionContext();
+        var cell = new CellViewModel();
+        var state = new ResizeState(cell, 1, 1);
+
+        var t = state.OnKeyDown(null!, ctx);
+
+        Assert.Equal(TransitionKind.Stay, t.Kind);
+    }
+
+    [Fact]
+    public void Resize_WithNonZeroOrigin_ComputesCorrectSpan()
+    {
+        var ctx = new FakeInteractionContext();
+        var cell = new CellViewModel { CanvasX = 320, CanvasY = 160, ColSpan = 1, RowSpan = 1 };
+
+        // (640 - 320) / 160 = 2 cols, (480 - 160) / 160 = 2 rows
+        ctx.InjectedCanvasPosition = new Point(640, 480);
+
+        var state = new ResizeState(cell, 1, 1);
+        state.Enter(ctx);
+        state.OnPointerMoved(null!, ctx);
+
+        Assert.Equal(2, cell.ColSpan);
+        Assert.Equal(2, cell.RowSpan);
+    }
 }

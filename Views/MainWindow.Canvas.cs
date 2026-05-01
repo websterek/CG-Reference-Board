@@ -180,6 +180,9 @@ public partial class MainWindow
         }
     }
 
+    internal bool TryStartTransformBodyMoveInternal(Point pointer) =>
+        TryStartTransformBodyMove(pointer, isLeftButtonPressed: true);
+
     private bool TryStartTransformBodyMove(Point pointer, bool isLeftButtonPressed)
     {
         if (!isLeftButtonPressed || Vm.IsViewMode || !Vm.TransformService.Capabilities.CanMove)
@@ -472,9 +475,6 @@ public partial class MainWindow
     {
         StopEdgeScroll();
         _isPanning = false;
-        _isShiftPanPending = false;
-        _middleZoomAnchorSet = false;
-        _middleZoomActive = false;
         EnableCellHitTesting();
 
         if (cancelActiveTransform)
@@ -530,9 +530,155 @@ public partial class MainWindow
         }
     }
 
+    // ─── Draw-mode helpers ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Creates a new AnnotationViewModel for non-Text tools, adds the initial point,
+    /// sets _currentAnnotation, and adds it to Vm.Annotations.
+    /// Returns null for the Text tool (text editing is handled separately via overlay).
+    /// </summary>
+    internal AnnotationViewModel? BeginDrawAnnotationInternal(Point canvasPt)
+    {
+        if (Vm.CurrentTool == "Text")
+            return null; // text path handled by legacy overlay code
+
+        _currentAnnotation = new AnnotationViewModel
+        {
+            Type = Vm.CurrentTool,
+            Color = Vm.CurrentBrushColor,
+            Thickness = Vm.CurrentBrushThickness,
+            IsInDrawMode = true
+        };
+        _currentAnnotation.Points.Add(canvasPt);
+        Vm.Annotations.Add(_currentAnnotation);
+        return _currentAnnotation;
+    }
+
+    internal void FinishDrawAnnotationInternal()
+    {
+        _currentAnnotation = null;
+        Vm.MarkUnsaved();
+    }
+
     private void MainCanvas_PointerEntered(object? sender, PointerEventArgs e)
     {
         Vm.IsPointerOverCanvas = true;
+    }
+
+    // ── Marquee selection wrappers (called from IInteractionContext) ───────────
+
+    internal void BeginAnnotationMarquee(Point canvasPt, bool additive)
+    {
+        _selectionAdditive = additive;
+        _annotationSelectionStart = canvasPt;
+
+        var marquee = _cachedSelectionMarquee ?? this.FindControl<Border>("SelectionMarquee");
+        if (marquee != null)
+        {
+            Canvas.SetLeft(marquee, canvasPt.X);
+            Canvas.SetTop(marquee, canvasPt.Y);
+            marquee.Width = 0;
+            marquee.Height = 0;
+            marquee.IsVisible = true;
+        }
+
+        if (!additive)
+            Vm.SelectionService.ClearSelection();
+    }
+
+    internal void UpdateAnnotationMarqueeFromState(Point canvasPt)
+    {
+        var marquee = _cachedSelectionMarquee ?? this.FindControl<Border>("SelectionMarquee");
+        if (marquee == null) return;
+        double left = Math.Min(_annotationSelectionStart.X, canvasPt.X);
+        double top  = Math.Min(_annotationSelectionStart.Y, canvasPt.Y);
+        Canvas.SetLeft(marquee, left);
+        Canvas.SetTop(marquee, top);
+        marquee.Width  = Math.Abs(canvasPt.X - _annotationSelectionStart.X);
+        marquee.Height = Math.Abs(canvasPt.Y - _annotationSelectionStart.Y);
+    }
+
+    internal void FinishAnnotationMarqueeFromState()
+    {
+        var marquee = _cachedSelectionMarquee ?? this.FindControl<Border>("SelectionMarquee");
+        if (marquee != null)
+        {
+            marquee.IsVisible = false;
+            double left   = Canvas.GetLeft(marquee);
+            double top    = Canvas.GetTop(marquee);
+            var selRect   = new Rect(left, top, marquee.Width, marquee.Height);
+
+            if (!_selectionAdditive)
+                Vm.SelectionService.ClearSelection();
+
+            foreach (var ann in Vm.Annotations)
+            {
+                if (!ann.IsSelected && Helpers.AnnotationBoundsHelper.IntersectsRenderedGeometry(ann, selRect))
+                    Vm.SelectionService.SelectAnnotation(ann, additive: true);
+            }
+        }
+        UpdateSelectionState();
+    }
+
+    internal void BeginCellMarquee(Point canvasPt, bool additive)
+    {
+        _selectionAdditive = additive;
+        if (!additive)
+            ClearSelection();
+        _cellSelectionStart = canvasPt;
+
+        var cellMarquee = _cachedCellSelectionMarquee ?? this.FindControl<Border>("CellSelectionMarquee");
+        if (cellMarquee != null)
+        {
+            Canvas.SetLeft(cellMarquee, canvasPt.X);
+            Canvas.SetTop(cellMarquee, canvasPt.Y);
+            cellMarquee.Width = 0;
+            cellMarquee.Height = 0;
+            cellMarquee.IsVisible = true;
+        }
+    }
+
+    internal void UpdateCellMarqueeFromState(Point canvasPt)
+    {
+        var cellMarquee = _cachedCellSelectionMarquee ?? this.FindControl<Border>("CellSelectionMarquee");
+        if (cellMarquee == null) return;
+        double left = Math.Min(_cellSelectionStart.X, canvasPt.X);
+        double top  = Math.Min(_cellSelectionStart.Y, canvasPt.Y);
+        Canvas.SetLeft(cellMarquee, left);
+        Canvas.SetTop(cellMarquee, top);
+        cellMarquee.Width  = Math.Abs(canvasPt.X - _cellSelectionStart.X);
+        cellMarquee.Height = Math.Abs(canvasPt.Y - _cellSelectionStart.Y);
+    }
+
+    internal void FinishCellMarqueeFromState()
+    {
+        var cellMarquee = _cachedCellSelectionMarquee ?? this.FindControl<Border>("CellSelectionMarquee");
+        if (cellMarquee != null)
+        {
+            cellMarquee.IsVisible = false;
+            double left   = Canvas.GetLeft(cellMarquee);
+            double top    = Canvas.GetTop(cellMarquee);
+            var selRect   = new Rect(left, top, cellMarquee.Width, cellMarquee.Height);
+
+            var hits = HitTestCellsInRect(selRect);
+            foreach (var cell in hits)
+                Vm.SelectionService.SelectCell(cell, additive: true);
+        }
+        UpdateSelectionState();
+    }
+
+    // Helper used by FinishCellMarqueeFromState
+    private IReadOnlyList<CellViewModel> HitTestCellsInRect(Rect canvasRect)
+    {
+        var result = new System.Collections.Generic.List<CellViewModel>();
+        foreach (var cell in Vm.GridCells)
+        {
+            var bounds = new Rect(cell.CanvasX, cell.CanvasY, cell.ColSpan * Constants.GridSize, cell.RowSpan * Constants.GridSize);
+            var intersection = bounds.Intersect(canvasRect);
+            if (intersection.Width > 0 && intersection.Height > 0)
+                result.Add(cell);
+        }
+        return result;
     }
 
     private void MainCanvas_PointerExited(object? sender, PointerEventArgs e)
@@ -547,17 +693,7 @@ public partial class MainWindow
     {
         _interactionController?.OnPointerPressed(e);
 
-        var props = e.GetCurrentPoint(this).Properties;
-        var mainCanvas = _cachedMainCanvas ?? this.FindControl<Canvas>("MainCanvas");
-
-        if (!e.Handled && mainCanvas != null && TryStartTransformBodyMove(e.GetPosition(mainCanvas), props.IsLeftButtonPressed))
-        {
-            e.Pointer.Capture(_cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder"));
-            e.Handled = true;
-            return;
-        }
-
-        // Update custom cursor icon position
+        // Update custom cursor icon position (cosmetic, not handled by state machine)
         var cursorIcon = _cachedCursorIconContainer ?? this.FindControl<Border>("CursorIconContainer");
         if (cursorIcon != null)
         {
@@ -566,144 +702,48 @@ public partial class MainWindow
             Canvas.SetTop(cursorIcon, ptScreen.Y + 15);
         }
 
-        // Handle placement preview click (backdrop positioning)
-        if (_isShowingPlacementPreview && props.IsLeftButtonPressed)
-        {
-            if (TryPlacePendingBackdrop())
-            {
-                e.Handled = true;
-                return;
-            }
-            else
-            {
-                // Invalid position - show shake feedback
-                ShakeScreen();
-                e.Handled = true;
-                return;
-            }
-        }
-
-        // Right-click or Escape cancels placement preview
-        if (_isShowingPlacementPreview && (props.IsRightButtonPressed || e.KeyModifiers.HasFlag(KeyModifiers.Control)))
-        {
-            HidePlacementPreview();
-            e.Handled = true;
+        if (e.Handled)
             return;
-        }
 
-        // Annotation mode: Eraser
-        if (Vm.IsDrawMode && Vm.IsEraserMode && !e.Handled && props.IsLeftButtonPressed && !props.IsMiddleButtonPressed)
-        {
-            EraseIntersectingAnnotations(e.GetPosition(mainCanvas));
-            e.Pointer.Capture(sender as IInputElement);
-            return;
-        }
-
-        // Annotation mode: Move/Select
-        if (Vm.IsDrawMode && Vm.IsMoveMode && !e.Handled && props.IsLeftButtonPressed)
-        {
-            _selectionAdditive = e.KeyModifiers.HasFlag(KeyModifiers.Control);
-            _isSelectingAnnotations = true;
-            _annotationSelectionStart = e.GetPosition(mainCanvas);
-
-            var marquee = this.FindControl<Border>("SelectionMarquee");
-            if (marquee != null)
-            {
-                Canvas.SetLeft(marquee, _annotationSelectionStart.X);
-                Canvas.SetTop(marquee, _annotationSelectionStart.Y);
-                marquee.Width = 0;
-                marquee.Height = 0;
-                marquee.IsVisible = true;
-            }
-
-            if (!_selectionAdditive)
-            {
-                Vm.SelectionService.ClearSelection();
-            }
-            e.Pointer.Capture(sender as IInputElement);
-            return;
-        }
-
-        // Annotation mode: Draw new annotation
-        if (Vm.IsDrawMode && !Vm.IsEraserMode && !Vm.IsMoveMode && !e.Handled && props.IsLeftButtonPressed)
+        // Text annotation: the state machine returns Stay for Text tool to allow
+        // this legacy overlay code to handle the text editor.
+        var props = e.GetCurrentPoint(this).Properties;
+        var mainCanvas = _cachedMainCanvas ?? this.FindControl<Canvas>("MainCanvas");
+        if (Vm.IsDrawMode && !Vm.IsEraserMode && !Vm.IsMoveMode && props.IsLeftButtonPressed
+            && Vm.CurrentTool == "Text" && mainCanvas != null)
         {
             _currentAnnotation = new AnnotationViewModel
             {
-                Type = Vm.CurrentTool,
+                Type = "Text",
                 Color = Vm.CurrentBrushColor,
                 Thickness = Vm.CurrentBrushThickness,
-                IsInDrawMode = true
+                IsInDrawMode = true,
+                Text = ""
             };
 
             var pt = e.GetPosition(mainCanvas);
             _currentAnnotation.Points.Add(pt);
+            _editingTextAnnotation = _currentAnnotation;
+            _editingTextAnnotationOriginalText = null;
 
-            if (Vm.CurrentTool == "Text")
+            var editor = this.FindControl<TextBox>("AnnotationTextEditor");
+            if (editor != null)
             {
-                _currentAnnotation.Text = "";
-                _editingTextAnnotation = _currentAnnotation;
-                _editingTextAnnotationOriginalText = null;
+                editor.Text = _currentAnnotation.Text;
+                Canvas.SetLeft(editor, pt.X);
+                Canvas.SetTop(editor, pt.Y);
+                editor.IsVisible = true;
+                editor.Focus();
 
-                var editor = this.FindControl<TextBox>("AnnotationTextEditor");
-                if (editor != null)
-                {
-                    editor.Text = _currentAnnotation.Text;
-                    Canvas.SetLeft(editor, pt.X);
-                    Canvas.SetTop(editor, pt.Y);
-                    editor.IsVisible = true;
-                    editor.Focus();
-
-                    editor.TextChanged -= AnnotationTextEditor_TextChanged;
-                    editor.TextChanged += AnnotationTextEditor_TextChanged;
-                    editor.LostFocus -= AnnotationTextEditor_LostFocus;
-                    editor.LostFocus += AnnotationTextEditor_LostFocus;
-                    editor.RemoveHandler(InputElement.KeyDownEvent, AnnotationTextEditor_KeyDown);
-                    editor.AddHandler(InputElement.KeyDownEvent, AnnotationTextEditor_KeyDown, RoutingStrategies.Tunnel);
-                }
+                editor.TextChanged -= AnnotationTextEditor_TextChanged;
+                editor.TextChanged += AnnotationTextEditor_TextChanged;
+                editor.LostFocus -= AnnotationTextEditor_LostFocus;
+                editor.LostFocus += AnnotationTextEditor_LostFocus;
+                editor.RemoveHandler(InputElement.KeyDownEvent, AnnotationTextEditor_KeyDown);
+                editor.AddHandler(InputElement.KeyDownEvent, AnnotationTextEditor_KeyDown, RoutingStrategies.Tunnel);
             }
 
             Vm.Annotations.Add(_currentAnnotation);
-            e.Pointer.Capture(sender as IInputElement);
-            return;
-        }
-
-        // Grid mode: Middle button starts pan immediately, Shift+Left uses threshold-based approach
-        if (props.IsMiddleButtonPressed)
-        {
-            _isPanning = true;
-            _isShiftPanPending = false;
-            _panStartPoint = e.GetPosition(this);
-            _middleZoomStartY = e.GetPosition(this).Y;
-            DisableCellHitTesting();
-
-            var canvasBorder = this.FindControl<Border>("CanvasBorder");
-            ApplyPanCursor(canvasBorder);
-        }
-        else if (props.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
-        {
-            // Shift+Left: prepare for potential pan, but don't start yet (allow double-click)
-            _isShiftPanPending = true;
-            _panStartPoint = e.GetPosition(this);
-        }
-        // Left-click on empty canvas space: start cell marquee selection
-        else if (!e.Handled && props.IsLeftButtonPressed && !Vm.IsDrawMode)
-        {
-            _selectionAdditive = e.KeyModifiers.HasFlag(KeyModifiers.Control);
-            if (!_selectionAdditive)
-                ClearSelection();
-            _isSelectingCells = true;
-            _cellSelectionStart = e.GetPosition(mainCanvas);
-
-            var cellMarquee = this.FindControl<Border>("CellSelectionMarquee");
-            if (cellMarquee != null)
-            {
-                Canvas.SetLeft(cellMarquee, _cellSelectionStart.X);
-                Canvas.SetTop(cellMarquee, _cellSelectionStart.Y);
-                cellMarquee.Width = 0;
-                cellMarquee.Height = 0;
-                cellMarquee.IsVisible = true;
-            }
-
             e.Pointer.Capture(sender as IInputElement);
         }
     }
@@ -714,6 +754,13 @@ public partial class MainWindow
 
         var mainCanvas = this.FindControl<Canvas>("MainCanvas");
         var pt = e.GetPosition(mainCanvas);
+
+        // If a transform operation is active and was started by a cell drag (not via
+        // TransformBodyMoveState, which handles its own UpdateActiveTransform call),
+        // update the transform here so cell dragging moves items.
+        if (Vm.TransformService.HasActiveOperation
+            && _interactionController?.CurrentState is not Interaction.States.TransformBodyMoveState)
+            UpdateActiveTransform(pt);
 
         // Store pointer position for edge scrolling
         _lastPointerPosition = e.GetPosition(CanvasBorder);
@@ -742,45 +789,11 @@ public partial class MainWindow
             }
         }
 
-        // Update placement preview for backdrop positioning
+        // Edge scroll for placement preview (state machine handles the preview update itself)
         if (_isShowingPlacementPreview)
-        {
-            UpdatePlacementPreview(pt);
             StartEdgeScrollIfNeeded(_lastPointerPosition);
-        }
 
-        if (UpdateActiveTransform(pt))
-        {
-            StartEdgeScrollIfNeeded(_lastPointerPosition);
-            return;
-        }
-
-        // Eraser drag
-        if (Vm.IsDrawMode && Vm.IsEraserMode
-            && e.GetCurrentPoint(this).Properties.IsLeftButtonPressed
-            && !e.GetCurrentPoint(this).Properties.IsMiddleButtonPressed)
-        {
-            EraseIntersectingAnnotations(pt);
-            return;
-        }
-
-        // Marquee selection drag
-        if (_isSelectingAnnotations)
-        {
-            var marquee = _cachedSelectionMarquee ?? this.FindControl<Border>("SelectionMarquee");
-            if (marquee != null)
-            {
-                double left = Math.Min(_annotationSelectionStart.X, pt.X);
-                double top = Math.Min(_annotationSelectionStart.Y, pt.Y);
-                Canvas.SetLeft(marquee, left);
-                Canvas.SetTop(marquee, top);
-                marquee.Width = Math.Abs(pt.X - _annotationSelectionStart.X);
-                marquee.Height = Math.Abs(pt.Y - _annotationSelectionStart.Y);
-            }
-            return;
-        }
-
-        // Annotation drag
+        // Annotation drag (not yet migrated to state machine)
         if (_isDraggingAnnotations && Vm.SelectionService.SelectedAnnotations.Count > 0)
         {
             StartEdgeScrollIfNeeded(_lastPointerPosition);
@@ -832,46 +845,6 @@ public partial class MainWindow
             return;
         }
 
-        // Drawing in progress
-        if (_currentAnnotation != null)
-        {
-            if (_currentAnnotation.Type == "Brush")
-            {
-                if (_currentAnnotation.Points.Count == 0
-                    || Math.Abs(pt.X - _currentAnnotation.Points.Last().X) > 2
-                    || Math.Abs(pt.Y - _currentAnnotation.Points.Last().Y) > 2)
-                {
-                    _currentAnnotation.Points.Add(pt);
-                }
-            }
-            else if (_currentAnnotation.Type != "Text")
-            {
-                if (_currentAnnotation.Points.Count < 2)
-                    _currentAnnotation.Points.Add(pt);
-                else
-                    _currentAnnotation.Points[1] = pt;
-            }
-            return;
-        }
-
-        // Cell marquee selection drag
-        if (_isSelectingCells)
-        {
-            StartEdgeScrollIfNeeded(_lastPointerPosition);
-
-            var cellMarquee = _cachedCellSelectionMarquee ?? this.FindControl<Border>("CellSelectionMarquee");
-            if (cellMarquee != null)
-            {
-                double left = Math.Min(_cellSelectionStart.X, pt.X);
-                double top = Math.Min(_cellSelectionStart.Y, pt.Y);
-                Canvas.SetLeft(cellMarquee, left);
-                Canvas.SetTop(cellMarquee, top);
-                cellMarquee.Width = Math.Abs(pt.X - _cellSelectionStart.X);
-                cellMarquee.Height = Math.Abs(pt.Y - _cellSelectionStart.Y);
-            }
-            return;
-        }
-
         // Hover highlight for grid cells
         var gridPt = e.GetPosition(MainCanvas);
         int gridX = (int)(Math.Floor(gridPt.X / Constants.GridSize) * Constants.GridSize);
@@ -899,151 +872,32 @@ public partial class MainWindow
                                          || _isPointerDown || existingContent != null || Vm.IsDrawMode);
         }
 
-        // Nuke-style drag-to-zoom
+        // Pan cursor (cosmetic)
         var currentProps = e.GetCurrentPoint(this).Properties;
-
-        // Show hand cursor only while the user is actively performing a pan gesture:
-        // - middle mouse button pressed OR
-        // - left button pressed while Ctrl is held
-        // Do NOT show the hand cursor for Ctrl being held alone.
-        // Save previous cursor from the CanvasBorder the first time we switch it so it can be restored later.
         bool wantsPanCursor = currentProps.IsMiddleButtonPressed || (currentProps.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Shift));
         var canvasBorder = this.FindControl<Border>("CanvasBorder");
         if (wantsPanCursor)
-        {
             ApplyPanCursor(canvasBorder);
-        }
         else
-        {
             RestorePanCursor(canvasBorder);
-        }
-
-        bool bothButtons = currentProps.IsMiddleButtonPressed && currentProps.IsLeftButtonPressed;
-
-        if (bothButtons)
-        {
-            if (!_middleZoomAnchorSet)
-            {
-                _middleZoomAnchor = sender is Visual v ? e.GetPosition(v) : e.GetPosition(this);
-                _middleZoomOriginY = e.GetPosition(this).Y;
-                _middleZoomStartY = _middleZoomOriginY;
-                _middleZoomActive = false;
-                _middleZoomAnchorSet = true;
-            }
-
-            var screenPt = e.GetPosition(this);
-
-            if (!_middleZoomActive)
-            {
-                if (Math.Abs(screenPt.Y - _middleZoomOriginY) < Constants.MiddleZoomDeadZone)
-                {
-                    _panStartPoint = screenPt;
-                    return;
-                }
-                _middleZoomActive = true;
-                _middleZoomStartY = screenPt.Y;
-            }
-
-            double deltaY = _middleZoomStartY - screenPt.Y;
-
-            double oldScale = _viewport.Zoom;
-            // Convert pointer vertical movement into a multiplicative scale change by
-            // applying the delta in log-space. This makes zoom feel consistent at all distances.
-            // Clamp the log-space delta to avoid large jumps per-frame.
-            double deltaLog = Math.Clamp(
-                deltaY * Constants.MiddleZoomSensitivity,
-                -Constants.MiddleZoomMaxDelta,
-                Constants.MiddleZoomMaxDelta);
-            double factor = Math.Exp(deltaLog);
-            double newScale = Math.Clamp(oldScale * factor, Constants.MinZoom, Constants.MaxZoom);
-
-            if (Math.Abs(newScale - oldScale) > 0.0001)
-            {
-                _viewport.ZoomAt(_middleZoomAnchor, factor);
-                InvalidateZoomRestore();
-            }
-
-            _middleZoomStartY = screenPt.Y;
-            _panStartPoint = screenPt;
-        }
-        else if (_isShiftPanPending && currentProps.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
-        {
-            // Check if mouse moved beyond threshold to start actual panning
-            var screenPt = e.GetPosition(this);
-            double dx = screenPt.X - _panStartPoint.X;
-            double dy = screenPt.Y - _panStartPoint.Y;
-            double distance = Math.Sqrt(dx * dx + dy * dy);
-
-            // Use a 5-pixel threshold to distinguish from double-click
-            if (distance > 5)
-            {
-                _isShiftPanPending = false;
-                _isPanning = true;
-                var border = this.FindControl<Border>("CanvasBorder");
-                ApplyPanCursor(border);
-            }
-        }
-        else if (_isPanning && (currentProps.IsMiddleButtonPressed || (currentProps.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Shift))))
-        {
-            var screenPt = e.GetPosition(this);
-            _viewport.OffsetX += (screenPt.X - _panStartPoint.X) / _viewport.Zoom;
-            _viewport.OffsetY += (screenPt.Y - _panStartPoint.Y) / _viewport.Zoom;
-            _panStartPoint = screenPt;
-            InvalidateZoomRestore();
-        }
     }
 
     private void Canvas_PointerReleased(object? sender, PointerReleasedEventArgs e)
     {
         _interactionController?.OnPointerReleased(e);
 
+        // Finish a transform operation started by cell drag (not TransformBodyMoveState).
+        if (Vm.TransformService.HasActiveOperation
+            && _interactionController?.CurrentState is not Interaction.States.TransformBodyMoveState)
+            FinishActiveTransform(e);
+
         // Stop edge scrolling when mouse is released
         StopEdgeScroll();
-
-        if (FinishActiveTransform(e))
-        {
-            UpdateSelectionState();
-            return;
-        }
 
         if (Vm.IsEraserMode)
             e.Pointer.Capture(null);
 
-        // Finish annotation marquee selection
-        if (_isSelectingAnnotations)
-        {
-            _isSelectingAnnotations = false;
-            e.Pointer.Capture(null);
-
-            var marquee = _cachedSelectionMarquee ?? this.FindControl<Border>("SelectionMarquee");
-            if (marquee != null)
-            {
-                marquee.IsVisible = false;
-                double left = Canvas.GetLeft(marquee);
-                double top = Canvas.GetTop(marquee);
-                double right = left + marquee.Width;
-                double bottom = top + marquee.Height;
-
-                if (!_selectionAdditive)
-                {
-                    Vm.SelectionService.ClearSelection();
-                }
-
-                foreach (var ann in Vm.Annotations)
-                {
-                    bool inRect = AnnotationBoundsHelper.IntersectsRenderedGeometry(ann, new Rect(left, top, marquee.Width, marquee.Height));
-
-                    if (inRect && !ann.IsSelected)
-                    {
-                        Vm.SelectionService.SelectAnnotation(ann, additive: true);
-                    }
-                }
-            }
-            UpdateSelectionState();
-            return;
-        }
-
-        // Finish annotation drag
+        // Finish annotation drag (not yet migrated to state machine)
         if (_isDraggingAnnotations)
         {
             _isDraggingAnnotations = false;
@@ -1101,73 +955,6 @@ public partial class MainWindow
             return;
         }
 
-        // Finish drawing
-        if (_currentAnnotation != null)
-        {
-            _currentAnnotation = null;
-            e.Pointer.Capture(null);
-            Vm.MarkUnsaved();
-            return;
-        }
-
-        // Finish cell marquee selection
-        if (_isSelectingCells)
-        {
-            _isSelectingCells = false;
-            e.Pointer.Capture(null);
-
-            var cellMarquee = _cachedCellSelectionMarquee ?? this.FindControl<Border>("CellSelectionMarquee");
-            if (cellMarquee != null)
-            {
-                cellMarquee.IsVisible = false;
-                double left = Canvas.GetLeft(cellMarquee);
-                double top = Canvas.GetTop(cellMarquee);
-                double right = left + cellMarquee.Width;
-                double bottom = top + cellMarquee.Height;
-
-                if (cellMarquee.Width > 4 || cellMarquee.Height > 4)
-                {
-                    if (!_selectionAdditive)
-                    {
-                        Vm.SelectionService.ClearSelection();
-                    }
-
-                    foreach (var cell in Vm.GridCells)
-                    {
-                        if (!cell.HasContent)
-                            continue;
-
-                        double cx = cell.CanvasX;
-                        double cy = cell.CanvasY;
-                        double cw = cell.ColSpan * Constants.GridSize;
-                        double ch = cell.RowSpan * Constants.GridSize;
-
-                        bool intersects = cx < right && cx + cw > left
-                                       && cy < bottom && cy + ch > top;
-                        if (intersects && !cell.IsSelected)
-                        {
-                            Vm.SelectionService.SelectCell(cell, additive: true);
-                        }
-                    }
-
-                    // Also select annotations in grid mode
-                    foreach (var ann in Vm.Annotations)
-                    {
-                        if (AnnotationBoundsHelper.IntersectsRenderedGeometry(ann, new Rect(left, top, cellMarquee.Width, cellMarquee.Height)) && !ann.IsSelected)
-                        {
-                            Vm.SelectionService.SelectAnnotation(ann, additive: true);
-                        }
-                    }
-                }
-            }
-            UpdateSelectionState();
-            return;
-        }
-
-        _isPanning = false;
-        _isShiftPanPending = false;
-        _middleZoomAnchorSet = false;
-        _middleZoomActive = false;
         EnableCellHitTesting();
 
         // Restore previous cursor on the CanvasBorder when panning stops
@@ -1435,7 +1222,7 @@ public partial class MainWindow
 
     #region Visual Feedback
 
-    private async void ShakeScreen()
+    internal async void ShakeScreen()
     {
         var startPos = Position;
         for (int i = 0; i < 5; i++)

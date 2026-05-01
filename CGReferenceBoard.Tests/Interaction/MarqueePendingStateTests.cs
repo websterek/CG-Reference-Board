@@ -46,4 +46,37 @@ public class MarqueePendingStateTests
         Assert.Equal(TransitionKind.Pop, t.Kind);
         Assert.Equal(1, ctx.Selection.SelectionCount);
     }
+
+    [Fact]
+    public void OnPointerMoved_Null_ReturnsStay()
+    {
+        var ctx = new FakeInteractionContext();
+        var state = new MarqueePendingState(new Point(100, 100));
+
+        var t = state.OnPointerMoved(null!, ctx);
+
+        Assert.Equal(TransitionKind.Stay, t.Kind);
+    }
+
+    [Fact]
+    public void OnPointerCaptureLost_ReturnsPop()
+    {
+        var ctx = new FakeInteractionContext();
+        var state = new MarqueePendingState(new Point(100, 100));
+
+        var t = state.OnPointerCaptureLost(null!, ctx);
+
+        Assert.Equal(TransitionKind.Pop, t.Kind);
+    }
+
+    [Fact]
+    public void OnKeyDown_ReturnsStay()
+    {
+        var ctx = new FakeInteractionContext();
+        var state = new MarqueePendingState(new Point(100, 100));
+
+        var t = state.OnKeyDown(null!, ctx);
+
+        Assert.Equal(TransitionKind.Stay, t.Kind);
+    }
 }

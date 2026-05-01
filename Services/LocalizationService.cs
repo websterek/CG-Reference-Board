@@ -21,5 +21,10 @@ public class LocalizationService : ILocalizationService
 
     public string this[string key] => Get(key);
 
-    public event EventHandler? CultureChanged;
+    public event EventHandler? CultureChanged
+    {
+        // Placeholder: event will be raised when culture switching is implemented (G3).
+        add { }
+        remove { }
+    }
 }

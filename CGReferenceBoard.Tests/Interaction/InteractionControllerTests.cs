@@ -68,6 +68,42 @@ internal class FakeInteractionContext : IInteractionContext
     public virtual bool BeginTransformMove(Point pt) => false;
     public virtual void UpdateTransformMove(Point pt) { }
     public virtual void FinishTransformMove() { }
+
+    // Marquee
+    public void BeginAnnotationMarquee(Point p, bool additive) => BeginAnnotationMarqueeOverride(p, additive);
+    public void UpdateAnnotationMarquee(Point p) { }
+    public void FinishAnnotationMarquee() => FinishAnnotationMarqueeOverride();
+    public void BeginCellMarquee(Point p, bool additive) => BeginCellMarqueeOverride(p, additive);
+    public void UpdateCellMarquee(Point p) { }
+    public void FinishCellMarquee() => FinishCellMarqueeOverride();
+    public virtual void BeginAnnotationMarqueeOverride(Point p, bool additive) { }
+    public virtual void FinishAnnotationMarqueeOverride() { }
+    public virtual void BeginCellMarqueeOverride(Point p, bool additive) { }
+    public virtual void FinishCellMarqueeOverride() { }
+
+    // Backdrop placement
+    public bool IsShowingPlacementPreview => false;
+    public void UpdatePlacementPreview(Point p) => UpdatePlacementPreviewOverride(p);
+    public bool TryPlacePendingBackdrop() => TryPlacePendingBackdropOverride();
+    public void HidePlacementPreview() => HidePlacementPreviewOverride();
+    public void ShakeScreen() => ShakeScreenOverride();
+    public virtual bool TryPlacePendingBackdropOverride() => false;
+    public virtual void HidePlacementPreviewOverride() { }
+    public virtual void ShakeScreenOverride() { }
+    public virtual void UpdatePlacementPreviewOverride(Point p) { }
+
+    // Alt-duplicate
+    public bool CancelAltDuplicate() => CancelAltDuplicateOverride();
+    public virtual bool CancelAltDuplicateOverride() => false;
+
+    // Transform body
+    public bool TryBeginTransformBodyMove(Point canvasPt) => TryBeginTransformBodyMoveOverride(canvasPt);
+    public virtual bool TryBeginTransformBodyMoveOverride(Point p) => false;
+
+    // Draw-mode
+    public AnnotationViewModel? BeginDrawAnnotation(Point canvasPt) => BeginDrawAnnotationOverride(canvasPt);
+    public virtual AnnotationViewModel? BeginDrawAnnotationOverride(Point p) => null;
+    public void FinishDrawAnnotation() { }
 }
 
 internal sealed class FakeState : IInteractionState

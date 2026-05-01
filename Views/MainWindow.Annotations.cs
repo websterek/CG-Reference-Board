@@ -316,7 +316,7 @@ public partial class MainWindow
         {
             UpdateSelectionState();
             Vm.MarkUnsaved();
-            ShowToastAsync("🗑 Deleted");
+            _ = ShowToastAsync("🗑 Deleted");
         }
     }
 

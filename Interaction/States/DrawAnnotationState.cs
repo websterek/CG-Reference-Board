@@ -26,7 +26,7 @@ public sealed class DrawAnnotationState : IInteractionState
     public void Exit(IInteractionContext ctx)
     {
         _annotation.IsInDrawMode = false;
-        ctx.Vm.MarkUnsaved();
+        ctx.FinishDrawAnnotation();
     }
 
     public StateTransition OnPointerPressed(PointerPressedEventArgs e, IInteractionContext ctx) =>

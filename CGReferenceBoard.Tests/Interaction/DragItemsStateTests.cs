@@ -89,4 +89,86 @@ public class DragItemsStateTests
 
         Assert.Equal(TransitionKind.Pop, t.Kind);
     }
+
+    [Fact]
+    public void DragItems_Enter_SetsDraggingOnAllCells()
+    {
+        var ctx = new FakeInteractionContext();
+        var cell1 = new CellViewModel();
+        var cell2 = new CellViewModel();
+
+        var state = new DragItemsState(cell1, 0, 0, new[] { (cell1, 0.0, 0.0), (cell2, 160.0, 0.0) });
+        state.Enter(ctx);
+
+        Assert.True(cell1.IsDragging);
+        Assert.True(cell2.IsDragging);
+    }
+
+    [Fact]
+    public void DragItems_Exit_ClearsDraggingFlagsAndMarksUnsaved()
+    {
+        var ctx = new FakeInteractionContext();
+        var cell = new CellViewModel();
+        var state = new DragItemsState(cell, 0, 0, new[] { (cell, 0.0, 0.0) });
+        state.Enter(ctx);
+
+        Assert.True(cell.IsDragging);
+        state.Exit(ctx);
+
+        Assert.False(cell.IsDragging);
+        Assert.False(cell.IsDragInvalid);
+        Assert.True(ctx.Vm.HasUnsavedChanges);
+    }
+
+    [Fact]
+    public void DragItems_OnKeyDown_ReturnsStay()
+    {
+        var ctx = new FakeInteractionContext();
+        var cell = new CellViewModel();
+        var state = new DragItemsState(cell, 0, 0, new[] { (cell, 0.0, 0.0) });
+        state.Enter(ctx);
+
+        var t = state.OnKeyDown(null!, ctx);
+
+        Assert.Equal(TransitionKind.Stay, t.Kind);
+    }
+
+    [Fact]
+    public void GroupDrag_DeltaClampedToOneGridStep()
+    {
+        // If cursor jumps far (>GridSize delta), the move should be clamped to 1 grid step
+        var ctx = new FakeInteractionContext();
+        var cell1 = new CellViewModel { CanvasX = 0, CanvasY = 0 };
+        var cell2 = new CellViewModel { CanvasX = 160, CanvasY = 0 };
+
+        // Primary starts at (0,0); inject canvas position at (960,0) — raw delta = 960
+        // Clamped to GridSize = 160; cell1 → 160, cell2 → 320
+        ctx.InjectedCanvasPosition = new Point(960, 0);
+
+        var state = new DragItemsState(cell1, 0, 0, new[] { (cell1, 0.0, 0.0), (cell2, 160.0, 0.0) });
+        state.Enter(ctx);
+        state.OnPointerMoved(null!, ctx);
+
+        Assert.Equal(160, cell1.CanvasX, precision: 0);
+        Assert.Equal(320, cell2.CanvasX, precision: 0);
+    }
+
+    [Fact]
+    public void GroupDrag_NoMovementInDeadZone()
+    {
+        // dx and dy both < 0.1 → no cells should move
+        var ctx = new FakeInteractionContext();
+        var cell1 = new CellViewModel { CanvasX = 0, CanvasY = 0 };
+        var cell2 = new CellViewModel { CanvasX = 160, CanvasY = 0 };
+
+        // Inject exactly the start position → targetX=0, targetY=0 → dx=0, dy=0
+        ctx.InjectedCanvasPosition = new Point(0, 0);
+
+        var state = new DragItemsState(cell1, 0, 0, new[] { (cell1, 0.0, 0.0), (cell2, 160.0, 0.0) });
+        state.Enter(ctx);
+        state.OnPointerMoved(null!, ctx);
+
+        Assert.Equal(0, cell1.CanvasX, precision: 0);
+        Assert.Equal(160, cell2.CanvasX, precision: 0);
+    }
 }

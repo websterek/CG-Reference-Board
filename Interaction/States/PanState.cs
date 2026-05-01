@@ -20,9 +20,13 @@ public sealed class PanState : IInteractionState
     {
         if (e is null) return StateTransition.Stay;
         var pos = e.GetPosition(null);
-        var delta = pos - _lastPoint;
+        var screenDelta = pos - _lastPoint;
         _lastPoint = pos;
-        ctx.Viewport.PanBy(delta);
+        // The canvas transform is Translate→Scale: screen = (canvas + tx) * zoom.
+        // To keep the grab point fixed under the cursor, tx must change by screen_delta / zoom.
+        double zoom = ctx.Viewport.Zoom;
+        var canvasDelta = new Avalonia.Vector(screenDelta.X / zoom, screenDelta.Y / zoom);
+        ctx.Viewport.PanBy(canvasDelta);
         ctx.NotifyZoomChanged();
         return StateTransition.Stay;
     }

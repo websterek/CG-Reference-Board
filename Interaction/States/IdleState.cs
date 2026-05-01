@@ -16,6 +16,18 @@ public sealed class IdleState : IInteractionState
         if (e is null) return StateTransition.Stay;
         var props = e.GetCurrentPoint(null).Properties;
 
+        // Backdrop placement takes priority over all other LMB handling
+        if (ctx.IsShowingPlacementPreview && props.IsLeftButtonPressed)
+            return StateTransition.GoTo(new BackdropPlacementState());
+
+        // Backdrop: right-click or Ctrl cancels
+        if (ctx.IsShowingPlacementPreview && (props.IsRightButtonPressed || e.KeyModifiers.HasFlag(KeyModifiers.Control)))
+        {
+            ctx.HidePlacementPreview();
+            e.Handled = true;
+            return StateTransition.Stay;
+        }
+
         if (props.IsMiddleButtonPressed)
         {
             var screenPt = e.GetPosition(null);
@@ -26,7 +38,49 @@ public sealed class IdleState : IInteractionState
             return StateTransition.GoTo(new ShiftPanPendingState(e.GetPosition(null)));
 
         if (props.IsLeftButtonPressed)
-            return StateTransition.GoTo(new MarqueePendingState());
+        {
+            var canvasPt = ctx.GetCanvasPosition(e);
+
+            // Transform body move
+            if (ctx.TryBeginTransformBodyMove(canvasPt))
+            {
+                ctx.SetPointerCapture(e.Pointer, true);
+                e.Handled = true;
+                return StateTransition.GoTo(new TransformBodyMoveState());
+            }
+
+            // Draw mode: eraser
+            if (ctx.Vm.IsDrawMode && ctx.Vm.IsEraserMode)
+                return StateTransition.GoTo(new EraseAnnotationState());
+
+            // Draw mode: annotation move/select marquee
+            if (ctx.Vm.IsDrawMode && ctx.Vm.IsMoveMode)
+            {
+                bool additive = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+                return StateTransition.GoTo(new MarqueeSelectState(canvasPt, additive, annotationMode: true));
+            }
+
+            // Draw mode: draw annotation (non-Text)
+            if (ctx.Vm.IsDrawMode && !ctx.Vm.IsEraserMode && !ctx.Vm.IsMoveMode)
+            {
+                var ann = ctx.BeginDrawAnnotation(canvasPt);
+                if (ann != null)
+                {
+                    ctx.SetPointerCapture(e.Pointer, true);
+                    e.Handled = true;
+                    return StateTransition.GoTo(new DrawAnnotationState(ann));
+                }
+                // Text tool: fall through to let legacy overlay code handle it
+                return StateTransition.Stay;
+            }
+
+            // Grid mode: cell marquee (via pending state for pan disambiguation)
+            if (!ctx.Vm.IsDrawMode)
+            {
+                bool additive = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+                return StateTransition.GoTo(new MarqueePendingState(e.GetPosition(null), additive));
+            }
+        }
 
         return StateTransition.Stay;
     }
