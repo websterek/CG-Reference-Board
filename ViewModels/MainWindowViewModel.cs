@@ -1015,6 +1015,70 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _ = UpdateBoardDirectoryListAsync();
     }
 
+    /// <summary>
+    /// Removes all annotations that intersect the given canvas point.
+    /// Returns true if any annotations were removed (caller should refresh selection state).
+    /// </summary>
+    public bool EraseAnnotationsAt(Avalonia.Point pt)
+    {
+        var toRemove = Annotations.Where(ann =>
+        {
+            double threshold = Math.Max(15, ann.Thickness / 2 + 5);
+            if (ann.Points.Count == 0)
+                return false;
+            if (ann.Type == "Rectangle" || ann.Type == "Ellipse" || ann.Type == "Text")
+            {
+                double left, right, top, bottom;
+                if (ann.Type == "Text")
+                {
+                    var renderedBounds = AnnotationBoundsHelper.GetRenderedBounds(ann);
+                    left   = renderedBounds.X;
+                    top    = renderedBounds.Y;
+                    right  = renderedBounds.Right;
+                    bottom = renderedBounds.Bottom;
+                }
+                else
+                {
+                    var pStart = new Avalonia.Point(ann.Points[0].X + ann.CanvasX, ann.Points[0].Y + ann.CanvasY);
+                    var pEnd   = new Avalonia.Point(ann.Points[^1].X + ann.CanvasX, ann.Points[^1].Y + ann.CanvasY);
+                    left   = Math.Min(pStart.X, pEnd.X);
+                    right  = Math.Max(pStart.X, pEnd.X);
+                    top    = Math.Min(pStart.Y, pEnd.Y);
+                    bottom = Math.Max(pStart.Y, pEnd.Y);
+                }
+                return pt.X >= left - threshold && pt.X <= right + threshold &&
+                       pt.Y >= top - threshold  && pt.Y <= bottom + threshold;
+            }
+
+            if (ann.Points.Count == 1)
+            {
+                var p0 = new Avalonia.Point(ann.Points[0].X + ann.CanvasX, ann.Points[0].Y + ann.CanvasY);
+                return Math.Sqrt(Math.Pow(p0.X - pt.X, 2) + Math.Pow(p0.Y - pt.Y, 2)) < threshold;
+            }
+
+            for (int i = 0; i < ann.Points.Count - 1; i++)
+            {
+                var p1 = new Avalonia.Point(ann.Points[i].X + ann.CanvasX, ann.Points[i].Y + ann.CanvasY);
+                var p2 = new Avalonia.Point(ann.Points[i + 1].X + ann.CanvasX, ann.Points[i + 1].Y + ann.CanvasY);
+                if (GeometryHelper.DistanceToSegment(pt, p1, p2) < threshold)
+                    return true;
+            }
+            return false;
+        }).ToList();
+
+        if (toRemove.Count == 0)
+            return false;
+
+        foreach (var ann in toRemove)
+        {
+            SelectionService.RemoveFromSelection(ann);
+            Annotations.Remove(ann);
+        }
+
+        MarkUnsaved();
+        return true;
+    }
+
     public void Cleanup()
     {
         // Signal the background save loop to exit and wait briefly so any
