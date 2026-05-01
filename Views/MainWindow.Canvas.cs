@@ -734,7 +734,7 @@ public partial class MainWindow
             brushCircle.IsVisible = showCircle;
             if (showCircle)
             {
-                double sizeInScreen = Vm.CurrentBrushThickness * _scale.ScaleX;
+                double sizeInScreen = Vm.CurrentBrushThickness * _viewport.Zoom;
                 brushCircle.Width = sizeInScreen;
                 brushCircle.Height = sizeInScreen;
                 Canvas.SetLeft(brushCircle, _lastPointerPosition.X - sizeInScreen / 2.0);
@@ -946,7 +946,7 @@ public partial class MainWindow
 
             double deltaY = _middleZoomStartY - screenPt.Y;
 
-            double oldScale = _scale.ScaleX;
+            double oldScale = _viewport.Zoom;
             // Convert pointer vertical movement into a multiplicative scale change by
             // applying the delta in log-space. This makes zoom feel consistent at all distances.
             // Clamp the log-space delta to avoid large jumps per-frame.
@@ -959,12 +959,8 @@ public partial class MainWindow
 
             if (Math.Abs(newScale - oldScale) > 0.0001)
             {
-                _translate.X += _middleZoomAnchor.X * (1.0 / newScale - 1.0 / oldScale);
-                _translate.Y += _middleZoomAnchor.Y * (1.0 / newScale - 1.0 / oldScale);
-                _scale.ScaleX = newScale;
-                _scale.ScaleY = newScale;
+                _viewport.ZoomAt(_middleZoomAnchor, factor);
                 InvalidateZoomRestore();
-                NotifyZoomChanged();
             }
 
             _middleZoomStartY = screenPt.Y;
@@ -990,8 +986,8 @@ public partial class MainWindow
         else if (_isPanning && (currentProps.IsMiddleButtonPressed || (currentProps.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Shift))))
         {
             var screenPt = e.GetPosition(this);
-            _translate.X += (screenPt.X - _panStartPoint.X) / _scale.ScaleX;
-            _translate.Y += (screenPt.Y - _panStartPoint.Y) / _scale.ScaleY;
+            _viewport.OffsetX += (screenPt.X - _panStartPoint.X) / _viewport.Zoom;
+            _viewport.OffsetY += (screenPt.Y - _panStartPoint.Y) / _viewport.Zoom;
             _panStartPoint = screenPt;
             InvalidateZoomRestore();
         }
@@ -1212,7 +1208,7 @@ public partial class MainWindow
             return;
 
         // Treat wheel deltas multiplicatively in log-space so zoom feels linear across scales.
-        double oldScale = _scale.ScaleX;
+        double oldScale = _viewport.Zoom;
 
         // The wheel delta is typically ±1 per step on most platforms, but can be larger.
         // sensitivity controls how aggressive each wheel step is; tune if needed.
@@ -1232,14 +1228,14 @@ public partial class MainWindow
         if (sender is Visual visual)
         {
             var pointerPos = e.GetPosition(visual);
-            _translate.X += pointerPos.X * (1.0 / newScale - 1.0 / oldScale);
-            _translate.Y += pointerPos.Y * (1.0 / newScale - 1.0 / oldScale);
+            _viewport.ZoomAt(pointerPos, factor);
+        }
+        else
+        {
+            _viewport.Zoom = newScale;
         }
 
-        _scale.ScaleX = newScale;
-        _scale.ScaleY = newScale;
         InvalidateZoomRestore();
-        NotifyZoomChanged();
     }
 
     #endregion
@@ -1250,12 +1246,8 @@ public partial class MainWindow
     {
         if (Vm.GridCells.Count == 0 && Vm.Annotations.Count == 0)
         {
-            _translate.X = 0;
-            _translate.Y = 0;
-            _scale.ScaleX = 1;
-            _scale.ScaleY = 1;
+            _viewport.ResetView();
             InvalidateZoomRestore();
-            NotifyZoomChanged();
             return;
         }
 
@@ -1298,10 +1290,9 @@ public partial class MainWindow
         double scaleY = viewportHeight / (contentHeight + padding);
         double scale = Math.Clamp(Math.Min(scaleX, scaleY), Constants.MinZoom, 2.0);
 
-        _scale.ScaleX = scale;
-        _scale.ScaleY = scale;
-        _translate.X = viewportWidth / 2 / scale - (minX + maxX) / 2;
-        _translate.Y = viewportHeight / 2 / scale - (minY + maxY) / 2;
+        _viewport.Zoom = scale;
+        _viewport.OffsetX = viewportWidth / 2 / scale - (minX + maxX) / 2;
+        _viewport.OffsetY = viewportHeight / 2 / scale - (minY + maxY) / 2;
         InvalidateZoomRestore();
         NotifyZoomChanged();
     }
@@ -1350,10 +1341,9 @@ public partial class MainWindow
         double scaleY = contentHeight > 0 ? viewportHeight / (contentHeight + padding) : 2.0;
         double scale = Math.Clamp(Math.Min(scaleX, scaleY), Constants.MinZoom, 2.0);
 
-        _scale.ScaleX = scale;
-        _scale.ScaleY = scale;
-        _translate.X = viewportWidth / 2 / scale - (minX + maxX) / 2;
-        _translate.Y = viewportHeight / 2 / scale - (minY + maxY) / 2;
+        _viewport.Zoom = scale;
+        _viewport.OffsetX = viewportWidth / 2 / scale - (minX + maxX) / 2;
+        _viewport.OffsetY = viewportHeight / 2 / scale - (minY + maxY) / 2;
         InvalidateZoomRestore();
         NotifyZoomChanged();
     }
@@ -1370,10 +1360,9 @@ public partial class MainWindow
         if (_canRestoreView && _zoomedToCell == cell)
         {
             // Restore previous view state
-            _translate.X = _savedTranslateX;
-            _translate.Y = _savedTranslateY;
-            _scale.ScaleX = _savedScale;
-            _scale.ScaleY = _savedScale;
+            _viewport.OffsetX = _savedTranslateX;
+            _viewport.OffsetY = _savedTranslateY;
+            _viewport.Zoom = _savedScale;
 
             // Clear zoom toggle state
             _canRestoreView = false;
@@ -1384,9 +1373,9 @@ public partial class MainWindow
         }
 
         // Save current view state before zooming
-        _savedTranslateX = _translate.X;
-        _savedTranslateY = _translate.Y;
-        _savedScale = _scale.ScaleX;
+        _savedTranslateX = _viewport.OffsetX;
+        _savedTranslateY = _viewport.OffsetY;
+        _savedScale = _viewport.Zoom;
 
         double contentWidth = cell.PixelWidth;
         double contentHeight = cell.PixelHeight;
@@ -1398,14 +1387,13 @@ public partial class MainWindow
         double scaleY = contentHeight > 0 ? viewportHeight / contentHeight : 2.0;
         double scale = Math.Clamp(Math.Min(scaleX, scaleY), Constants.MinZoom, 2.0);
 
-        _scale.ScaleX = scale;
-        _scale.ScaleY = scale;
+        _viewport.Zoom = scale;
 
         // Center the cell in the viewport (use VisualX/VisualY for correct backdrop positioning)
         double cellCenterX = cell.VisualX + contentWidth / 2;
         double cellCenterY = cell.VisualY + contentHeight / 2;
-        _translate.X = viewportWidth / 2 / scale - cellCenterX;
-        _translate.Y = viewportHeight / 2 / scale - cellCenterY;
+        _viewport.OffsetX = viewportWidth / 2 / scale - cellCenterX;
+        _viewport.OffsetY = viewportHeight / 2 / scale - cellCenterY;
 
         // Mark that we can restore this view on next double-click
         _canRestoreView = true;
@@ -1416,10 +1404,8 @@ public partial class MainWindow
 
     private void ZoomReset_Click(object? sender, RoutedEventArgs e)
     {
-        _scale.ScaleX = 1;
-        _scale.ScaleY = 1;
+        _viewport.Zoom = 1.0;
         InvalidateZoomRestore();
-        NotifyZoomChanged();
         ScheduleViewportUpdate();
     }
 
@@ -1431,8 +1417,8 @@ public partial class MainWindow
         double viewportWidth = MainCanvas.Bounds.Width > 0 ? MainCanvas.Bounds.Width : this.Bounds.Width;
         double viewportHeight = MainCanvas.Bounds.Height > 0 ? MainCanvas.Bounds.Height : this.Bounds.Height;
 
-        _translate.X = viewportWidth / 2 / _scale.ScaleX - canvasX;
-        _translate.Y = viewportHeight / 2 / _scale.ScaleY - canvasY;
+        _viewport.OffsetX = viewportWidth / 2 / _viewport.Zoom - canvasX;
+        _viewport.OffsetY = viewportHeight / 2 / _viewport.Zoom - canvasY;
     }
 
     /// <summary>

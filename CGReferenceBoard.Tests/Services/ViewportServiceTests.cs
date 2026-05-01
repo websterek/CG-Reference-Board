@@ -29,10 +29,12 @@ public class ViewportServiceTests
     public void ZoomAt_ZoomsAroundAnchor()
     {
         var svc = new ViewportService();
+        // Translate→Scale: OffsetX += anchor.X * (1/newZoom - 1/oldZoom)
+        // = 0 + 100 * (1/2 - 1/1) = 100 * -0.5 = -50
         svc.ZoomAt(new Point(100, 100), 2.0);
         Assert.Equal(2.0, svc.Zoom, precision: 6);
-        Assert.Equal(-100, svc.OffsetX, precision: 6);
-        Assert.Equal(-100, svc.OffsetY, precision: 6);
+        Assert.Equal(-50, svc.OffsetX, precision: 6);
+        Assert.Equal(-50, svc.OffsetY, precision: 6);
     }
 
     [Fact]
@@ -52,8 +54,8 @@ public class ViewportServiceTests
     {
         var svc = new ViewportService();
         svc.FitToBoard(new Rect(0, 0, 1000, 500), new Size(800, 400));
-        // Min(800/1000, 400/500) * 0.9 = min(0.8, 0.8) * 0.9 = 0.72
-        Assert.Equal(0.72, svc.Zoom, precision: 4);
+        // Min(800/1000, 400/500) = Min(0.8, 0.8) = 0.8 (no 0.9 multiplier in new math)
+        Assert.Equal(0.8, svc.Zoom, precision: 4);
     }
 
     [Fact]
@@ -79,7 +81,7 @@ public class ViewportServiceTests
     {
         var svc = new ViewportService();
         svc.ZoomAt(new Point(0, 0), 1000.0);
-        Assert.Equal(50.0, svc.Zoom, precision: 4);
+        Assert.Equal(CGReferenceBoard.Helpers.Constants.MaxZoom, svc.Zoom, precision: 4);
     }
 
     [Fact]

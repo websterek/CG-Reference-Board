@@ -42,22 +42,22 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public MainWindowViewModel Vm { get; }
 
     // ── Zoom-dependent View-only properties ───────────────────────────────────
-    // These depend on _scale which stays in the View (pan/zoom is pure UI).
+    // These delegate to _viewport (ViewportService) — single source of truth.
 
     /// <summary>Current zoom level as percentage string for the status bar.</summary>
-    public string ZoomLevelText => $"{_scale.ScaleX * 100:F0}%";
+    public string ZoomLevelText => $"{_viewport.Zoom * 100:F0}%";
 
     /// <summary>Inverse of current zoom scale for zoom-independent UI elements.</summary>
-    public double ZoomInverseFactor => 1.0 / _scale.ScaleX;
+    public double ZoomInverseFactor => 1.0 / _viewport.Zoom;
 
     /// <summary>Border thickness that remains constant regardless of zoom level.</summary>
-    public Thickness ZoomIndependentBorderThickness => new Thickness(2.0 / _scale.ScaleX);
+    public Thickness ZoomIndependentBorderThickness => new Thickness(2.0 / _viewport.Zoom);
 
     /// <summary>Corner radius that remains constant regardless of zoom level.</summary>
     public CornerRadius ZoomIndependentCornerRadius => new CornerRadius(0);
 
     /// <summary>Hide the dot/grid background below 25% zoom — VisualBrush tile count explodes at low scale.</summary>
-    public bool IsCanvasBackgroundVisible => _scale.ScaleX >= 0.25;
+    public bool IsCanvasBackgroundVisible => _viewport.Zoom >= 0.25;
 
     /// <summary>Delegates to <see cref="MainWindowViewModel.IsViewMode"/> for bindings inside DataTemplates that use RelativeSource AncestorType=views:MainWindow.</summary>
     public bool IsViewMode => Vm.IsViewMode;
@@ -117,7 +117,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private CellViewModel? _editingTextCell;
     private CellViewModel? _draggingCell;
 
-    // Pan/Zoom
+    // Pan/Zoom — owned by ViewportService; _scale/_translate are the render objects kept in sync
+    private IViewportService _viewport = new ViewportService();
     private bool _isPanning;
     private bool _isShiftPanPending;
     private Point _panStartPoint;
@@ -252,9 +253,13 @@ Vm = vm;
             if (e.PropertyName == nameof(Vm.TransformContextVersion))
                 CancelActiveInteractionForContextChange();
         };
-        // Wire ViewportService refresh → LOD invalidation
+        // Wire ViewportService refresh → LOD invalidation + sync render transforms
         if (App.Services?.GetService<IViewportService>() is { } vs)
+        {
+            _viewport = vs;
             vs.RefreshRequested += ScheduleViewportUpdate;
+            vs.PropertyChanged += OnViewportPropertyChanged;
+        }
         Vm.TransformService.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(Vm.TransformService.IsVisible) or nameof(Vm.TransformService.Bounds))
@@ -532,6 +537,25 @@ Vm = vm;
 
     // ── Zoom notifications ────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Keeps the render transforms (_scale, _translate) in sync whenever the
+    /// ViewportService state changes (from any source: user gesture, service call, etc.).
+    /// </summary>
+    private void OnViewportPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(IViewportService.Zoom))
+        {
+            _scale.ScaleX = _viewport.Zoom;
+            _scale.ScaleY = _viewport.Zoom;
+            NotifyZoomChanged();
+        }
+        else if (e.PropertyName is nameof(IViewportService.OffsetX) or nameof(IViewportService.OffsetY))
+        {
+            _translate.X = _viewport.OffsetX;
+            _translate.Y = _viewport.OffsetY;
+        }
+    }
+
     private void NotifyZoomChanged()
     {
         if (_zoomNotificationPending)
@@ -569,14 +593,14 @@ Vm = vm;
         Vm.IsCanvasBackgroundVisible = IsCanvasBackgroundVisible;
         Vm.ZoomLevelText = ZoomLevelText;
 
-        CGReferenceBoard.Controls.AnnotationShape.SetScale(_scale.ScaleX);
+        CGReferenceBoard.Controls.AnnotationShape.SetScale(_viewport.Zoom);
 
         var canvas = this.FindControl<Avalonia.Controls.Canvas>("MainCanvas");
         if (canvas != null)
         {
-            var mode = _scale.ScaleX < 0.35
+            var mode = _viewport.Zoom < 0.35
                 ? Avalonia.Media.Imaging.BitmapInterpolationMode.LowQuality
-                : _scale.ScaleX < 1.0
+                : _viewport.Zoom < 1.0
                     ? Avalonia.Media.Imaging.BitmapInterpolationMode.MediumQuality
                     : Avalonia.Media.Imaging.BitmapInterpolationMode.HighQuality;
             Avalonia.Media.RenderOptions.SetBitmapInterpolationMode(canvas, mode);
@@ -658,8 +682,8 @@ Vm = vm;
 
         var bounds = CanvasBorder.Bounds;
         var centerPos = new Point(
-            bounds.Width / 2 / _scale.ScaleX - _translate.X,
-            bounds.Height / 2 / _scale.ScaleY - _translate.Y);
+            bounds.Width / 2 / _viewport.Zoom - _viewport.OffsetX,
+            bounds.Height / 2 / _viewport.Zoom - _viewport.OffsetY);
         return GetOrCreateCellAt(centerPos);
     }
 
@@ -965,8 +989,8 @@ Vm = vm;
 
             if (Math.Abs(dx) > 0.1 || Math.Abs(dy) > 0.1)
             {
-                _translate.X += dx;
-                _translate.Y += dy;
+                _viewport.OffsetX += dx;
+                _viewport.OffsetY += dy;
             }
         }, Avalonia.Threading.DispatcherPriority.Background);
     }
@@ -1030,9 +1054,9 @@ Vm = vm;
 
     private void ViewportLodTimer_Tick(object? sender, EventArgs e)
     {
-        double tx = _translate.X;
-        double ty = _translate.Y;
-        double sc = _scale.ScaleX;
+        double tx = _viewport.OffsetX;
+        double ty = _viewport.OffsetY;
+        double sc = _viewport.Zoom;
         int count = Vm.GridCells.Count;
         double vw = MainCanvas.Bounds.Width > 0 ? MainCanvas.Bounds.Width : this.Bounds.Width;
         double vh = MainCanvas.Bounds.Height > 0 ? MainCanvas.Bounds.Height : this.Bounds.Height;
@@ -1070,9 +1094,9 @@ Vm = vm;
     {
         try
         {
-            double scale = _scale.ScaleX;
-            double tx = _translate.X;
-            double ty = _translate.Y;
+            double scale = _viewport.Zoom;
+            double tx = _viewport.OffsetX;
+            double ty = _viewport.OffsetY;
 
             double viewW = MainCanvas.Bounds.Width > 0 ? MainCanvas.Bounds.Width : this.Bounds.Width;
             double viewH = MainCanvas.Bounds.Height > 0 ? MainCanvas.Bounds.Height : this.Bounds.Height;

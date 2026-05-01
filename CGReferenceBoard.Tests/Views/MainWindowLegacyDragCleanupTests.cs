@@ -8,6 +8,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using CGReferenceBoard.Helpers;
 using CGReferenceBoard.Models;
+using CGReferenceBoard.Services;
 using CGReferenceBoard.Services.Transform;
 using CGReferenceBoard.Tests.TestInfrastructure;
 using CGReferenceBoard.ViewModels;
@@ -161,6 +162,8 @@ public sealed class MainWindowLegacyDragCleanupTests
         SetPrivateField(window, "_cachedTransformOverlay", new Canvas());
         SetPrivateField(window, "_cachedTransformBody", new Border());
         SetPrivateField(window, "_scale", new ScaleTransform(1, 1));
+        SetPrivateField(window, "_translate", new Avalonia.Media.TranslateTransform(0, 0));
+        SetPrivateField(window, "_viewport", new ViewportService());
 
         viewModel.Annotations.Add(duplicate);
         viewModel.ModeService.SetMode("Annotation");
@@ -176,6 +179,8 @@ public sealed class MainWindowLegacyDragCleanupTests
         SetPrivateField(window, "_cachedTransformOverlay", new Canvas());
         SetPrivateField(window, "_cachedTransformBody", new Border());
         SetPrivateField(window, "_scale", new ScaleTransform(1, 1));
+        SetPrivateField(window, "_translate", new Avalonia.Media.TranslateTransform(0, 0));
+        SetPrivateField(window, "_viewport", new ViewportService());
 
         var cancelled = window.CancelPendingAnnotationAltDuplicateDrag();
 
@@ -277,6 +282,8 @@ public sealed class MainWindowLegacyDragCleanupTests
         SetPrivateField(window, "_cachedTransformOverlay", new Canvas());
         SetPrivateField(window, "_cachedTransformBody", new Border());
         SetPrivateField(window, "_scale", new ScaleTransform(1, 1));
+        SetPrivateField(window, "_translate", new Avalonia.Media.TranslateTransform(0, 0));
+        SetPrivateField(window, "_viewport", new ViewportService());
 
         viewModel.Annotations.Add(annotation);
         viewModel.ModeService.SetMode("Annotation");
@@ -360,6 +367,8 @@ public sealed class MainWindowLegacyDragCleanupTests
         SetPrivateField(window, "_cachedTransformOverlay", new Canvas());
         SetPrivateField(window, "_cachedTransformBody", new Border());
         SetPrivateField(window, "_scale", new ScaleTransform(1, 1));
+        SetPrivateField(window, "_translate", new Avalonia.Media.TranslateTransform(0, 0));
+        SetPrivateField(window, "_viewport", new ViewportService());
 
         viewModel.GridCells.Add(backdrop);
         viewModel.GridCells.Add(cellInBackdropPadding);
@@ -507,6 +516,8 @@ public sealed class MainWindowLegacyDragCleanupTests
         SetPrivateField(window, "_cachedTransformOverlay", new Canvas());
         SetPrivateField(window, "_cachedTransformBody", new Border());
         SetPrivateField(window, "_scale", new ScaleTransform(1, 1));
+        SetPrivateField(window, "_translate", new Avalonia.Media.TranslateTransform(0, 0));
+        SetPrivateField(window, "_viewport", new ViewportService());
         return window;
     }
 
