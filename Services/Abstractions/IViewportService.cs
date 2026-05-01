@@ -37,4 +37,15 @@ public interface IViewportService : INotifyPropertyChanged
 
     /// <summary>Fits the viewport to show all content within <paramref name="boardBounds"/>.</summary>
     void FitToBoard(Rect boardBounds, Size viewportSize);
+
+    // ── LOD refresh request ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Fired when the viewport LOD cache should be invalidated (e.g. after undo/redo).
+    /// The View listens to this instead of <c>MainWindowViewModel.ViewportUpdateRequested</c>.
+    /// </summary>
+    event Action? RefreshRequested;
+
+    /// <summary>Signals the View to invalidate its LOD cache.</summary>
+    void RequestRefresh();
 }

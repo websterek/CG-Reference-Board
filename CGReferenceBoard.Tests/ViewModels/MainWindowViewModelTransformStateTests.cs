@@ -51,7 +51,11 @@ public sealed class MainWindowViewModelTransformStateTests
     {
         var viewModel = new MainWindowViewModel();
         int changeCount = 0;
-        viewModel.TransformContextChanging += () => changeCount++;
+        viewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(viewModel.TransformContextVersion))
+                changeCount++;
+        };
 
         viewModel.ModeService.SetMode("Annotation");
         viewModel.ModeService.AnnotationMode.CurrentTool = "Move";

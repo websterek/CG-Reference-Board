@@ -57,6 +57,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IHistoryService _historyService;
     private readonly ILocalizationService _localizationService;
     private readonly INotificationService _notificationService;
+    private readonly IViewportService _viewportService;
 
     /// <summary>
     /// Layer manager that owns the visual layer hierarchy.
@@ -194,15 +195,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsAnnotationEffectOutline))]
     private string _annotationEffectMode = "None";
 
-    // ── View-integration events ───────────────────────────────────────────────
-
-    /// <summary>Fired when the viewport LOD system should schedule an update.</summary>
-    public event Action? ViewportUpdateRequested;
+    // ── View-integration observable ───────────────────────────────────────────
 
     /// <summary>
-    /// Fired before mode/tool changes refresh transform state so the View can cancel live drags cleanly.
+    /// Incremented before each mode/tool change. The View observes
+    /// <see cref="PropertyChanged"/> for <c>nameof(TransformContextVersion)</c>
+    /// and calls <c>CancelActiveInteractionForContextChange()</c>.
+    /// Replaces the removed <c>TransformContextChanging</c> Action event.
     /// </summary>
-    public event Action? TransformContextChanging;
+    [ObservableProperty]
+    private int _transformContextVersion;
 
     // ── Computed / derived properties ─────────────────────────────────────────
 
@@ -310,7 +312,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IBoardService? boardService,
         IHistoryService? historyService,
         ILocalizationService? localizationService,
-        INotificationService? notificationService)
+        INotificationService? notificationService,
+        IViewportService? viewportService = null)
     {
         IsViewMode = isViewMode;
         ModeService = modeService ?? new ModeService();
@@ -320,6 +323,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _historyService = historyService ?? new HistoryService();
         _localizationService = localizationService ?? new LocalizationService();
         _notificationService = notificationService ?? new NotificationService();
+        _viewportService = viewportService ?? new ViewportService();
 
         WorkspaceDir = Path.Combine(Constants.ConfigDirectory, "Assets");
 
@@ -332,7 +336,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             if (e.PropertyName == nameof(AnnotationMode.CurrentTool))
             {
-                TransformContextChanging?.Invoke();
+                TransformContextVersion++;
                 RefreshTransformState();
                 OnPropertyChanged(nameof(CurrentTool));
                 OnPropertyChanged(nameof(CanvasCursor));
@@ -376,14 +380,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
             services?.GetService<IBoardService>(),
             services?.GetService<IHistoryService>(),
             services?.GetService<ILocalizationService>(),
-            services?.GetService<INotificationService>());
+            services?.GetService<INotificationService>(),
+            services?.GetService<IViewportService>());
     }
 
     // ── Mode-change handler ───────────────────────────────────────────────────
 
     private void HandleModeChanged(object? sender, ModeChangedEventArgs e)
     {
-        TransformContextChanging?.Invoke();
+        TransformContextVersion++;
         OnModeChanged(sender, e);
         RefreshTransformState();
     }
@@ -475,7 +480,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (IsViewMode) return;
         _historyService.Undo();
         RequestSave();
-        ViewportUpdateRequested?.Invoke();
+        _viewportService.RequestRefresh();
         _notificationService.ShowToast("↩ Undo");
     }
 
@@ -485,7 +490,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (IsViewMode) return;
         _historyService.Redo();
         RequestSave();
-        ViewportUpdateRequested?.Invoke();
+        _viewportService.RequestRefresh();
         _notificationService.ShowToast("↪ Redo");
     }
 
@@ -876,7 +881,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (cell.NeedsImage && cell.PlaceholderColor == "#FF2A2A2A")
                 _ = cell.EnsurePlaceholderColorAsync();
 
-        ViewportUpdateRequested?.Invoke();
+        _viewportService.RequestRefresh();
     }
 
     // ── Recent boards ─────────────────────────────────────────────────────────

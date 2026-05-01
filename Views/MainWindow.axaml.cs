@@ -249,9 +249,12 @@ Vm = vm;
         {
             if (e.PropertyName == nameof(Vm.IsAlwaysOnTop))
                 Topmost = Vm.IsAlwaysOnTop;
+            if (e.PropertyName == nameof(Vm.TransformContextVersion))
+                CancelActiveInteractionForContextChange();
         };
-        Vm.ViewportUpdateRequested += ScheduleViewportUpdate;
-        Vm.TransformContextChanging += CancelActiveInteractionForContextChange;
+        // Wire ViewportService refresh → LOD invalidation
+        if (App.Services?.GetService<IViewportService>() is { } vs)
+            vs.RefreshRequested += ScheduleViewportUpdate;
         Vm.TransformService.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(Vm.TransformService.IsVisible) or nameof(Vm.TransformService.Bounds))

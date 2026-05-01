@@ -1,3 +1,4 @@
+using System;
 using Avalonia.Input;
 
 namespace CGReferenceBoard.Interaction;
@@ -12,12 +13,18 @@ public sealed class InteractionController : IInteractionController
 
     public IInteractionState CurrentState => _current;
 
+    /// <inheritdoc/>
+    public event Action? TransformContextChanging;
+
     public InteractionController(IInteractionContext ctx, IInteractionState initialState)
     {
         _ctx = ctx;
         _current = initialState;
         _current.Enter(ctx);
     }
+
+    /// <inheritdoc/>
+    public void NotifyTransformContextChanging() => TransformContextChanging?.Invoke();
 
     private void Apply(StateTransition t)
     {

@@ -89,4 +89,10 @@ public sealed class ViewportService : IViewportService
         OffsetX = (viewportSize.Width - boardBounds.Width * newZoom) / 2 - boardBounds.X * newZoom;
         OffsetY = (viewportSize.Height - boardBounds.Height * newZoom) / 2 - boardBounds.Y * newZoom;
     }
+
+    // ── LOD refresh request ──────────────────────────────────────────────────
+
+    public event Action? RefreshRequested;
+
+    public void RequestRefresh() => RefreshRequested?.Invoke();
 }
