@@ -23,7 +23,7 @@ public sealed class IdleState : IInteractionState
         }
 
         if (props.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
-            return StateTransition.GoTo(new PanState());
+            return StateTransition.GoTo(new ShiftPanPendingState(e.GetPosition(null)));
 
         if (props.IsLeftButtonPressed)
             return StateTransition.GoTo(new MarqueePendingState());

@@ -28,6 +28,13 @@ public interface IInteractionContext
     /// </summary>
     Point GetCanvasPosition(PointerEventArgs e);
 
+    /// <summary>
+    /// Returns the screen-space position of a pointer event.
+    /// Equivalent to e.GetPosition(null), but allows test fakes to inject
+    /// arbitrary positions without real event args.
+    /// </summary>
+    Point GetScreenPosition(PointerEventArgs e);
+
     IHistoryService History { get; }
 
     CellViewModel? HitTestCell(Point canvasPt);

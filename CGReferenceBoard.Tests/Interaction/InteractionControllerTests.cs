@@ -55,6 +55,8 @@ internal class FakeInteractionContext : IInteractionContext
     public Point ScreenToCanvas(Point p) => p;
     public Point GetCanvasPosition(PointerEventArgs e) => InjectedCanvasPosition;
     public Point InjectedCanvasPosition { get; set; } = new Point(0, 0);
+    public Point GetScreenPosition(PointerEventArgs e) => InjectedScreenPosition;
+    public Point InjectedScreenPosition { get; set; } = new Point(0, 0);
     public CellViewModel? HitTestCell(Point p) => null;
     public IReadOnlyList<CellViewModel> HitTestCellsInRect(Rect r) => Array.Empty<CellViewModel>();
     public IReadOnlyList<AnnotationViewModel> HitTestAnnotationsInRect(Rect r) => Array.Empty<AnnotationViewModel>();
