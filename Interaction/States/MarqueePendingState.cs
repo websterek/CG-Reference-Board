@@ -52,7 +52,7 @@ public sealed class MarqueePendingState : IInteractionState
                 if (ctrl || _additive)
                     return StateTransition.GoTo(new MarqueeSelectState(canvasPt, additive: true, annotationMode: false));
                 else
-                    return StateTransition.GoTo(new PanState(_startPoint));
+                    return StateTransition.GoTo(new MarqueeSelectState(canvasPt, additive: false, annotationMode: false));
             }
             else
             {

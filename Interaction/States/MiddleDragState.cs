@@ -47,6 +47,13 @@ public sealed class MiddleDragState : IInteractionState
     {
         if (e is null) return StateTransition.Stay;
 
+        // Activate zoom mode if Alt or Left button is pressed (handles LMB pressed after MMB)
+        if (!_zoomMode && (e.KeyModifiers.HasFlag(KeyModifiers.Alt)
+            || e.GetCurrentPoint(null).Properties.IsLeftButtonPressed))
+        {
+            _zoomMode = true;
+        }
+
         if (_zoomMode)
         {
             var screenY = ctx.GetScreenPosition(e).Y;
@@ -84,8 +91,20 @@ public sealed class MiddleDragState : IInteractionState
         return StateTransition.Stay;
     }
 
-    public StateTransition OnPointerReleased(PointerReleasedEventArgs e, IInteractionContext ctx) =>
-        StateTransition.Pop;
+    public StateTransition OnPointerReleased(PointerReleasedEventArgs e, IInteractionContext ctx)
+    {
+        // If middle button is still held (LMB or Alt released), switch back to pan mode
+        if (e is not null)
+        {
+            var props = e.GetCurrentPoint(null).Properties;
+            if (props.IsMiddleButtonPressed)
+            {
+                _zoomMode = false;
+                return StateTransition.Stay;
+            }
+        }
+        return StateTransition.Pop;
+    }
 
     public StateTransition OnPointerCaptureLost(PointerCaptureLostEventArgs e, IInteractionContext ctx) =>
         StateTransition.Pop;
