@@ -40,12 +40,17 @@ public sealed class MiddleDragState : IInteractionState
     {
         if (e is null) return StateTransition.Stay;
 
+        var pos = e.GetPosition(null);
+
         // Determine sub-mode fresh every frame: zoom if Alt or LMB held, otherwise pan
         bool zoomMode = (e.KeyModifiers.HasFlag(KeyModifiers.Alt)
             || e.GetCurrentPoint(null).Properties.IsLeftButtonPressed);
 
         if (zoomMode)
         {
+            // Keep pan position current so there's no jump when switching back to pan
+            _panLastPos = pos;
+
             var screenY = ctx.GetScreenPosition(e).Y;
 
             if (!_zoomActive)
@@ -69,7 +74,6 @@ public sealed class MiddleDragState : IInteractionState
         }
         else
         {
-            var pos = e.GetPosition(null);
             var screenDelta = pos - _panLastPos;
             _panLastPos = pos;
             double zoom = ctx.Viewport.Zoom;
