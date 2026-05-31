@@ -31,7 +31,7 @@ public sealed class IdleState : IInteractionState
         if (props.IsMiddleButtonPressed)
         {
             var screenPt = e.GetPosition(null);
-            return StateTransition.GoTo(new MiddleZoomState(anchor: screenPt, screenY: screenPt.Y));
+            return StateTransition.GoTo(new MiddleDragState(anchor: screenPt, screenY: screenPt.Y));
         }
 
         if (props.IsLeftButtonPressed)
