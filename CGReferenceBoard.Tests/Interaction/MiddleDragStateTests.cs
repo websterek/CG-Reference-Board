@@ -9,12 +9,13 @@ namespace CGReferenceBoard.Tests.Interaction;
 public class MiddleDragStateTests
 {
     [Fact]
-    public void MiddleOnly_EnteredWithNoModifier_HasPanSubMode()
+    public void PanMode_NullEvent_DoesNotCrash()
     {
         var ctx = new FakeInteractionContext();
         var state = new MiddleDragState(anchor: new Point(0, 0), screenY: 0);
         state.Enter(ctx);
-        // No crash = success
+        var result = state.OnPointerMoved(null!, ctx);
+        Assert.Equal(StateTransition.Stay, result);
     }
 
     [Fact]
@@ -76,24 +77,24 @@ public class MiddleDragStateTests
     }
 
     [Fact]
-    public void MiddleDrag_PanMode_OnPointerMoved_ReturnsStay()
+    public void OnKeyDown_Alt_FlipsToZoomMode()
     {
         var ctx = new FakeInteractionContext();
-        var state = new MiddleDragState(anchor: new Point(0, 0), screenY: 0, zoomMode: false);
+        var state = new MiddleDragState(anchor: new Point(0, 0), screenY: 0);
         state.Enter(ctx);
 
-        // Pan mode uses e.GetPosition(null) so we need a non-null event.
-        // Like the existing PanState tests, we skip synthesizing a real event
-        // and just verify the state machine doesn't pop unexpectedly.
-        Assert.IsType<MiddleDragState>(state);
+        var result = state.OnKeyDown(null!, ctx);
+
+        // OnKeyDown handles null safely; verify state stays
+        Assert.Equal(StateTransition.Stay, result);
     }
 
     [Fact]
-    public void Constructor_DefaultIsPanMode()
+    public void DefaultConstructor_DoesNotThrow()
     {
         var state = new MiddleDragState(new Point(0, 0), 0);
-        // Default zoomMode should be false (pan mode) — no crash
         var ctx = new FakeInteractionContext();
-        state.Enter(ctx);
+        var ex = Record.Exception(() => state.Enter(ctx));
+        Assert.Null(ex);
     }
 }

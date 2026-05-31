@@ -70,6 +70,7 @@ public sealed class MiddleDragState : IInteractionState
         }
         else
         {
+            if (e is null) return StateTransition.Stay;
             var pos = e.GetPosition(null);
             var screenDelta = pos - _panLastPos;
             _panLastPos = pos;
