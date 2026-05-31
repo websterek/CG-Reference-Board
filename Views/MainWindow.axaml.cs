@@ -118,8 +118,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     // Pan/Zoom — owned by ViewportService; _scale/_translate are the render objects kept in sync
     private IViewportService _viewport = new ViewportService();
-    private bool _isPanning;
-    private Point _panStartPoint;
     private readonly TranslateTransform _translate = new(0, 0);
     private readonly ScaleTransform _scale = new(1, 1);
 
@@ -129,9 +127,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private double _savedScale;
     private CellViewModel? _zoomedToCell;
     private bool _canRestoreView;
-
-    // Middle-button drag-to-zoom (Nuke-style)
-    private double _middleZoomStartY;
 
     // Multi-selection
     private Point _cellSelectionStart;
@@ -282,18 +277,6 @@ Vm = vm;
 
         CacheCanvasControls();
         UpdateTransformOverlayLayout();
-
-        try
-        {
-            var canvasBorder = this.FindControl<Border>("CanvasBorder");
-            if (canvasBorder != null)
-            {
-                canvasBorder.AddHandler(InputElement.PointerPressedEvent,
-                    new EventHandler<PointerPressedEventArgs>(CanvasBorder_Tunneled_PointerPressed),
-                    Avalonia.Interactivity.RoutingStrategies.Tunnel);
-            }
-        }
-        catch { }
 
         _ = Vm.LoadRecentBoardsAsync();
         _ = Vm.LoadUserSettingsAsync();
@@ -799,33 +782,6 @@ Vm = vm;
     private void ClearLocalSelectionState()
     {
         Vm.SelectionService.ClearSelection();
-    }
-
-    private void CanvasBorder_Tunneled_PointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (e.Handled)
-            return;
-
-        var props = e.GetCurrentPoint(this).Properties;
-        if (!props.IsMiddleButtonPressed)
-            return;
-
-        _isPanning = true;
-        _panStartPoint = e.GetPosition(this);
-        _middleZoomStartY = e.GetPosition(this).Y;
-
-        try
-        {
-            var canvasBorder = this.FindControl<Border>("CanvasBorder");
-            if (canvasBorder != null)
-            {
-                ApplyPanCursor(canvasBorder);
-                e.Pointer.Capture(canvasBorder);
-            }
-        }
-        catch { }
-
-        e.Handled = true;
     }
 
     public void UpdateSelectionState()

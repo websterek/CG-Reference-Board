@@ -404,7 +404,6 @@ public partial class MainWindow
     private void ResetTransientPointerState(bool cancelActiveTransform)
     {
         StopEdgeScroll();
-        _isPanning = false;
         EnableCellHitTesting();
 
         if (cancelActiveTransform)
@@ -796,7 +795,7 @@ public partial class MainWindow
             Canvas.SetTop(hoverHighlight, gridY);
             hoverHighlight.Width = Constants.GridSize;
             hoverHighlight.Height = Constants.GridSize;
-            hoverHighlight.IsVisible = !(_isPanning || _isDraggingCell || _isResizing
+            hoverHighlight.IsVisible = !(_isDraggingCell || _isResizing
                                          || _isPointerDown || existingContent != null || Vm.IsDrawMode);
         }
 
