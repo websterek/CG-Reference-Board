@@ -45,6 +45,8 @@ public sealed class MiddleDragState : IInteractionState
 
     public StateTransition OnPointerMoved(PointerEventArgs e, IInteractionContext ctx)
     {
+        if (e is null) return StateTransition.Stay;
+
         if (_zoomMode)
         {
             var screenY = ctx.GetScreenPosition(e).Y;
@@ -70,7 +72,6 @@ public sealed class MiddleDragState : IInteractionState
         }
         else
         {
-            if (e is null) return StateTransition.Stay;
             var pos = e.GetPosition(null);
             var screenDelta = pos - _panLastPos;
             _panLastPos = pos;

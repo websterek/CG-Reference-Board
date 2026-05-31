@@ -87,6 +87,8 @@ public sealed class IdleState : IInteractionState
             if (!ctx.Vm.IsDrawMode)
             {
                 bool additive = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+                ctx.SetPointerCapture(e.Pointer, true);
+                e.Handled = true;
                 return StateTransition.GoTo(new MarqueePendingState(e.GetPosition(null), additive));
             }
         }
