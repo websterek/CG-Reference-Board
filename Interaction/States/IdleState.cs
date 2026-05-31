@@ -28,6 +28,10 @@ public sealed class IdleState : IInteractionState
             return StateTransition.Stay;
         }
 
+        // Alt+LMB: Always pan (overrides item hit-testing)
+        if (props.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Alt))
+            return StateTransition.GoTo(new AltPanState(e.GetPosition(null)));
+
         if (props.IsMiddleButtonPressed)
         {
             var screenPt = e.GetPosition(null);
