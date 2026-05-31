@@ -209,7 +209,7 @@
                     </ContextMenu>
                 </Border.ContextMenu>
 
-                <Grid Background="Transparent">
+                <Grid Background="{x:Null}">
                     <!-- Selection highlight -->
                     <Border
                         Classes="SelectionHighlight"
@@ -920,15 +920,17 @@
                             </Border.Effect>
                         </Border>
 
-                        <!-- Grid Background Pattern + Context Menu -->
-                        <Border
-                            Width="1000000"
-                            Height="1000000"
+                        <!-- Background pattern + Context Menu -->
+                        <local:BackgroundPatternControl
+                            x:Name="BackgroundPattern"
+                            IsVisible="{Binding IsCanvasBackgroundVisible}"
+                            Pattern="Dots"
                             Canvas.Left="-500000"
                             Canvas.Top="-500000"
-                            Background="Transparent"
+                            Width="1000000"
+                            Height="1000000"
                         >
-                            <Border.ContextMenu>
+                            <local:BackgroundPatternControl.ContextMenu>
                                 <ContextMenu>
                                     <!-- Grid Mode Context Items -->
                                     <MenuItem
@@ -1116,51 +1118,8 @@
                                         </MenuItem>
                                     </MenuItem>
                                 </ContextMenu>
-                            </Border.ContextMenu>
-
-                            <!-- Canvas background layers – one visible at a time -->
-                            <Panel IsVisible="{Binding IsCanvasBackgroundVisible}" IsHitTestVisible="False">
-                                <!-- Dots: subtle grid lines + centred dot in each cell -->
-                                <Border IsVisible="{Binding IsGridBackgroundDots}">
-                                    <Border.Background>
-                                        <VisualBrush
-                                            TileMode="Tile"
-                                            SourceRect="0,0,160,160"
-                                            DestinationRect="0,0,160,160"
-                                        >
-                                            <VisualBrush.Visual>
-                                                <Canvas Width="160" Height="160">
-                                                        <Ellipse Width="6" Height="6" Fill="#3D3D3D"
-                                                            Canvas.Left="77" Canvas.Top="77" />
-                                                    </Canvas>
-                                            </VisualBrush.Visual>
-                                        </VisualBrush>
-                                    </Border.Background>
-                                </Border>
-
-                                <!-- Grid: lines only, slightly brighter so they read without dots -->
-                                <Border IsVisible="{Binding IsGridBackgroundGrid}">
-                                    <Border.Background>
-                                        <VisualBrush
-                                            TileMode="Tile"
-                                            SourceRect="0,0,160,160"
-                                            DestinationRect="0,0,160,160"
-                                        >
-                                            <VisualBrush.Visual>
-                                                <Canvas Width="160" Height="160">
-                                                    <Rectangle Width="160" Height="0.5" Fill="#282828"
-                                                        Canvas.Left="0" Canvas.Top="0" />
-                                                    <Rectangle Width="0.5" Height="160" Fill="#282828"
-                                                        Canvas.Left="0" Canvas.Top="0" />
-                                                </Canvas>
-                                            </VisualBrush.Visual>
-                                        </VisualBrush>
-                                    </Border.Background>
-                                </Border>
-
-                                <!-- None: fully transparent – nothing to render -->
-                            </Panel>
-                        </Border>
+                            </local:BackgroundPatternControl.ContextMenu>
+                        </local:BackgroundPatternControl>
 
                         <!-- ─────────────────────────────────────────── -->
                         <!-- Annotations Layer                           -->

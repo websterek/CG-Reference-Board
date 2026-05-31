@@ -192,6 +192,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private bool _zoomNotificationPending;
     private Avalonia.Threading.DispatcherTimer? _zoomNotificationTimer;
 
+    // High-performance background pattern control (replaces VisualBrush tiling)
+    private BackgroundPatternControl? _backgroundPattern;
+
     // ── Constructor ───────────────────────────────────────────────────────────
 
     /// <summary>Parameterless constructor required by Avalonia designer.</summary>
@@ -229,6 +232,7 @@ Vm = vm;
 
         InitializeComponent();
         _toast = this.FindControl<ToastNotification>("Toast");
+        _backgroundPattern = this.FindControl<BackgroundPatternControl>("BackgroundPattern");
 
         // Wire fullscreen overlay events
         FullMediaOverlay.TextChanged += (_, _) =>
@@ -248,6 +252,8 @@ Vm = vm;
                 Topmost = Vm.IsAlwaysOnTop;
             if (e.PropertyName == nameof(Vm.TransformContextVersion))
                 CancelActiveInteractionForContextChange();
+            if (e.PropertyName == nameof(Vm.GridBackgroundMode))
+                SyncBackgroundPatternType();
         };
         // Wire ViewportService refresh → LOD invalidation + sync render transforms
         if (App.Services?.GetService<IViewportService>() is { } vs)
@@ -275,8 +281,14 @@ Vm = vm;
         // Wire async event handlers that cannot use XAML wiring
         KeyDown += Window_KeyDown;
 
+        CanvasBorder.SizeChanged += (_, _) => SyncBackgroundPatternViewport();
+
         CacheCanvasControls();
         UpdateTransformOverlayLayout();
+
+        // Initial background sync after layout
+        SyncBackgroundPatternType();
+        SyncBackgroundPatternViewport();
 
         _ = Vm.LoadRecentBoardsAsync();
         _ = Vm.LoadUserSettingsAsync();
@@ -529,13 +541,69 @@ Vm = vm;
         {
             _scale.ScaleX = _viewport.Zoom;
             _scale.ScaleY = _viewport.Zoom;
+            SyncBackgroundPatternViewport();
             NotifyZoomChanged();
         }
         else if (e.PropertyName is nameof(IViewportService.OffsetX) or nameof(IViewportService.OffsetY))
         {
             _translate.X = _viewport.OffsetX;
             _translate.Y = _viewport.OffsetY;
+            SyncBackgroundPatternViewport();
         }
+    }
+
+    /// <summary>
+    /// Updates the BackgroundPatternControl's visible viewport bounds so it only
+    /// renders dots/grid lines within the actual visible area — one DrawGeometry call
+    /// instead of VisualBrush instantiating thousands of mini-control-trees.
+    /// </summary>
+    private void SyncBackgroundPatternViewport()
+    {
+        if (_backgroundPattern is null) return;
+        try
+        {
+            double zoom = _viewport.Zoom;
+            double screenW = CanvasBorder.Bounds.Width;
+            double screenH = CanvasBorder.Bounds.Height;
+            if (screenW <= 0 || screenH <= 0 || zoom <= 0) return;
+
+            // Canvas-world viewport bounds.
+            // Transform chain: screen = (world + offset) × zoom
+            //   → world = screen / zoom - offset
+            // At screen origin (0,0): world = -offset
+            double worldLeft = -_viewport.OffsetX;
+            double worldTop = -_viewport.OffsetY;
+            double worldW = screenW / zoom;
+            double worldH = screenH / zoom;
+
+            // Convert to control-local: the control is at (-500000, -500000) on the canvas
+            double controlX = Canvas.GetLeft(_backgroundPattern);
+            double controlY = Canvas.GetTop(_backgroundPattern);
+            double localX = double.IsNaN(controlX) ? 500000.0 : -controlX;
+            double localY = double.IsNaN(controlY) ? 500000.0 : -controlY;
+            _backgroundPattern.ViewportLeft = worldLeft + localX;
+            _backgroundPattern.ViewportTop = worldTop + localY;
+            _backgroundPattern.ViewportWidth = worldW;
+            _backgroundPattern.ViewportHeight = worldH;
+        }
+        catch
+        {
+            // Ignore during layout transitions
+        }
+    }
+
+    /// <summary>
+    /// Syncs the background pattern type when the ViewModel's GridBackgroundMode changes.
+    /// </summary>
+    private void SyncBackgroundPatternType()
+    {
+        if (_backgroundPattern is null) return;
+        _backgroundPattern.Pattern = Vm.GridBackgroundMode switch
+        {
+            "Grid" => BackgroundPatternControl.PatternType.Grid,
+            "None" => BackgroundPatternControl.PatternType.None,
+            _ => BackgroundPatternControl.PatternType.Dots
+        };
     }
 
     private void NotifyZoomChanged()
@@ -967,7 +1035,7 @@ Vm = vm;
     {
         _viewportLodTimer = new Avalonia.Threading.DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(200)
+            Interval = TimeSpan.FromMilliseconds(500)
         };
         _viewportLodTimer.Tick += ViewportLodTimer_Tick;
         _viewportLodTimer.Start();
