@@ -81,19 +81,11 @@ public class AltPanStateTests
     }
 
     [Fact]
-    public void AltPan_Exit_CallsRequestViewportUpdate()
-    {
-        var ctx = new FakeInteractionContext();
-        var state = new AltPanState(new Point(100, 100));
-        state.Enter(ctx);
-        state.Exit(ctx); // should not throw
-    }
-
-    [Fact]
-    public void Enter_DoesNotThrow()
+    public void AltPan_EnterAndExit_DoesNotThrow()
     {
         var ctx = new FakeInteractionContext();
         var state = new AltPanState(new Point(100, 100));
         state.Enter(ctx); // should not throw
+        state.Exit(ctx); // should not throw (RequestViewportUpdate is called internally)
     }
 }
