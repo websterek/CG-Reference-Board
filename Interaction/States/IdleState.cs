@@ -42,8 +42,7 @@ public sealed class IdleState : IInteractionState
             var screenPt = e.GetPosition(null);
             ctx.SetPointerCapture(e.Pointer, true);
             e.Handled = true;
-            bool zoomMode = e.KeyModifiers.HasFlag(KeyModifiers.Alt) || props.IsLeftButtonPressed;
-            return StateTransition.GoTo(new MiddleDragState(anchor: screenPt, screenY: screenPt.Y, zoomMode: zoomMode));
+            return StateTransition.GoTo(new MiddleDragState(anchor: screenPt, screenY: screenPt.Y));
         }
 
         if (props.IsLeftButtonPressed)

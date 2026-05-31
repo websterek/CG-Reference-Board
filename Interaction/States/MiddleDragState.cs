@@ -9,6 +9,9 @@ namespace CGReferenceBoard.Interaction.States;
 /// Entered when middle button is pressed. Dual-mode state:
 /// - Pan sub-mode (default): Middle-drag pans the canvas
 /// - Zoom sub-mode: Alt held or Left button also pressed -> vertical drag controls zoom
+///
+/// Sub-mode is determined FRESH EVERY FRAME from current modifier state,
+/// so releasing LMB or Alt while MMB is held immediately reverts to pan.
 /// </summary>
 public sealed class MiddleDragState : IInteractionState
 {
@@ -16,45 +19,32 @@ public sealed class MiddleDragState : IInteractionState
     private readonly double _originY;
     private double _zoomStartY;
     private Point _panLastPos;
-    private bool _zoomMode;
     private bool _zoomActive;
 
-    public MiddleDragState(Point anchor, double screenY, bool zoomMode = false)
+    public MiddleDragState(Point anchor, double screenY)
     {
         _zoomAnchor = anchor;
         _originY = screenY;
         _zoomStartY = screenY;
         _panLastPos = anchor;
-        _zoomMode = zoomMode;
         _zoomActive = false;
     }
 
     public void Enter(IInteractionContext ctx) { }
     public void Exit(IInteractionContext ctx) { }
 
-    public StateTransition OnPointerPressed(PointerPressedEventArgs e, IInteractionContext ctx)
-    {
-        if (e is not null)
-        {
-            var props = e.GetCurrentPoint(null).Properties;
-            if (e.KeyModifiers.HasFlag(KeyModifiers.Alt) || props.IsLeftButtonPressed)
-                _zoomMode = true;
-        }
-        return StateTransition.Stay;
-    }
+    public StateTransition OnPointerPressed(PointerPressedEventArgs e, IInteractionContext ctx) =>
+        StateTransition.Stay;
 
     public StateTransition OnPointerMoved(PointerEventArgs e, IInteractionContext ctx)
     {
         if (e is null) return StateTransition.Stay;
 
-        // Activate zoom mode if Alt or Left button is pressed (handles LMB pressed after MMB)
-        if (!_zoomMode && (e.KeyModifiers.HasFlag(KeyModifiers.Alt)
-            || e.GetCurrentPoint(null).Properties.IsLeftButtonPressed))
-        {
-            _zoomMode = true;
-        }
+        // Determine sub-mode fresh every frame: zoom if Alt or LMB held, otherwise pan
+        bool zoomMode = (e.KeyModifiers.HasFlag(KeyModifiers.Alt)
+            || e.GetCurrentPoint(null).Properties.IsLeftButtonPressed);
 
-        if (_zoomMode)
+        if (zoomMode)
         {
             var screenY = ctx.GetScreenPosition(e).Y;
 
@@ -93,15 +83,13 @@ public sealed class MiddleDragState : IInteractionState
 
     public StateTransition OnPointerReleased(PointerReleasedEventArgs e, IInteractionContext ctx)
     {
-        // If middle button is still held (LMB or Alt released), switch back to pan mode
+        // Pop only when middle button is released; LMB/Alt release is handled
+        // by per-frame modifier checking in OnPointerMoved
         if (e is not null)
         {
             var props = e.GetCurrentPoint(null).Properties;
             if (props.IsMiddleButtonPressed)
-            {
-                _zoomMode = false;
                 return StateTransition.Stay;
-            }
         }
         return StateTransition.Pop;
     }
@@ -109,13 +97,6 @@ public sealed class MiddleDragState : IInteractionState
     public StateTransition OnPointerCaptureLost(PointerCaptureLostEventArgs e, IInteractionContext ctx) =>
         StateTransition.Pop;
 
-    public StateTransition OnKeyDown(KeyEventArgs e, IInteractionContext ctx)
-    {
-        if (e?.Key == Key.LeftAlt || e?.Key == Key.RightAlt)
-        {
-            _zoomMode = true;
-            return StateTransition.Stay;
-        }
-        return StateTransition.Stay;
-    }
+    public StateTransition OnKeyDown(KeyEventArgs e, IInteractionContext ctx) =>
+        StateTransition.Stay;
 }
