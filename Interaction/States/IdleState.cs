@@ -30,12 +30,20 @@ public sealed class IdleState : IInteractionState
 
         // Alt+LMB: Always pan (overrides item hit-testing)
         if (props.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Alt))
+        {
+            ctx.SetPointerCapture(e.Pointer, true);
+            e.Handled = true;
             return StateTransition.GoTo(new AltPanState(e.GetPosition(null)));
+        }
 
+        // Middle button: pan (default) or zoom (if Alt / Left also held)
         if (props.IsMiddleButtonPressed)
         {
             var screenPt = e.GetPosition(null);
-            return StateTransition.GoTo(new MiddleDragState(anchor: screenPt, screenY: screenPt.Y));
+            ctx.SetPointerCapture(e.Pointer, true);
+            e.Handled = true;
+            bool zoomMode = e.KeyModifiers.HasFlag(KeyModifiers.Alt) || props.IsLeftButtonPressed;
+            return StateTransition.GoTo(new MiddleDragState(anchor: screenPt, screenY: screenPt.Y, zoomMode: zoomMode));
         }
 
         if (props.IsLeftButtonPressed)
