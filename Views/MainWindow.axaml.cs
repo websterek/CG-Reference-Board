@@ -148,9 +148,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private double _dragStartY;
     private List<(CellViewModel Cell, double StartX, double StartY)>? _groupDragStarts;
     private List<(AnnotationViewModel Ann, double StartX, double StartY)>? _groupAnnotationDragStarts;
-    private bool _isAltDuplicateDrag;
-    private AnnotationViewModel? _pendingAltDuplicateAnnotation;
-
     // Cell resize
     private bool _isResizing;
     private Point _resizeStartPos;
@@ -462,8 +459,6 @@ Vm = vm;
     private void CancelActiveInteractionForContextChange()
     {
         CancelActiveTransform();
-        CancelPendingAnnotationAltDuplicateDrag();
-        CancelLegacyAltDuplicateDrag();
         UpdateSelectionState();
     }
 

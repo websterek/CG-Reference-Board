@@ -92,10 +92,6 @@ internal class FakeInteractionContext : IInteractionContext
     public virtual void ShakeScreenOverride() { }
     public virtual void UpdatePlacementPreviewOverride(Point p) { }
 
-    // Alt-duplicate
-    public bool CancelAltDuplicate() => CancelAltDuplicateOverride();
-    public virtual bool CancelAltDuplicateOverride() => false;
-
     // Transform body
     public bool TryBeginTransformBodyMove(Point canvasPt) => TryBeginTransformBodyMoveOverride(canvasPt);
     public virtual bool TryBeginTransformBodyMoveOverride(Point p) => false;

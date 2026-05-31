@@ -33,76 +33,8 @@ public partial class MainWindow
         if (Vm.IsDrawMode || e.Handled || Vm.IsViewMode)
             return;
 
-        // Shift+Left: Let it pass through for panning (don't start cell drag)
-        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
-            return;
-
         if (sender is not Border { DataContext: CellViewModel cell })
             return;
-        var props = e.GetCurrentPoint(this).Properties;
-
-        // Alt+Drag: Duplicate cell and start dragging the clone
-        if (props.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Alt))
-        {
-            var duplicate = new CellViewModel
-            {
-                CanvasX = cell.CanvasX,
-                CanvasY = cell.CanvasY,
-                ColSpan = cell.ColSpan,
-                RowSpan = cell.RowSpan,
-                Type = cell.Type,
-                BackgroundColor = cell.BackgroundColor,
-                ForegroundColor = cell.ForegroundColor,
-                ImageStretch = cell.ImageStretch,
-                FontSize = cell.FontSize,
-                TextContent = cell.TextContent
-            };
-
-            if (cell.IsImage || cell.IsVideo)
-            {
-                // Copy paths only — do NOT share the Bitmap reference.
-                // The LOD system will load its own bitmap; sharing causes
-                // ObjectDisposedException when either cell's LOD transitions.
-                duplicate.FilePath = cell.FilePath;
-                duplicate.VideoPath = cell.VideoPath;
-                duplicate.PlaceholderColor = cell.PlaceholderColor;
-                duplicate.ThumbnailPath = cell.ThumbnailPath;
-                // Must reset LOD to Placeholder so the viewport timer triggers a bitmap load.
-                // Default is Full, but the duplicate has no bitmap loaded.
-                duplicate.CurrentLod = ImageLod.Placeholder;
-            }
-
-            Vm.GridCells.Add(duplicate);
-
-            // Clear current selection and select the duplicate
-            ClearSelection();
-            Vm.SelectionService.SelectCell(duplicate);
-            UpdateSelectionState();
-
-            // Immediately start dragging the duplicate
-            _isPointerDown = true;
-            _isDraggingCell = true;
-            _draggingCell = duplicate;
-            _lastPressedEventArgs = e;
-            _pointerDownPos = e.GetPosition(this);
-            _dragStartX = cell.CanvasX;
-            _dragStartY = cell.CanvasY;
-            _groupDragStarts = null;
-            _groupAnnotationDragStarts = null;
-            _isAltDuplicateDrag = true;
-            DisableCellHitTesting();
-
-            duplicate.IsDragging = true;
-
-            var canvasPt = e.GetPosition(MainCanvas);
-            _dragOffsetX = canvasPt.X - duplicate.CanvasX;
-            _dragOffsetY = canvasPt.Y - duplicate.CanvasY;
-            e.Pointer.Capture(sender as Control);
-
-            e.Handled = true;
-            return;
-        }
-
         var isLeftButton = e.GetCurrentPoint(this).Properties.IsLeftButtonPressed;
         var isRightButton = e.GetCurrentPoint(this).Properties.IsRightButtonPressed;
 
@@ -208,16 +140,13 @@ public partial class MainWindow
             if (Math.Abs(pt.X - _pointerDownPos.X) > Constants.DragThreshold
                 || Math.Abs(pt.Y - _pointerDownPos.Y) > Constants.DragThreshold)
             {
-                if (!_isAltDuplicateDrag)
+                var mainCanvas = _cachedMainCanvas ?? this.FindControl<Canvas>("MainCanvas");
+                if (mainCanvas != null && StartTransformMoveFromCurrentSelection(e.GetPosition(mainCanvas)))
                 {
-                    var mainCanvas = _cachedMainCanvas ?? this.FindControl<Canvas>("MainCanvas");
-                    if (mainCanvas != null && StartTransformMoveFromCurrentSelection(e.GetPosition(mainCanvas)))
-                    {
-                        _isPointerDown = false;
-                        _lastPressedEventArgs = null;
-                        e.Pointer.Capture(_cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder"));
-                        return;
-                    }
+                    _isPointerDown = false;
+                    _lastPressedEventArgs = null;
+                    e.Pointer.Capture(_cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder"));
+                    return;
                 }
 
                 _isDraggingCell = true;
@@ -432,23 +361,8 @@ public partial class MainWindow
                         _draggingCell.ColSpan, _draggingCell.RowSpan);
                 if (hasCollision)
                 {
-                    if (_isAltDuplicateDrag)
-                    {
-                        // Alt-duplicate dropped on invalid spot: discard the clone.
-                        // Bitmap was never shared, so no dispose risk.
-                        _draggingCell.IsDragInvalid = false;
-                        _draggingCell.IsDragging = false;
-                        Vm.GridCells.Remove(_draggingCell);
-                        Vm.SelectionService.RemoveFromSelection(_draggingCell);
-                        // Skip the IsDragInvalid/IsDragging lines below —
-                        // _draggingCell is already cleaned up and removed.
-                        _draggingCell = null;
-                    }
-                    else
-                    {
-                        _draggingCell.CanvasX = _dragStartX;
-                        _draggingCell.CanvasY = _dragStartY;
-                    }
+                    _draggingCell.CanvasX = _dragStartX;
+                    _draggingCell.CanvasY = _dragStartY;
                 }
                 if (_draggingCell != null)
                 {
@@ -462,7 +376,6 @@ public partial class MainWindow
             _draggingCell = null;
             _groupDragStarts = null;
             _groupAnnotationDragStarts = null;
-            _isAltDuplicateDrag = false;
             EnableCellHitTesting();
             Vm.MarkUnsaved();
         }

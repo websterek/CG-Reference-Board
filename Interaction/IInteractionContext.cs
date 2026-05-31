@@ -83,14 +83,6 @@ public interface IInteractionContext
     /// <summary>Triggers the shake-screen visual feedback (invalid placement).</summary>
     void ShakeScreen();
 
-    // ── Alt-duplicate drag ────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Cancels an in-progress alt-duplicate drag (annotation or cell).
-    /// Returns true if a drag was actually cancelled.
-    /// </summary>
-    bool CancelAltDuplicate();
-
     // ── Transform body ────────────────────────────────────────────────────────
 
     /// <summary>

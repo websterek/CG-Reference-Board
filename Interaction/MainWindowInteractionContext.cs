@@ -148,11 +148,6 @@ public sealed class MainWindowInteractionContext : IInteractionContext
     public void ShakeScreen() =>
         _window.ShakeScreen();
 
-    // ── Alt-duplicate drag ────────────────────────────────────────────────────
-
-    public bool CancelAltDuplicate() =>
-        _window.CancelPendingAnnotationAltDuplicateDrag() | _window.CancelLegacyAltDuplicateDrag();
-
     // ── Transform body ────────────────────────────────────────────────────────
 
     public bool TryBeginTransformBodyMove(Point canvasPt) =>

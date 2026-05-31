@@ -289,11 +289,6 @@ public partial class MainWindow
         transformService.End();
         transformService.ClearSnapshots();
 
-        if (!hasCollision && annotationMode && _pendingAltDuplicateAnnotation is not null)
-        {
-            ClearPendingAnnotationAltDuplicateState();
-        }
-
         // Only invalidate the zoom-toggle state when the object actually changed position.
         // A plain click (pointer-down then up without dragging) also calls FinishActiveTransform
         // but must NOT clear the zoom-toggle state, otherwise double-click zoom can never restore.
@@ -341,9 +336,6 @@ public partial class MainWindow
         transformService.End();
         transformService.ClearSnapshots();
 
-        if (!hasCollision && annotationMode && _pendingAltDuplicateAnnotation is not null)
-            ClearPendingAnnotationAltDuplicateState();
-
         if (actuallyMoved)
             InvalidateZoomRestore();
 
@@ -354,12 +346,6 @@ public partial class MainWindow
             Vm.MarkUnsaved();
 
         return true;
-    }
-
-    private void ClearPendingAnnotationAltDuplicateState()
-    {
-        _pendingAltDuplicateAnnotation = null;
-        _isAltDuplicateDrag = false;
     }
 
     private bool CancelActiveTransform()
@@ -379,65 +365,9 @@ public partial class MainWindow
         return true;
     }
 
-    internal bool CancelPendingAnnotationAltDuplicateDrag()
-    {
-        var pendingDuplicate = _pendingAltDuplicateAnnotation;
-        if (!_isAltDuplicateDrag || pendingDuplicate is null)
-        {
-            return false;
-        }
-
-        if (Vm.TransformService.HasActiveOperation)
-        {
-            CancelActiveTransform();
-        }
-
-        Vm.SelectionService.RemoveFromSelection(pendingDuplicate);
-        Vm.Annotations.Remove(pendingDuplicate);
-        ClearPendingAnnotationAltDuplicateState();
-        Vm.RefreshTransformState();
-        UpdateTransformOverlayLayout();
-        return true;
-    }
-
-    internal bool CancelLegacyAltDuplicateDrag()
-    {
-        if (!_isDraggingCell || !_isAltDuplicateDrag || _draggingCell is null)
-        {
-            return false;
-        }
-
-        _draggingCell.IsDragInvalid = false;
-        _draggingCell.IsDragging = false;
-        Vm.GridCells.Remove(_draggingCell);
-        Vm.SelectionService.RemoveFromSelection(_draggingCell);
-        _draggingCell = null;
-        _isDraggingCell = false;
-        _groupDragStarts = null;
-        _groupAnnotationDragStarts = null;
-        _isAltDuplicateDrag = false;
-        _isPointerDown = false;
-        _lastPressedEventArgs = null;
-        return true;
-    }
-
     private bool HandleEscapeShortcut()
     {
         if (CancelActiveTransform())
-        {
-            CancelPendingAnnotationAltDuplicateDrag();
-            CancelLegacyAltDuplicateDrag();
-            UpdateSelectionState();
-            return true;
-        }
-
-        if (CancelPendingAnnotationAltDuplicateDrag())
-        {
-            UpdateSelectionState();
-            return true;
-        }
-
-        if (CancelLegacyAltDuplicateDrag())
         {
             UpdateSelectionState();
             return true;
@@ -480,8 +410,6 @@ public partial class MainWindow
         if (cancelActiveTransform)
         {
             CancelActiveTransform();
-            CancelPendingAnnotationAltDuplicateDrag();
-            CancelLegacyAltDuplicateDrag();
         }
 
         try
@@ -901,14 +829,6 @@ public partial class MainWindow
         if (_isDraggingAnnotations)
         {
             _isDraggingAnnotations = false;
-
-            if (_isAltDuplicateDrag)
-            {
-                _isAltDuplicateDrag = false;
-                e.Pointer.Capture(null);
-                Vm.MarkUnsaved();
-                return;
-            }
 
             if (!Vm.IsDrawMode && _annotationDragCellOriginals != null && _annotationDragCellOriginals.Count > 0)
             {

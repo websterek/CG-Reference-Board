@@ -61,46 +61,6 @@ public partial class MainWindow
         if (Vm.IsMoveMode && sender is Control { DataContext: AnnotationViewModel annMove })
         {
             bool isCtrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
-            bool isAlt = e.KeyModifiers.HasFlag(KeyModifiers.Alt);
-
-            // Alt+Drag: Duplicate annotation and start dragging the clone
-            if (isAlt)
-            {
-                var duplicate = new AnnotationViewModel
-                {
-                    CanvasX = annMove.CanvasX,
-                    CanvasY = annMove.CanvasY,
-                    Color = annMove.Color,
-                    Thickness = annMove.Thickness,
-                    TextScale = annMove.TextScale,
-                    Type = annMove.Type,
-                    Text = annMove.Text,
-                    IsSelected = true,
-                    IsInDrawMode = annMove.IsInDrawMode
-                };
-                foreach (var pt in annMove.Points)
-                    duplicate.Points.Add(pt);
-                duplicate.UpdateBoundsCache();
-
-                Vm.Annotations.Add(duplicate);
-
-                ClearSelection();
-                Vm.SelectionService.SelectAnnotation(duplicate);
-                UpdateSelectionState();
-                _isAltDuplicateDrag = true;
-                _pendingAltDuplicateAnnotation = duplicate;
-
-                BringToFront(Vm.SelectionService.SelectedAnnotations);
-
-                var canvas = _cachedMainCanvas ?? this.FindControl<Canvas>("MainCanvas");
-                if (canvas != null && StartTransformMoveFromCurrentSelection(e.GetPosition(canvas)))
-                {
-                    e.Pointer.Capture(_cachedCanvasBorder ?? this.FindControl<Border>("CanvasBorder"));
-                }
-
-                e.Handled = true;
-                return;
-            }
 
             if (isCtrl)
             {
