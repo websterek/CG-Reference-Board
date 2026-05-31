@@ -1088,6 +1088,33 @@ public partial class MainWindow
         bool isShift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         bool noModifiers = e.KeyModifiers == KeyModifiers.None;
 
+        // ── Keyboard zoom (+/- keys) ────────────────────────────────────────
+
+        // Use viewport center as zoom anchor
+        var mainCanvas = _cachedMainCanvas ?? this.FindControl<Canvas>("MainCanvas");
+        if (mainCanvas != null)
+        {
+            double viewportCenterX = mainCanvas.Bounds.Width / 2.0;
+            double viewportCenterY = mainCanvas.Bounds.Height / 2.0;
+            var viewportCenter = new Avalonia.Point(viewportCenterX, viewportCenterY);
+
+            // +/=/OemPlus or NumpadAdd = zoom in
+            if (e.Key == Key.OemPlus || e.Key == Key.Add)
+            {
+                _viewport.ZoomAt(viewportCenter, 1.1);
+                e.Handled = true;
+                return;
+            }
+
+            // -/OemMinus or NumpadSubtract = zoom out
+            if (e.Key == Key.OemMinus || e.Key == Key.Subtract)
+            {
+                _viewport.ZoomAt(viewportCenter, 1.0 / 1.1);
+                e.Handled = true;
+                return;
+            }
+        }
+
         // Cancel placement preview on Escape
         if (e.Key == Key.Escape && _isShowingPlacementPreview)
         {
