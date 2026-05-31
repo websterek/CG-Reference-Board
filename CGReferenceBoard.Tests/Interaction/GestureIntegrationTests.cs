@@ -34,23 +34,12 @@ public class GestureIntegrationTests
     }
 
     [Fact]
-    public async Task MiddleAndLeftButton_ZomsViewport()
+    public async Task MiddleAndLeftButton_ZoomsViewport()
     {
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
             var vm = MainWindowViewModel.CreateWithDI(false);
             // TODO H1: middle+left drag, verify viewport zoom changed
-            Assert.True(true, "Placeholder — expand in H1");
-        });
-    }
-
-    [Fact]
-    public async Task ShiftLeftDrag_PansViewport()
-    {
-        await Dispatcher.UIThread.InvokeAsync(() =>
-        {
-            var vm = MainWindowViewModel.CreateWithDI(false);
-            // TODO H1: shift+left drag, verify viewport offset changed
             Assert.True(true, "Placeholder — expand in H1");
         });
     }
