@@ -2,13 +2,14 @@ using System;
 using Avalonia;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace CGReferenceBoard.ViewModels;
 
 /// <summary>
 /// Represents a single annotation (drawing, shape, or text note) on the board's annotation layer.
 /// </summary>
-public class AnnotationViewModel : ViewModelBase
+public partial class AnnotationViewModel : ViewModelBase
 {
     // ───────── Bounding-box cache (local coordinates, updated when points change) ─────────
 
@@ -57,108 +58,60 @@ public class AnnotationViewModel : ViewModelBase
 
     // ───────── Viewport visibility ─────────
 
-    private bool _isInViewport = true;
     /// <summary>
     /// Whether this annotation overlaps the current viewport.
     /// Set by the LOD timer; drives IsVisible on the AnnotationShape so
     /// off-screen annotations are excluded from layout and rendering.
     /// Defaults to true so annotations are visible before the first LOD pass.
     /// </summary>
-    public bool IsInViewport
-    {
-        get => _isInViewport;
-        set => SetProperty(ref _isInViewport, value);
-    }
+    [ObservableProperty]
+    private bool _isInViewport = true;
 
+    [ObservableProperty]
     private bool _isHitTestEnabled = true;
-    public bool IsHitTestEnabled
-    {
-        get => _isHitTestEnabled;
-        set => SetProperty(ref _isHitTestEnabled, value);
-    }
 
-    private double _canvasX;
     /// <summary>Canvas X offset for the entire annotation group.</summary>
-    public double CanvasX
-    {
-        get => _canvasX;
-        set => SetProperty(ref _canvasX, value);
-    }
+    [ObservableProperty]
+    private double _canvasX;
 
-    private double _canvasY;
     /// <summary>Canvas Y offset for the entire annotation group.</summary>
-    public double CanvasY
-    {
-        get => _canvasY;
-        set => SetProperty(ref _canvasY, value);
-    }
+    [ObservableProperty]
+    private double _canvasY;
 
-    private string _color = "#FFFF4444";
     /// <summary>Stroke/fill color in ARGB hex format.</summary>
-    public string Color
-    {
-        get => _color;
-        set => SetProperty(ref _color, value);
-    }
+    [ObservableProperty]
+    private string _color = "#FFFF4444";
 
-    private double _thickness = 4.0;
     /// <summary>Stroke thickness in pixels.</summary>
-    public double Thickness
-    {
-        get => _thickness;
-        set => SetProperty(ref _thickness, value);
-    }
+    [ObservableProperty]
+    private double _thickness = 4.0;
 
     /// <summary>Ordered collection of points that define the annotation shape.</summary>
     public ObservableCollection<Point> Points { get; set; } = new();
 
-    private string _type = "Brush";
     /// <summary>Annotation tool type: Brush, Rectangle, Ellipse, Arrow, or Text.</summary>
-    public string Type
-    {
-        get => _type;
-        set => SetProperty(ref _type, value);
-    }
+    [ObservableProperty]
+    private string _type = "Brush";
 
-    private string _text = "";
     /// <summary>Text content (only used when <see cref="Type"/> is "Text").</summary>
-    public string Text
-    {
-        get => _text;
-        set => SetProperty(ref _text, value);
-    }
+    [ObservableProperty]
+    private string _text = "";
 
-    private double _textScale = 1.0;
     /// <summary>Additional scale factor applied to text annotations during resize.</summary>
-    public double TextScale
-    {
-        get => _textScale;
-        set => SetProperty(ref _textScale, Math.Max(0.25, value));
-    }
+    [ObservableProperty]
+    private double _textScale = 1.0;
 
-    private bool _isSelected;
     /// <summary>Whether this annotation is currently selected for moving/editing.</summary>
-    public bool IsSelected
-    {
-        get => _isSelected;
-        set
-        {
-            if (SetProperty(ref _isSelected, value))
-                OnPropertyChanged(nameof(IsHitTestable));
-        }
-    }
+    [ObservableProperty]
+    private bool _isSelected;
 
-    private bool _isInDrawMode;
+    partial void OnIsSelectedChanged(bool value) => OnPropertyChanged(nameof(IsHitTestable));
+
     /// <summary>Whether the application is currently in draw/annotation mode.</summary>
-    public bool IsInDrawMode
-    {
-        get => _isInDrawMode;
-        set
-        {
-            if (SetProperty(ref _isInDrawMode, value))
-                OnPropertyChanged(nameof(IsHitTestable));
-        }
-    }
+    [ObservableProperty]
+    private bool _isInDrawMode;
+
+    partial void OnIsInDrawModeChanged(bool value) => OnPropertyChanged(nameof(IsHitTestable));
 
     /// <summary>
     /// Whether this annotation should receive pointer events.

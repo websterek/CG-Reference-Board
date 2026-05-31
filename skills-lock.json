@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "skills": {
+    "avalonia-layout-zafiro": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/avalonia-layout-zafiro/SKILL.md",
+      "computedHash": "cac82f5068b38206b705567faa7ebddcfc5d8467511fde825ba983689e055d97"
+    },
+    "avalonia-mvvm": {
+      "source": "abdssamie/quater",
+      "sourceType": "github",
+      "skillPath": ".opencode/skills/avalonia-mvvm/SKILL.md",
+      "computedHash": "ad553846fa1c924be3b135c8a1910f9af97ac11b42a29e2d31786b350c4ea12e"
+    },
+    "avalonia-viewmodels-zafiro": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/avalonia-viewmodels-zafiro/SKILL.md",
+      "computedHash": "25bba3f88dbd61b02c4968eeda6cfe7449581352776a145c013ae5a5447de2ef"
+    },
+    "avalonia-zafiro-development": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/avalonia-zafiro-development/SKILL.md",
+      "computedHash": "60a1fa684ddc019c3835a3a2a98c0d91e117dbb6d6b5df445a1d58527fa73af4"
+    }
+  }
+}

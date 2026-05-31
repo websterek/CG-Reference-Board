@@ -178,7 +178,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private bool _isEdgeScrolling;
 
     // Toast notification
-    private System.Threading.CancellationTokenSource? _toastCts;
+    private ToastNotification? _toast;
 
     // Interaction controller (wired in constructor; does not yet route events)
     private CGReferenceBoard.Interaction.IInteractionController? _interactionController;
@@ -236,6 +236,18 @@ Vm = vm;
         DataContext = Vm;
 
         InitializeComponent();
+        _toast = this.FindControl<ToastNotification>("Toast");
+
+        // Wire fullscreen overlay events
+        FullMediaOverlay.TextChanged += (_, _) =>
+        {
+            if (_editingTextCell != null)
+            {
+                _editingTextCell.TextContent = FullMediaOverlay.TextContent;
+                Vm.MarkUnsaved();
+            }
+        };
+        FullMediaOverlay.Closed += (_, _) => _editingTextCell = null;
 
         // Wire ViewModel events to View callbacks
         Vm.PropertyChanged += (_, e) =>
@@ -994,27 +1006,8 @@ Vm = vm;
 
     private async Task ShowToastAsync(string message)
     {
-        var border = this.FindControl<Border>("ToastBorder");
-        var text = this.FindControl<TextBlock>("ToastText");
-        if (border == null || text == null)
-            return;
-
-        _toastCts?.Cancel();
-        _toastCts = new System.Threading.CancellationTokenSource();
-        var token = _toastCts.Token;
-
-        text.Text = message;
-        border.IsVisible = true;
-        border.Opacity = 1;
-
-        try
-        {
-            await Task.Delay(1500, token);
-            border.Opacity = 0;
-            await Task.Delay(250, token);
-            border.IsVisible = false;
-        }
-        catch (TaskCanceledException) { }
+        if (_toast != null)
+            await _toast.Show(message);
     }
 
     // ── Viewport LOD Management ───────────────────────────────────────────────

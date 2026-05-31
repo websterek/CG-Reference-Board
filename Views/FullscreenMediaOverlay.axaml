@@ -1,0 +1,46 @@
+<UserControl
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:Class="CGReferenceBoard.Views.FullscreenMediaOverlay"
+>
+    <Border
+        Background="#F0101010"
+        IsVisible="False"
+        PointerPressed="Overlay_PointerPressed"
+    >
+        <Grid>
+            <Image x:Name="FullImage" Stretch="Uniform" Margin="60" />
+
+            <TextBox
+                x:Name="FullText"
+                Margin="60"
+                AcceptsReturn="True"
+                TextWrapping="Wrap"
+                Background="{StaticResource SurfaceBrushLight}"
+                BorderThickness="1"
+                BorderBrush="{StaticResource BorderBrushMedium}"
+                Foreground="White"
+                FontSize="24"
+                IsVisible="False"
+            />
+
+            <Button
+                Classes="overlayCloseBtn"
+                Click="CloseFullMedia_Click"
+            >
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <PathIcon
+                        Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
+                        Width="12"
+                        Height="12"
+                        Foreground="White"
+                    />
+                    <TextBlock
+                        Text="Close"
+                        VerticalAlignment="Center"
+                    />
+                </StackPanel>
+            </Button>
+        </Grid>
+    </Border>
+</UserControl>

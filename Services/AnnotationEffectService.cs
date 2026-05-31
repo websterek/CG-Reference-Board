@@ -17,6 +17,5 @@ public class AnnotationEffectService : Services.Abstractions.IAnnotationEffectSe
             return;
         _currentEffect = mode;
         EffectModeChanged?.Invoke();
-        AnnotationShape.SetEffectMode(mode);
     }
 }

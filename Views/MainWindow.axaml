@@ -1466,52 +1466,10 @@
                 </Grid>
             </Border>
 
-            <!-- ═══════════════════════════════════════════════════════════ -->
-            <!-- Fullscreen Media Overlay                                   -->
-            <!-- ═══════════════════════════════════════════════════════════ -->
-            <Border
+            <views:FullscreenMediaOverlay
                 Grid.RowSpan="2"
                 x:Name="FullMediaOverlay"
-                Background="#F0101010"
-                IsVisible="False"
-                PointerPressed="Overlay_PointerPressed"
-            >
-                <Grid>
-                    <Image x:Name="FullImage" Stretch="Uniform" Margin="60" />
-
-                    <TextBox
-                        x:Name="FullText"
-                        Margin="60"
-                        AcceptsReturn="True"
-                        TextWrapping="Wrap"
-                        Background="{StaticResource SurfaceBrushLight}"
-                        BorderThickness="1"
-                        BorderBrush="{StaticResource BorderBrushMedium}"
-                        Foreground="White"
-                        FontSize="24"
-                        IsVisible="False"
-                        TextChanged="FullText_TextChanged"
-                    />
-
-                    <Button
-                        Classes="overlayCloseBtn"
-                        Click="CloseFullMedia_Click"
-                    >
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <PathIcon
-                                Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
-                                Width="12"
-                                Height="12"
-                                Foreground="White"
-                            />
-                            <TextBlock
-                                Text="Close"
-                                VerticalAlignment="Center"
-                            />
-                        </StackPanel>
-                    </Button>
-                </Grid>
-            </Border>
+            />
 
             <!-- ═══════════════════════════════════════════════════════════ -->
             <!-- Startup Overlay                                            -->
@@ -1635,120 +1593,13 @@
                 </StackPanel>
             </Border>
 
-            <!-- ═══════════════════════════════════════════════════════════ -->
-            <!-- Status Bar                                                 -->
-            <!-- ═══════════════════════════════════════════════════════════ -->
-            <Border
-                Grid.Row="2"
-                Background="{StaticResource ChromeBrush}"
-                BorderBrush="{StaticResource SurfaceBrushLight}"
-                BorderThickness="0,1,0,0"
-                Padding="12,3"
-                Height="26"
-            >
-                <Grid ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto, Auto, Auto, Auto">
-                    <!-- Mode indicator -->
-                    <StackPanel
-                        Grid.Column="0"
-                        Orientation="Horizontal"
-                        Spacing="6"
-                        VerticalAlignment="Center"
-                    >
-                        <Ellipse
-                            Width="7"
-                            Height="7"
-                            Fill="{Binding ModeIndicatorColor}"
-                            VerticalAlignment="Center"
-                        />
-                        <TextBlock
-                            Text="{Binding CurrentModeText}"
-                            Classes="statusText"
-                            FontWeight="SemiBold"
-                        />
-                        <TextBlock
-                            Text="{Binding CurrentTool, StringFormat='Tool: {0}'}"
-                            Classes="statusText"
-                            IsVisible="{Binding IsDrawMode}"
-                            Margin="10,0,0,0"
-                        />
-                    </StackPanel>
-
-                    <Border Grid.Column="1" Classes="statusDivider" />
-
-                    <!-- Board name -->
-                    <TextBlock
-                        Grid.Column="2"
-                        Text="{Binding CurrentBoardName}"
-                        Classes="statusText"
-                    />
-
-                    <!-- Spacer -->
-
-                    <!-- Selection count -->
-                    <TextBlock
-                        Grid.Column="4"
-                        Text="{Binding SelectionCountText}"
-                        Classes="statusText"
-                        Foreground="{StaticResource AccentBrush}"
-                    />
-
-                    <Border Grid.Column="5" Classes="statusDivider" />
-
-                    <!-- Zoom level -->
-                    <TextBlock
-                        Grid.Column="6"
-                        Text="{Binding ZoomLevelText}"
-                        Classes="statusText"
-                        FontWeight="SemiBold"
-                        MinWidth="40"
-                        TextAlignment="Right"
-                    />
-
-                    <Border Grid.Column="7" Classes="statusDivider" />
-
-                    <!-- App version -->
-                    <TextBlock
-                        Grid.Column="8"
-                        Text="{Binding VersionText}"
-                        Classes="statusText"
-                        Opacity="0.5"
-                    />
-                </Grid>
-            </Border>
+            <views:StatusBarView Grid.Row="2" />
         </Grid>
 
         <!-- ═══════════════════════════════════════════════════════════ -->
         <!-- Toast Notification Overlay                                 -->
         <!-- ═══════════════════════════════════════════════════════════ -->
-        <Border
-            x:Name="ToastBorder"
-            IsVisible="False"
-            IsHitTestVisible="False"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Bottom"
-            Margin="0,0,0,40"
-            Padding="16,8"
-            Background="#DD222222"
-            BorderBrush="#40FFFFFF"
-            BorderThickness="1"
-            CornerRadius="8"
-            Opacity="0"
-            ZIndex="5000"
-        >
-            <Border.Transitions>
-                <Transitions>
-                    <DoubleTransition Property="Opacity" Duration="0:0:0.2" />
-                </Transitions>
-            </Border.Transitions>
-            <TextBlock
-                x:Name="ToastText"
-                Text=""
-                Foreground="White"
-                FontSize="13"
-                FontWeight="SemiBold"
-                HorizontalAlignment="Center"
-            />
-        </Border>
+        <views:ToastNotification x:Name="Toast" />
 
         <!-- ═══════════════════════════════════════════════════════════ -->
         <!-- Window Resize Grips (custom chrome, SystemDecorations=None)-->

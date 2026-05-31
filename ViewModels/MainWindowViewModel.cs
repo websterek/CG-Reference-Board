@@ -14,6 +14,7 @@ using CommunityToolkit.Mvvm.Input;
 using CGReferenceBoard.Controls;
 using CGReferenceBoard.Helpers;
 using CGReferenceBoard.Layers.Infrastructure;
+using CGReferenceBoard.Models;
 using CGReferenceBoard.Modes;
 using CGReferenceBoard.Services;
 using CGReferenceBoard.Services.Abstractions;
@@ -34,15 +35,6 @@ namespace CGReferenceBoard.ViewModels;
 /// </summary>
 public sealed partial class MainWindowViewModel : ObservableObject
 {
-    // ── Inner types ───────────────────────────────────────────────────────────
-
-    /// <summary>Persisted user preference bag (serialised to user_settings.json).</summary>
-    private sealed class UserSettings
-    {
-        public string AnnotationEffect { get; set; } = "None";
-        public string GridBackground { get; set; } = "Dots";
-    }
-
     // ── Services (injected / owned) ───────────────────────────────────────────
 
     /// <summary>Manages the active interaction mode (Grid / Annotation).</summary>

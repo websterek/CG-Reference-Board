@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CGReferenceBoard.Helpers;
 using CGReferenceBoard.Models;
 using CGReferenceBoard.Services;
@@ -11,67 +12,39 @@ namespace CGReferenceBoard.ViewModels;
 /// <summary>
 /// Represents a single cell on the reference board (image, text, video, label, or backdrop).
 /// </summary>
-public class CellViewModel : ViewModelBase, IDisposable
+public partial class CellViewModel : ViewModelBase, IDisposable
 {
     #region Position
 
+    [ObservableProperty]
     private double _canvasX;
     /// <summary>Grid-snapped X position on the canvas.</summary>
-    public double CanvasX
-    {
-        get => _canvasX;
-        set
-        {
-            if (SetProperty(ref _canvasX, value))
-                OnPropertyChanged(nameof(VisualX));
-        }
-    }
+    partial void OnCanvasXChanged(double value) => OnPropertyChanged(nameof(VisualX));
 
+    [ObservableProperty]
     private double _canvasY;
     /// <summary>Grid-snapped Y position on the canvas.</summary>
-    public double CanvasY
-    {
-        get => _canvasY;
-        set
-        {
-            if (SetProperty(ref _canvasY, value))
-                OnPropertyChanged(nameof(VisualY));
-        }
-    }
+    partial void OnCanvasYChanged(double value) => OnPropertyChanged(nameof(VisualY));
 
     /// <summary>Effective visual X, offset by backdrop padding when applicable.</summary>
-    public double VisualX => _canvasX - (Type == CellType.Backdrop ? Constants.BackdropPadding : 0);
+    public double VisualX => CanvasX - (Type == CellType.Backdrop ? Constants.BackdropPadding : 0);
 
     /// <summary>Effective visual Y, offset by backdrop padding when applicable.</summary>
-    public double VisualY => _canvasY - (Type == CellType.Backdrop ? Constants.BackdropPadding : 0);
+    public double VisualY => CanvasY - (Type == CellType.Backdrop ? Constants.BackdropPadding : 0);
 
     #endregion
 
     #region Size
 
+    [ObservableProperty]
     private int _colSpan = 1;
     /// <summary>Number of grid columns this cell spans.</summary>
-    public int ColSpan
-    {
-        get => _colSpan;
-        set
-        {
-            if (SetProperty(ref _colSpan, value))
-                OnPropertyChanged(nameof(PixelWidth));
-        }
-    }
+    partial void OnColSpanChanged(int value) => OnPropertyChanged(nameof(PixelWidth));
 
+    [ObservableProperty]
     private int _rowSpan = 1;
     /// <summary>Number of grid rows this cell spans.</summary>
-    public int RowSpan
-    {
-        get => _rowSpan;
-        set
-        {
-            if (SetProperty(ref _rowSpan, value))
-                OnPropertyChanged(nameof(PixelHeight));
-        }
-    }
+    partial void OnRowSpanChanged(int value) => OnPropertyChanged(nameof(PixelHeight));
 
     /// <summary>Total pixel width including backdrop visual padding when applicable.
     /// Backdrops are drawn to extend by <see cref="Constants.BackdropPadding"/> on both
@@ -89,184 +62,86 @@ public class CellViewModel : ViewModelBase, IDisposable
 
     #region Type & State
 
+    [ObservableProperty]
     private CellType _type = CellType.None;
     /// <summary>The content type of this cell.</summary>
-    public CellType Type
+    partial void OnTypeChanged(CellType value)
     {
-        get => _type;
-        set
-        {
-            if (!SetProperty(ref _type, value))
-                return;
-
-            // Position and size depend on type (backdrop has padding)
-            OnPropertyChanged(nameof(VisualX));
-            OnPropertyChanged(nameof(VisualY));
-            OnPropertyChanged(nameof(PixelWidth));
-            OnPropertyChanged(nameof(PixelHeight));
-
-            // Derived boolean flags
-            OnPropertyChanged(nameof(IsImage));
-            OnPropertyChanged(nameof(IsVideo));
-            OnPropertyChanged(nameof(IsText));
-            OnPropertyChanged(nameof(IsLabel));
-            OnPropertyChanged(nameof(IsBackdrop));
-            OnPropertyChanged(nameof(IsFile));
-            OnPropertyChanged(nameof(IsBoardElement));
-            OnPropertyChanged(nameof(HasContent));
-            OnPropertyChanged(nameof(HasTextContent));
-            OnPropertyChanged(nameof(ShowIcon));
-            OnPropertyChanged(nameof(TypeIcon));
-            OnPropertyChanged(nameof(ZIndex));
-            OnPropertyChanged(nameof(NeedsImage));
-            OnPropertyChanged(nameof(ShowPlaceholder));
-            OnPropertyChanged(nameof(ShowTextContent));
-            OnPropertyChanged(nameof(ShowLabelContent));
-            OnPropertyChanged(nameof(ShowIconBadge));
-
-            // Context-menu visibility flags derived from Type
-            OnPropertyChanged(nameof(HasAppearanceOptions));
-            OnPropertyChanged(nameof(HasArrangeOptions));
-            OnPropertyChanged(nameof(HasFileOptions));
-            OnPropertyChanged(nameof(HasTextOptions));
-            OnPropertyChanged(nameof(HasClipboardOptions));
-        }
+        OnPropertyChanged(string.Empty); // all computed properties derive from Type
     }
 
+    [ObservableProperty]
     private bool _isDownloading;
     /// <summary>Whether this cell is currently downloading content (e.g. video from URL).</summary>
-    public bool IsDownloading
-    {
-        get => _isDownloading;
-        set => SetProperty(ref _isDownloading, value);
-    }
 
+    [ObservableProperty]
     private float _downloadProgress;
     /// <summary>Download progress 0–100. Updated during active yt-dlp downloads.</summary>
-    public float DownloadProgress
-    {
-        get => _downloadProgress;
-        set => SetProperty(ref _downloadProgress, value);
-    }
 
+    [ObservableProperty]
     private string _downloadStatusText = "Downloading...";
     /// <summary>Human-readable download status string, e.g. "Downloading 45% @ 1.5MiB/s ETA 00:30".</summary>
-    public string DownloadStatusText
-    {
-        get => _downloadStatusText;
-        set => SetProperty(ref _downloadStatusText, value);
-    }
 
+    [ObservableProperty]
     private bool _isSelected;
     /// <summary>Whether this cell is currently selected (for multi-selection operations).</summary>
-    public bool IsSelected
-    {
-        get => _isSelected;
-        set
-        {
-            if (SetProperty(ref _isSelected, value))
-                OnPropertyChanged(nameof(ZIndex));
-        }
-    }
+    partial void OnIsSelectedChanged(bool value) => OnPropertyChanged(nameof(ZIndex));
 
+    [ObservableProperty]
     private bool _hasMultipleSelection;
-    public bool HasMultipleSelection
-    {
-        get => _hasMultipleSelection;
-        set => SetProperty(ref _hasMultipleSelection, value);
-    }
 
+    [ObservableProperty]
     private bool _hasSingleSelection;
-    public bool HasSingleSelection
-    {
-        get => _hasSingleSelection;
-        set => SetProperty(ref _hasSingleSelection, value);
-    }
 
+    [ObservableProperty]
     private bool _isDragInvalid;
     /// <summary>Whether this cell is being dragged to an invalid position (collision detected).</summary>
-    public bool IsDragInvalid
-    {
-        get => _isDragInvalid;
-        set => SetProperty(ref _isDragInvalid, value);
-    }
 
+    [ObservableProperty]
     private bool _isDragging;
     /// <summary>Whether this cell is currently being dragged.</summary>
-    public bool IsDragging
-    {
-        get => _isDragging;
-        set
-        {
-            if (SetProperty(ref _isDragging, value))
-                OnPropertyChanged(nameof(ZIndex));
-        }
-    }
+    partial void OnIsDraggingChanged(bool value) => OnPropertyChanged(nameof(ZIndex));
 
+    [ObservableProperty]
     private bool _isHighlighted;
     /// <summary>Whether this cell is temporarily highlighted (e.g. after paste).</summary>
-    public bool IsHighlighted
-    {
-        get => _isHighlighted;
-        set => SetProperty(ref _isHighlighted, value);
-    }
 
+    [ObservableProperty]
     private bool _isInViewport = true;
     /// <summary>
     /// Controlled by the viewport LOD system. When false the cell lies outside
     /// the padded viewport region; its entire visual tree is collapsed to save
     /// layout and render work. Defaults to true so cells appear immediately on load.
     /// </summary>
-    public bool IsInViewport
-    {
-        get => _isInViewport;
-        set
-        {
-            if (SetProperty(ref _isInViewport, value))
-                OnPropertyChanged(nameof(IsEffectivelyVisible));
-        }
-    }
+    partial void OnIsInViewportChanged(bool value) => OnPropertyChanged(nameof(IsEffectivelyVisible));
 
+    [ObservableProperty]
     private bool _isLayerVisible = true;
     /// <summary>
     /// Reflects the owning layer's <c>IsVisible</c> state. Set by <see cref="Views.MainWindow"/>
     /// when a layer visibility toggle changes. Combined with <see cref="IsInViewport"/>
     /// to produce <see cref="IsEffectivelyVisible"/>.
     /// </summary>
-    public bool IsLayerVisible
-    {
-        get => _isLayerVisible;
-        set
-        {
-            if (SetProperty(ref _isLayerVisible, value))
-                OnPropertyChanged(nameof(IsEffectivelyVisible));
-        }
-    }
+    partial void OnIsLayerVisibleChanged(bool value) => OnPropertyChanged(nameof(IsEffectivelyVisible));
 
     /// <summary>
     /// Combined visibility: the cell is only rendered when it is both inside the
     /// viewport AND its owning layer is visible. Bound by the cell root Border.
     /// </summary>
-    public bool IsEffectivelyVisible => _isInViewport && _isLayerVisible;
+    public bool IsEffectivelyVisible => IsInViewport && IsLayerVisible;
 
+    [ObservableProperty]
     private bool _isDetailVisible = true;
     /// <summary>
     /// True when the cell is large enough on screen to justify rendering
     /// text bodies, icon badges, and other detail elements.
     /// False when zoomed far out. Updated by the viewport LOD system.
     /// </summary>
-    public bool IsDetailVisible
+    partial void OnIsDetailVisibleChanged(bool value)
     {
-        get => _isDetailVisible;
-        set
-        {
-            if (SetProperty(ref _isDetailVisible, value))
-            {
-                OnPropertyChanged(nameof(ShowTextContent));
-                OnPropertyChanged(nameof(ShowLabelContent));
-                OnPropertyChanged(nameof(ShowIconBadge));
-            }
-        }
+        OnPropertyChanged(nameof(ShowTextContent));
+        OnPropertyChanged(nameof(ShowLabelContent));
+        OnPropertyChanged(nameof(ShowIconBadge));
     }
 
     public bool HasAppearanceOptions => IsBoardElement || IsFile || IsImage;
@@ -275,12 +150,8 @@ public class CellViewModel : ViewModelBase, IDisposable
     public bool HasTextOptions => HasTextContent;
     public bool HasClipboardOptions => IsImage || IsFile || HasTextContent;
 
+    [ObservableProperty]
     private bool _isHitTestEnabled = true;
-    public bool IsHitTestEnabled
-    {
-        get => _isHitTestEnabled;
-        set => SetProperty(ref _isHitTestEnabled, value);
-    }
 
     #endregion
 
@@ -308,19 +179,19 @@ public class CellViewModel : ViewModelBase, IDisposable
     public bool ShowIcon => HasContent && !IsBoardElement;
 
     /// <summary>True when the Text-cell content body should be rendered.</summary>
-    public bool ShowTextContent => IsText && _isDetailVisible;
+    public bool ShowTextContent => IsText && IsDetailVisible;
 
     /// <summary>True when the Label-cell content body should be rendered.</summary>
-    public bool ShowLabelContent => IsLabel && _isDetailVisible;
+    public bool ShowLabelContent => IsLabel && IsDetailVisible;
 
     /// <summary>True when the type icon badge should be rendered.</summary>
-    public bool ShowIconBadge => ShowIcon && _isDetailVisible;
+    public bool ShowIconBadge => ShowIcon && IsDetailVisible;
 
     /// <summary>True when this cell type uses a bitmap (Image or Video).</summary>
     public bool NeedsImage => Type == CellType.Image || Type == CellType.Video;
 
     /// <summary>True when the placeholder color rect should be shown instead of an image.</summary>
-    public bool ShowPlaceholder => NeedsImage && _image == null;
+    public bool ShowPlaceholder => NeedsImage && Image == null;
 
     /// <summary>
     /// Z-index for rendering order with proper layering:
@@ -384,113 +255,66 @@ public class CellViewModel : ViewModelBase, IDisposable
 
     #region Appearance
 
+    [ObservableProperty]
     private string _backgroundColor = "#885A3A10";
     /// <summary>Background color for backdrop cells.</summary>
-    public string BackgroundColor
-    {
-        get => _backgroundColor;
-        set => SetProperty(ref _backgroundColor, value);
-    }
 
+    [ObservableProperty]
     private string _foregroundColor = "#FFFFA500";
     /// <summary>Foreground (text) color for labels and backdrops.</summary>
-    public string ForegroundColor
-    {
-        get => _foregroundColor;
-        set => SetProperty(ref _foregroundColor, value);
-    }
 
+    [ObservableProperty]
     private string _imageStretch = "UniformToFill";
     /// <summary>Image stretch mode: "UniformToFill" or "Uniform".</summary>
-    public string ImageStretch
-    {
-        get => _imageStretch;
-        set => SetProperty(ref _imageStretch, value);
-    }
 
+    [ObservableProperty]
     private double _fontSize = 48.0;
     /// <summary>Font size for label text.</summary>
-    public double FontSize
-    {
-        get => _fontSize;
-        set => SetProperty(ref _fontSize, value);
-    }
 
     #endregion
 
     #region Content
 
+    [ObservableProperty]
     private string? _filePath;
     /// <summary>Path to the image file or video thumbnail on disk.</summary>
-    public string? FilePath
-    {
-        get => _filePath;
-        set => SetProperty(ref _filePath, value);
-    }
 
+    [ObservableProperty]
     private string? _videoPath;
     /// <summary>Path to the video file on disk (only for Video type).</summary>
-    public string? VideoPath
-    {
-        get => _videoPath;
-        set => SetProperty(ref _videoPath, value);
-    }
 
+    [ObservableProperty]
     private string? _textContent;
     /// <summary>Text content for Text, Label, and Backdrop cells.</summary>
-    public string? TextContent
-    {
-        get => _textContent;
-        set => SetProperty(ref _textContent, value);
-    }
 
+    [ObservableProperty]
     private Bitmap? _image;
     /// <summary>Loaded bitmap for display (image content or video thumbnail).</summary>
-    public Bitmap? Image
-    {
-        get => _image;
-        set
-        {
-            if (SetProperty(ref _image, value))
-                OnPropertyChanged(nameof(ShowPlaceholder));
-        }
-    }
+    partial void OnImageChanged(Bitmap? value) => OnPropertyChanged(nameof(ShowPlaceholder));
 
     #endregion
 
     #region LOD (Level-of-Detail) Image Lifecycle
 
+    [ObservableProperty]
     private string _placeholderColor = "#FF2A2A2A";
     /// <summary>
     /// Average colour of the source image, shown as a placeholder rectangle
     /// when the full bitmap is not loaded (off-screen or zoomed far out).
     /// Persisted in the .cgrb file so we never need to decode just for the colour.
     /// </summary>
-    public string PlaceholderColor
-    {
-        get => _placeholderColor;
-        set => SetProperty(ref _placeholderColor, value);
-    }
 
+    [ObservableProperty]
     private string? _thumbnailPath;
     /// <summary>
     /// Path to a small (~200 px wide) JPEG thumbnail generated on first load.
     /// Stored in a .thumbs subdirectory next to the source image.
     /// Not persisted — regenerated on demand.
     /// </summary>
-    public string? ThumbnailPath
-    {
-        get => _thumbnailPath;
-        set => SetProperty(ref _thumbnailPath, value);
-    }
 
+    [ObservableProperty]
     private ImageLod _currentLod = ImageLod.Full;
     /// <summary>The LOD tier currently loaded for this cell's image.</summary>
-    public ImageLod CurrentLod
-    {
-        get => _currentLod;
-        internal set => SetProperty(ref _currentLod, value);
-    }
 
     /// <summary>
     /// Serial token incremented on every LOD transition.
@@ -510,14 +334,14 @@ public class CellViewModel : ViewModelBase, IDisposable
             return;
 
         // Already at the target level — nothing to do.
-        if (target == _currentLod && (_currentLod == ImageLod.Placeholder || _image != null))
+        if (target == CurrentLod && (CurrentLod == ImageLod.Placeholder || Image != null))
             return;
 
         int token = Interlocked.Increment(ref _lodToken);
 
         if (target == ImageLod.Placeholder)
         {
-            var old = _image;
+            var old = Image;
             Image = null;
             CurrentLod = ImageLod.Placeholder;
             old?.Dispose();
@@ -525,8 +349,8 @@ public class CellViewModel : ViewModelBase, IDisposable
         }
 
         // Capture paths for the background closure.
-        var filePath = _filePath;
-        var thumbPath = _thumbnailPath;
+        var filePath = FilePath;
+        var thumbPath = ThumbnailPath;
 
         // All I/O (File.Exists, thumbnail generation, bitmap decode) on thread-pool.
         Bitmap? newBitmap = null;
@@ -585,10 +409,10 @@ public class CellViewModel : ViewModelBase, IDisposable
 
         // Update thumbnail path if it was generated during this load.
         // Use the property setter (not the backing field) so UI bindings are notified.
-        if (target == ImageLod.Thumbnail && thumbPath != _thumbnailPath)
+        if (target == ImageLod.Thumbnail && thumbPath != ThumbnailPath)
             ThumbnailPath = thumbPath;
 
-        var oldBitmap = _image;
+        var oldBitmap = Image;
         Image = newBitmap;
         CurrentLod = target;
         oldBitmap?.Dispose();
@@ -600,12 +424,12 @@ public class CellViewModel : ViewModelBase, IDisposable
     /// </summary>
     public void UnloadImage()
     {
-        if (_image == null && _currentLod == ImageLod.Placeholder)
+        if (Image == null && CurrentLod == ImageLod.Placeholder)
             return;
 
         Interlocked.Increment(ref _lodToken); // cancel any in-flight loads
 
-        var old = _image;
+        var old = Image;
         Image = null;
         CurrentLod = ImageLod.Placeholder;
         old?.Dispose();
@@ -617,14 +441,14 @@ public class CellViewModel : ViewModelBase, IDisposable
     /// </summary>
     public async Task EnsurePlaceholderColorAsync()
     {
-        if (!NeedsImage || string.IsNullOrEmpty(_filePath))
+        if (!NeedsImage || string.IsNullOrEmpty(FilePath))
             return;
 
         // Skip if we already have a meaningful (non-default) colour.
-        if (_placeholderColor != "#FF2A2A2A")
+        if (PlaceholderColor != "#FF2A2A2A")
             return;
 
-        var color = await ImageManager.ComputeAverageColorAsync(_filePath);
+        var color = await ImageManager.ComputeAverageColorAsync(FilePath);
         PlaceholderColor = color;
     }
 
@@ -684,7 +508,7 @@ public class CellViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        var old = _image;
+        var old = Image;
         Image = newBitmap;
         old?.Dispose();
         FilePath = path;
@@ -728,7 +552,7 @@ public class CellViewModel : ViewModelBase, IDisposable
         }
         catch { /* not a valid image — will use placeholder */ }
 
-        var old = _image;
+        var old = Image;
         if (newBitmap != null)
         {
             Image = newBitmap;
@@ -774,7 +598,7 @@ public class CellViewModel : ViewModelBase, IDisposable
         TextContent = text;
         if (!IsBoardElement)
             Type = CellType.Text;
-        var old = _image;
+        var old = Image;
         Image = null;
         CurrentLod = ImageLod.Placeholder;
         old?.Dispose();
@@ -789,7 +613,7 @@ public class CellViewModel : ViewModelBase, IDisposable
     public void Clear()
     {
         Interlocked.Increment(ref _lodToken);
-        var old = _image;
+        var old = Image;
         Type = CellType.None;
         Image = null;
         TextContent = null;
@@ -811,8 +635,8 @@ public class CellViewModel : ViewModelBase, IDisposable
     {
         // Cancel any in-flight LOD load so it cannot resurrect the bitmap.
         Interlocked.Increment(ref _lodToken);
-        var old = _image;
-        _image = null;
+        var old = Image;
+        Image = null;
         old?.Dispose();
     }
 

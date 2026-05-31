@@ -1,0 +1,36 @@
+<UserControl
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:Class="CGReferenceBoard.Views.ToastNotification"
+    IsHitTestVisible="False"
+>
+    <Border
+        x:Name="ToastBorder"
+        IsVisible="False"
+        IsHitTestVisible="False"
+        HorizontalAlignment="Center"
+        VerticalAlignment="Bottom"
+        Margin="0,0,0,40"
+        Padding="16,8"
+        Background="#DD222222"
+        BorderBrush="#40FFFFFF"
+        BorderThickness="1"
+        CornerRadius="8"
+        Opacity="0"
+        ZIndex="5000"
+    >
+        <Border.Transitions>
+            <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.2" />
+            </Transitions>
+        </Border.Transitions>
+        <TextBlock
+            x:Name="ToastText"
+            Text=""
+            Foreground="White"
+            FontSize="13"
+            FontWeight="SemiBold"
+            HorizontalAlignment="Center"
+        />
+    </Border>
+</UserControl>

@@ -33,31 +33,19 @@ public class AnnotationShape : Control
         _effectService.EffectModeChanged += () => EffectModeChanged?.Invoke();
     }
 
-    // ───────── Static effect state ─────────
-
-    private static AnnotationEffect _currentEffect = AnnotationEffect.None;
-
-    /// <summary>Current global effect mode for all annotation shapes.</summary>
-    public static AnnotationEffect CurrentEffect => _effectService?.CurrentEffect ?? _currentEffect;
-
     /// <summary>Raised when the effect mode changes so all instances can re-render.</summary>
     public static event Action? EffectModeChanged;
 
+    /// <summary>Current global effect mode for all annotation shapes, delegated to the service.</summary>
+    public static AnnotationEffect CurrentEffect => _effectService?.CurrentEffect ?? AnnotationEffect.None;
+
     /// <summary>
-    /// Sets the global effect mode and notifies all instances to re-render.
+    /// Sets the global effect mode via the effect service.
+    /// All instances subscribed to <see cref="EffectModeChanged"/> will re-render.
     /// </summary>
     public static void SetEffectMode(AnnotationEffect mode)
     {
-        if (_effectService != null)
-        {
-            _effectService.SetEffectMode(mode);
-            return;
-        }
-
-        if (_currentEffect == mode)
-            return;
-        _currentEffect = mode;
-        EffectModeChanged?.Invoke();
+        _effectService?.SetEffectMode(mode);
     }
 
     // ───────── Static scale state ─────────

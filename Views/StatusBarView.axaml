@@ -1,0 +1,85 @@
+<UserControl
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="clr-namespace:CGReferenceBoard.ViewModels"
+    x:Class="CGReferenceBoard.Views.StatusBarView"
+    x:DataType="vm:MainWindowViewModel"
+    x:CompileBindings="True"
+>
+    <Border
+        Background="{StaticResource ChromeBrush}"
+        BorderBrush="{StaticResource SurfaceBrushLight}"
+        BorderThickness="0,1,0,0"
+        Padding="12,3"
+        Height="26"
+    >
+        <Grid ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto, Auto, Auto, Auto">
+            <!-- Mode indicator -->
+            <StackPanel
+                Grid.Column="0"
+                Orientation="Horizontal"
+                Spacing="6"
+                VerticalAlignment="Center"
+            >
+                <Ellipse
+                    Width="7"
+                    Height="7"
+                    Fill="{Binding ModeIndicatorColor}"
+                    VerticalAlignment="Center"
+                />
+                <TextBlock
+                    Text="{Binding CurrentModeText}"
+                    Classes="statusText"
+                    FontWeight="SemiBold"
+                />
+                <TextBlock
+                    Text="{Binding CurrentTool, StringFormat='Tool: {0}'}"
+                    Classes="statusText"
+                    IsVisible="{Binding IsDrawMode}"
+                    Margin="10,0,0,0"
+                />
+            </StackPanel>
+
+            <Border Grid.Column="1" Classes="statusDivider" />
+
+            <!-- Board name -->
+            <TextBlock
+                Grid.Column="2"
+                Text="{Binding CurrentBoardName}"
+                Classes="statusText"
+            />
+
+            <!-- Spacer -->
+
+            <!-- Selection count -->
+            <TextBlock
+                Grid.Column="4"
+                Text="{Binding SelectionCountText}"
+                Classes="statusText"
+                Foreground="{StaticResource AccentBrush}"
+            />
+
+            <Border Grid.Column="5" Classes="statusDivider" />
+
+            <!-- Zoom level -->
+            <TextBlock
+                Grid.Column="6"
+                Text="{Binding ZoomLevelText}"
+                Classes="statusText"
+                FontWeight="SemiBold"
+                MinWidth="40"
+                TextAlignment="Right"
+            />
+
+            <Border Grid.Column="7" Classes="statusDivider" />
+
+            <!-- App version -->
+            <TextBlock
+                Grid.Column="8"
+                Text="{Binding VersionText}"
+                Classes="statusText"
+                Opacity="0.5"
+            />
+        </Grid>
+    </Border>
+</UserControl>

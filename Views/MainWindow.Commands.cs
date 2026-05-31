@@ -476,11 +476,8 @@ public partial class MainWindow
         if (!cell.IsText && !cell.IsBoardElement)
             return;
 
-        FullImage.IsVisible = false;
-        FullText.IsVisible = true;
-        FullText.Text = cell.TextContent;
+        FullMediaOverlay.ShowText(cell.TextContent ?? "");
         _editingTextCell = cell;
-        FullMediaOverlay.IsVisible = true;
     }
 
     private void ChangeColor_Click(object? sender, RoutedEventArgs e)
@@ -1084,7 +1081,7 @@ public partial class MainWindow
         _interactionController?.OnKeyDown(e);
 
         var startupOverlay = this.FindControl<Border>("StartupOverlay");
-        if (FullMediaOverlay.IsVisible || (startupOverlay?.IsVisible == true))
+        if (FullMediaOverlay.IsOpen || (startupOverlay?.IsVisible == true))
             return;
 
         bool isCtrl = e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Meta);
@@ -1763,11 +1760,8 @@ public partial class MainWindow
         if (isShift)
         {
             // Shift+double-click: Open text editor
-            FullImage.IsVisible = false;
-            FullText.IsVisible = true;
-            FullText.Text = cell.TextContent;
+            FullMediaOverlay.ShowText(cell.TextContent ?? "");
             _editingTextCell = cell;
-            FullMediaOverlay.IsVisible = true;
         }
         else
         {
@@ -1777,30 +1771,6 @@ public partial class MainWindow
             UpdateSelectionState();
             ZoomToCell(cell);
         }
-    }
-
-    private void FullText_TextChanged(object? sender, TextChangedEventArgs e)
-    {
-        if (_editingTextCell == null)
-            return;
-        _editingTextCell.TextContent = FullText.Text;
-        Vm.MarkUnsaved();
-    }
-
-    private void CloseFullMedia_Click(object? sender, RoutedEventArgs e)
-    {
-        FullMediaOverlay.IsVisible = false;
-        FullText.IsVisible = false;
-        _editingTextCell = null;
-    }
-
-    private void Overlay_PointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (e.Source is TextBox)
-            return;
-        FullMediaOverlay.IsVisible = false;
-        FullText.IsVisible = false;
-        _editingTextCell = null;
     }
 
     #endregion
