@@ -289,7 +289,7 @@ public partial class MainWindow
             StartEdgeScrollIfNeeded(_lastPointerPosition);
 
             // Use _draggingCell for movement — `cell` from sender DataContext
-            // points to the original cell, which is wrong for alt-duplicate drags.
+            // may differ from the actual drag target in group-drag scenarios.
             var dragTarget = _draggingCell ?? cell;
 
             var canvasPt = e.GetPosition(MainCanvas);
