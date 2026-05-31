@@ -34,9 +34,6 @@ public sealed class IdleState : IInteractionState
             return StateTransition.GoTo(new MiddleZoomState(anchor: screenPt, screenY: screenPt.Y));
         }
 
-        if (props.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
-            return StateTransition.GoTo(new ShiftPanPendingState(e.GetPosition(null)));
-
         if (props.IsLeftButtonPressed)
         {
             var canvasPt = ctx.GetCanvasPosition(e);
